@@ -1,0 +1,24 @@
+fmac
+100
+SYSB
+CDC MACF DEBUG DIAB K14 TEL4
+% Add what is unknown by MAC and FMAC
+IOT=160000;ACT=400;SKA=1000;PIN=2000;SNI=0;     % Added by CVS
+INTDS=150440;INTEN=150540              % Added by CVS
+TDBI=410; TDBO=40             % Added by CVS
+DIABD=156; TT3=162; TT4=DIABD; DIABT=4; DLP=143 % Added by CVS
+GRP1=1;GRP2=2;GRP3=4;GRP4=10;
+MPR=3;
+% STR and LSS are defined in the MAC/FMAC symbol table
+% CVS:  STR has been substituted by XTR
+% CVS:  LSS has been substituted by XSS
+8LP=200; 9PPT=100; 9TTI=40; 9TTO=40
+9FP=200; 9CR=5; NOPEN=16
+)9ASSM TSS1
+)9ASSM TSS2
+)9ASSM TSS3
+)9ASSM TSS4
+)9ASSM TSS5,,BSYMB:SYMB
+)LIST
+)9TSS
+@cc

@@ -1,0 +1,11 @@
+# Compiled artifacts of the C assembler. Regenerate with: cd mac-c && make
+mac-c/*.o
+mac-c/mac-as
+mac-c/mac-as.exe
+mac-c/test_mac
+mac-c/test_mac.exe
+
+# NOTE: Build/ is deliberately NOT ignored. It holds the assembler's output
+# (ASYMB/BSYMB symbol dumps, LIST1-5 listings) and is kept in the repository
+# so the result is browsable without running a build. It is still fully
+# regenerable: cd mac-c && ./build_tss_assysa.sh

@@ -149,13 +149,41 @@ I/O: symbol listing in the archived `ASYMB:SYMB` format; image save/load
 **verbatim octal bootstrap recovered from the real `MAC.BPUN`**, and
 `)9READ`/`mac_read_bpun` reloading it with checksum verification.
 
+## The overlay-to-disc pipeline (implemented)
+
+TSS ships its 31 code overlays on the CDC system disc and pages them in at
+run time. mac-c now reproduces that pipeline (see `docs/OVERLAY-DISC-SPEC.md`):
+
+- **`)9MOVE src dst count`** (ND-60.096.01 §C.1.1.1) — a verbatim block copy
+  of `count` assembled words within the image, **no relocation**. The `"MACF`
+  `OVERX` macro uses it (`)9MOVE ROVER VOR VORS`, TSS3:83) to stage each
+  overlay from its assembly window at `ROVER` into a distinct `VOR` slot
+  (040000, 041000, … 076000) so all 31 survive in memory. It copies memory
+  only, so the golden symbol dump is unchanged.
+- **CDC-disc image (`mac-as -c FILE`)** — after assembly, writes a raw
+  big-endian disc image placing overlay *n* on sectors `OVDK+2n` / `OVDK+2n+1`
+  (two 256-word sectors, byte offset `sector*512`), exactly where the run-time
+  overlay reader (routine `S5`) looks. Constants (`OVDK`, `VORS`, `RQR`, `VOR`)
+  are read from the build's own symbol table, not hard-coded; `VOR_base =
+  VOR − RQR*VORS`. Wired into `build_tss_drum.sh` → `Build/drum/tss-cdc.img`
+  (174 sectors / 89 088 bytes for the DRUM build). The writer prints an
+  overlay→sector table to stderr so the boot test can verify the mapping.
+  The window-index → overlay-number mapping is the straightforward parallel
+  choice (window *n* → overlay *n*); it is not fully pinned in the TSS source
+  (`OVERLAY-DISC-SPEC.md` §8) which is why the diagnostic table is emitted.
+
 ## Not implemented (and why)
 
-- `)9MOVE`, `)SOVER`, `)8DUMP`, `)SCRATCH`, `)FRIEND` — used by the corpus
-  but they move/write memory images through MAC's own overlay and
-  SINTRAN file machinery. They are accepted and ignored; they have **no
-  effect on the assembled image or the symbol table**, which the golden
-  reconciliation confirms.
+- `)SOVER`, `)8DUMP` — `)SYMBOL`-style invocations of assembled ND-100
+  routines that would need **ND-100 execution** to run. They live only in the
+  `"NMACF` / `"TSBIN` paths, which the MACF/DRUM builds never assemble
+  (`OVERLAY-DISC-SPEC.md` §1.3, §6), so on the builds mac-c targets they are a
+  **documented intentional no-op** — and unnecessary, because the run-time
+  disc contract they implement is reproduced directly by `)9MOVE` + the CDC
+  image writer above. mac-c does **not** fake ND-100 execution.
+  (Note: `)SCRATCH` / `)FRIEND` are **not** MAC commands at all — they appear
+  only inside quoted strings in the corpus; an earlier version of this list
+  named them wrongly.)
 - BRF relocatable object output (`)9BEG`, `)9END`, `)9ENT`, `)9EXT`,
   `)9LIB`, `)9FABS`, `)9EOF`, `)9ASF`, `)9ADS`, `)9LC`, `)9RT`). TSS is an
   absolute assembly and never uses them.

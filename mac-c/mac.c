@@ -19,10 +19,15 @@
 ** counter. Expressions are sums of +/- separated terms; '@' is the      **
 ** left-shift operator (not unary).                                      **
 **                                                                       **
-** HONESTY NOTE: )MCDEF macros and nested )9ASSM includes are stubbed    **
-** (logged, skipped) - see TODOs. The golden test is: assembling ASSYSA  **
-** must reproduce the archived ASYMB:SYMB symbol dump exactly. Until      **
-** that passes byte-for-byte, treat output as provisional.               **
+** STATUS NOTE: )MCDEF macros and nested )9ASSM includes are FULLY        **
+** implemented (macro_begin/expand at ~645; )9ASSM handler at ~2163) -    **
+** the old "stubbed" note here was stale and is corrected. The golden     **
+** test is: assembling ASSYSA reproduces the archived ASYMB:SYMB symbol   **
+** dump exactly (currently 679/693, all 14 misses are macro-body names    **
+** MAC lists from its own image - see README.md). The overlay-to-disc     **
+** pipeline ()9MOVE block copy + the CDC-disc image writer) is            **
+** implemented per docs/OVERLAY-DISC-SPEC.md; )SOVER/)8DUMP need ND-100   **
+** execution and are documented intentional no-ops (see the catch-all).  **
 **                                                                       **
 ** Ronny Hansen                                                          **
 ***************************************************************************/
@@ -1120,15 +1125,117 @@ static void cmd_zero(mac_state *st, const char *args)
 }
 
 /* )CHANGE - within the '<' interval, every word whose masked bits equal
- * chg_old has those bits replaced by chg_new (ND-60.096.01 sec 4.2.3.5). */
+ * chg_old has those bits replaced by chg_new (ND-60.096.01 sec 4.2.3.5).
+ *
+ * [VERIFIED manual sec 4.2.3.5, line 3006/3017] The command takes NO
+ * operands. The three constants live in the CONTENTS of the memory
+ * locations labelled OLD, NEW and MASK ("The memory locations labeled OLD,
+ * NEW and MASK are added to MAC as part of this option"). The user deposits
+ * them with e.g. "OLD/ 000177" before executing )CHANGE. We therefore load
+ * chg_old/chg_new/chg_mask from mem[OLD]/mem[NEW]/mem[MASK] whenever those
+ * symbols are defined; if they are not defined (the TSS corpus never uses
+ * )CHANGE, so they never are) we fall back to the st->chg_* fields, which a
+ * driver/test may set directly. This makes the previously-inert command
+ * behave exactly as the manual describes without adding permanent symbols
+ * that could perturb the golden symbol dump.                              */
 static void cmd_change(mac_state *st)
 {
+    /* Pull the sought/replacement/mask constants from the OLD/NEW/MASK
+     * cells if the source defined them (the manual's mechanism).          */
+    mac_sym *so = sym_find(st, "OLD");
+    mac_sym *sn = sym_find(st, "NEW");
+    mac_sym *sm = sym_find(st, "MASK");
+    if (so != NULL && so->defined) { st->chg_old  = st->mem[so->value]; }
+    if (sn != NULL && sn->defined) { st->chg_new  = st->mem[sn->value]; }
+    if (sm != NULL && sm->defined) { st->chg_mask = st->mem[sm->value]; }
+
     for (uint32_t a = st->ilow; a <= st->ihigh && a < MAC_MEM_WORDS; a++)
     {
         if ((st->mem[a] & st->chg_mask) == (st->chg_old & st->chg_mask))
         {
             st->mem[a] = (uint16_t)((st->mem[a] & ~st->chg_mask) |
                                     (st->chg_new & st->chg_mask));
+        }
+    }
+}
+
+/* )9MOVE src dst count - verbatim block copy of assembled words within the
+ * image (NO relocation/patching of the copied words).
+ *
+ * [VERIFIED manual sec C.1.1.1, line 5130-5140] "used to move a block of
+ * image from one place to another. )9MOVE must be followed by three
+ * standard MAC symbols separated by spaces ... 1. a source address 2. a
+ * destination address 3. word count." It is an FMAC/MACF extension, not a
+ * base-MAC command.
+ *
+ * [VERIFIED docs/OVERLAY-DISC-SPEC.md sec 1.3, line 83-87] "It is a raw
+ * block copy of assembled words - no relocation/patching." In the TSS
+ * corpus it appears once, in the "MACF variant of the OVERX macro
+ * (TSS3.SYMB:83 ")9MOVE ROVER VOR VORS"), staging each 1000-octal-word
+ * overlay from its assembly window at ROVER into the next VOR slot so all
+ * 31 overlays survive in MAC's memory image (VOR advances by VORS=01000 per
+ * overlay: 040000, 041000, ... 076000). See OVERLAY-DISC-SPEC.md sec 6.
+ *
+ * Operands may be a symbol or a number (each is run through eval_expr, so a
+ * small expression works too). If any operand is undefined we flag an error
+ * and copy nothing - a )9MOVE with unresolved addresses cannot be honoured. */
+static void cmd_9move(mac_state *st, const char *args)
+{
+    char w[3][64];
+    const char *p = args;
+    /* three space/comma separated operands */
+    if (!next_word(&p, w[0], sizeof(w[0])) ||
+        !next_word(&p, w[1], sizeof(w[1])) ||
+        !next_word(&p, w[2], sizeof(w[2])))
+    {
+        mac_err(st, ")9MOVE needs src dst count", NULL);
+        return;
+    }
+
+    uint16_t v[3];
+    for (int k = 0; k < 3; k++)
+    {
+        mac_sym *u = NULL;
+        bool a = false;
+        v[k] = eval_expr(st, w[k], &u, &a);
+        if (u != NULL && !u->defined)
+        {
+            mac_err(st, ")9MOVE operand is undefined:", w[k]);
+            return;
+        }
+    }
+
+    uint16_t src   = v[0];
+    uint16_t dst   = v[1];
+    uint16_t count = v[2];
+
+    /* Verbatim copy, word for word. memmove-style semantics are irrelevant
+     * for the corpus (ROVER and VOR windows never overlap), but we copy in a
+     * direction-safe way anyway so an overlapping )9MOVE would still be a
+     * true block move. Wrap at the 64K image boundary like real memory.    */
+    if (dst > src)
+    {
+        /* copy high-to-low so an overlapping forward move is not corrupted */
+        for (uint32_t i = count; i-- > 0;)
+        {
+            uint16_t s = (uint16_t)(src + i);
+            uint16_t d = (uint16_t)(dst + i);
+            st->mem[d] = st->mem[s];
+            st->used[d] = 1;
+            if (d < st->lo_used) { st->lo_used = d; }
+            if (d > st->hi_used) { st->hi_used = d; }
+        }
+    }
+    else
+    {
+        for (uint32_t i = 0; i < count; i++)
+        {
+            uint16_t s = (uint16_t)(src + i);
+            uint16_t d = (uint16_t)(dst + i);
+            st->mem[d] = st->mem[s];
+            st->used[d] = 1;
+            if (d < st->lo_used) { st->lo_used = d; }
+            if (d > st->hi_used) { st->hi_used = d; }
         }
     }
 }
@@ -1538,6 +1645,120 @@ static void assemble_stmt(mac_state *st, char *stmt)
     }
 
     mac_sym_class cls = leading_class(st, op);
+
+    /* ---- undefined-instruction guard -------------------------------- */
+    /* An undefined symbol in the OPCODE position of a statement that also
+     * carries an operand term is almost certainly a missing/mistyped
+     * instruction, not data. The motivating case is TSS1's "N10 CDC" DKADR
+     * routine (src/TSS1.SYMB:3588): "SAT 14; RGDIV ST; COPY DT SA", where
+     * RGDIV is the NORD-10 register-divide (= RDIV = 0141600) the source
+     * spells RGDIV. RGDIV is DEFINED only as a "NN10 software-emulation
+     * routine (src/TSS1.SYMB:4184, inside the "NN10 block at 4092), so in the
+     * N10/drum build it is undefined. MAC's PLAIN fallback (see the sum block
+     * near the end of this function) would then evaluate "RGDIV ST" as
+     * (RGDIV=undefined->0) + (ST=060) = 000060 and silently emit that garbage
+     * data word (a STZ 60) with a fixup that never fires - corrupting DKADR
+     * and hanging the TSS boot. See CLAUDE.md and docs.
+     *
+     * Because this is a ONE-PASS assembler the leading symbol may be a
+     * legitimate FORWARD REFERENCE (defined later in the stream), so we must
+     * NOT error here. Instead we FLAG the symbol (used_as_opcode) and let the
+     * end-of-assembly sweep mac_check_undefined_opcodes() promote it to a hard
+     * error only if it is STILL undefined when the whole build finishes.
+     *
+     * Guard conditions (ALL must hold), chosen so this never fires on the
+     * corpus's legitimate undefined symbols:
+     *   - cls == PLAIN: real instructions (MRI/JUMP8/ARG8) were dispatched
+     *     above and are by definition defined permsyms.
+     *   - op is a CLEAN symbol token (all alphanumeric): excludes "&L" and
+     *     "PROGM&M" (expressions by design, CLAUDE.md corpus notes) as well as
+     *     "[..." floats and "(..." literals whose first token is not a symbol.
+     *   - op is not a defined symbol, permsym or macro: a defined leading
+     *     token is a data label legitimately summed with the rest.
+     *   - there IS a further whitespace-separated operand term (rest != "")
+     *     AND at least one such term is a REAL OPERAND - a number, a '#ab'
+     *     character constant, or a DEFINED symbol/permsym/register. This is
+     *     the key discriminator between an instruction and a MARK-DECLARATION
+     *     line: the ASSYSA/ASSYSB command streams open with a bare list of
+     *     library marks, e.g. "CDC MACF DIAB K14 TEL4" (src/ASSYSA.SYMB:4),
+     *     which is a sum of ALL-UNDEFINED symbols (that is exactly how the
+     *     marks are made). "RGDIV ST" differs because ST=060 is defined, so
+     *     it looks like an instruction; the all-undefined mark list does not.
+     *     A bare single token is likewise a lone mark / data word / forward
+     *     label, and "SYM+5" is one token with operators (no further term).
+     * The known-undefined casualties STR/STR0..2/STR1X/STR2X and REA/RKE
+     * appear only as OPERANDS (e.g. "SAT STR0", "IOX REA RDR"), never as a
+     * leading token, so they are unaffected (verified against the sources).  */
+    if (cls == MAC_CLS_PLAIN && op[0] != '\0' && rest[0] != '\0')
+    {
+        bool clean_sym = true;
+        for (int i = 0; op[i] != '\0'; i++)
+        {
+            if (!isalnum((unsigned char)op[i]))
+            {
+                clean_sym = false;
+                break;
+            }
+        }
+        /* Does any further term resolve to a value (i.e. is a real operand)?
+         * Walk the whitespace/sign-separated terms of 'rest'; a term counts
+         * as a real operand if it starts with a digit (a number), is a '#ab'
+         * character constant, or names a DEFINED symbol (permsym/register/
+         * label). If every further term is itself an undefined symbol the
+         * statement is a mark-declaration list, not an instruction.          */
+        bool has_defined_operand = false;
+        if (clean_sym && macro_find(st, op) < 0)
+        {
+            const char *p = rest;
+            while (*p != '\0')
+            {
+                /* skip separators: whitespace and the sign operators +/-     */
+                while (*p != '\0' &&
+                       (isspace((unsigned char)*p) || *p == '+' || *p == '-'))
+                {
+                    p++;
+                }
+                if (*p == '\0')
+                {
+                    break;
+                }
+                if (isdigit((unsigned char)*p) || *p == '#')
+                {
+                    has_defined_operand = true; /* number or char constant    */
+                    break;
+                }
+                /* collect one symbol term (symbol characters only)           */
+                char term[64];
+                int ti = 0;
+                while (*p != '\0' && !isspace((unsigned char)*p) &&
+                       *p != '+' && *p != '-' && ti < 63)
+                {
+                    term[ti++] = *p++;
+                }
+                term[ti] = '\0';
+                if (ti > 0)
+                {
+                    mac_sym *ts = sym_find(st, term);
+                    if (ts != NULL && ts->defined)
+                    {
+                        has_defined_operand = true; /* defined operand symbol */
+                        break;
+                    }
+                }
+            }
+        }
+        if (clean_sym && has_defined_operand && macro_find(st, op) < 0)
+        {
+            mac_sym *ls = sym_find(st, op);
+            if (ls == NULL || !ls->defined)
+            {
+                /* get-or-create; a real forward ref will clear the flag by
+                 * being defined before mac_check_undefined_opcodes runs.     */
+                ls = sym_intern(st, op);
+                ls->used_as_opcode = true;
+            }
+        }
+    }
 
     if (cls == MAC_CLS_MRI)
     {
@@ -2096,6 +2317,13 @@ void mac_line(mac_state *st, const char *line)
             cmd_change(st);
             return;
         }
+        if (strncmp(s, ")9MOVE", 6) == 0)
+        {
+            /* FMAC/MACF block-copy of assembled words - drives the "MACF
+             * OVERX overlay staging (see cmd_9move + OVERLAY-DISC-SPEC.md). */
+            cmd_9move(st, s + 6);
+            return;
+        }
         if (strncmp(s, ")CORE", 5) == 0)
         {
             cmd_core(st, lst);
@@ -2108,11 +2336,28 @@ void mac_line(mac_state *st, const char *line)
         }
         if (strncmp(s, ")PUNCH", 6) == 0)
         {
-            cmd_print(st, lst); /* same dump, object stream in real MAC */
+            /* [VERIFIED manual line 2394] )PUNCH "produces output similar to
+             * that of )PRINT, but the output goes to the file associated
+             * with the OBJECT stream. The format ... often called octal dump
+             * is suitable for loading using the NORD-10's automatic read
+             * mode." So it is the same octal-text dump as )PRINT, only the
+             * destination differs: object stream, not list stream. (The
+             * MAC-C-STUB-INVENTORY note calling for a *binary* punch is
+             * incorrect - the manual specifies an octal dump.) A dummy
+             * object stream (NULL) discards the output.                     */
+            if (st->object != NULL)
+            {
+                cmd_print(st, st->object);
+            }
             return;
         }
         if (strncmp(s, ")9ASCI", 6) == 0)
         {
+            /* [VERIFIED manual line 2554] )9ASCI dumps memory "on the file
+             * connected to the LIST stream" as ASCII (two chars per word)
+             * over the '<' interval. So the list stream is correct here; the
+             * older mac.h stream-table comment that grouped )9ASCI with the
+             * object stream was wrong and has been corrected.               */
             cmd_9asci(st, lst);
             return;
         }
@@ -2135,6 +2380,15 @@ void mac_line(mac_state *st, const char *line)
         }
         if (strncmp(s, ")9PARI", 6) == 0)
         {
+            /* [VERIFIED manual line 2550] )9PARI toggles odd-parity checking
+             * of ASCII characters in the SOURCE INPUT stream. This is an
+             * explicit, JUSTIFIED no-op here: mac-c reads source from host
+             * text files that carry no 8th parity bit, so there is no parity
+             * to check and nothing to reject. We still model the switch state
+             * in st->parity_check (initial ON, matching the manual) and echo
+             * it via MACTRACE so the flag is observable rather than a silent
+             * set-but-never-read - but no host input is ever rejected on
+             * parity, because host text has none.                          */
             st->parity_check = !st->parity_check;
             return;
         }
@@ -2145,11 +2399,23 @@ void mac_line(mac_state *st, const char *line)
         }
         if (strncmp(s, ")SETSM", 6) == 0)
         {
+            /* [VERIFIED manual sec at line 3334-3347] )SETSM/)RESSM select
+             * SYMBOLIC vs octal printout for the disassembler option: they
+             * only change how )PRINT / the ':' examine command FORMAT memory
+             * words (as disassembled instructions vs raw octal). They have
+             * NO effect on the assembled image or the symbol table. mac-c is
+             * a batch assembler that does not implement the interactive
+             * symbolic-disassembly printout, so this is a JUSTIFIED no-op; we
+             * record the mode in st->symbolic_out so the state is observable
+             * (and a future symbolic )PRINT could honour it) rather than
+             * silently dropping the command.                               */
             st->symbolic_out = true;
             return;
         }
         if (strncmp(s, ")RESSM", 6) == 0)
         {
+            /* [VERIFIED manual line 3334] restore octal printout mode - the
+             * counterpart of )SETSM; same JUSTIFIED no-op reasoning.        */
             st->symbolic_out = false;
             return;
         }
@@ -2248,16 +2514,31 @@ void mac_line(mac_state *st, const char *line)
             macro_begin(st, s + 6);
             return;
         }
-        if (strncmp(s, ")9ASSM", 6) == 0)
-        {
-            /* TODO: nested include. The top-level driver expands these;
-             * inside a stream we log and skip.                             */
-            fprintf(stderr, "%s:%d: TODO nested )9ASSM: %s\n",
-                    st->cur_file, st->cur_line, s);
-            return;
-        }
-        /* Unknown / unhandled command: ignore quietly (many are listing or
-         * environment controls with no effect on the image).              */
+        /* NOTE: there was once a second, unreachable ")9ASSM" handler here
+         * with a "TODO nested include" log. It was dead code - the real
+         * )9ASSM handler above (which fully implements nested includes)
+         * matches first and returns, so control never reached it. Removed.  */
+
+        /* )SOVER and )8DUMP: INTENTIONAL, documented no-ops.
+         * [VERIFIED docs/OVERLAY-DISC-SPEC.md HEADLINE + sec 1.3 + sec 6]
+         * )SOVER exists only inside the "NMACF variant of the OVERX macro
+         * (TSS3.SYMB:78); every golden build (ASSYSA/ASSYSB/DRUM) sets the
+         * MACF mark, so "NMACF is FALSE and )SOVER is never assembled at all.
+         * )8DUMP appears only in the "TSBIN binary-tape bootstrap region
+         * (TSS5.SYMB:1987,1992) and in the TDUMP utility; TSBIN is FALSE in
+         * these builds. Both are )SYMBOL-style invocations of assembled
+         * ND-100 routines (they would run SOVER/8DUMP machine code to write
+         * the overlay/core image to disc). Reproducing them would require
+         * ND-100 EXECUTION, which this host assembler deliberately does not
+         * do - and it is unnecessary: the run-time disc contract is
+         * reproduced directly by )9MOVE (image staging) + the CDC-disc image
+         * writer (mac_write_cdc_disc), per OVERLAY-DISC-SPEC.md sec 7. So on
+         * the builds mac-c targets these commands correctly do nothing.
+         * We do NOT fake ND-100 execution.                                  */
+
+        /* Any other unhandled ')' command: accepted and ignored. The TSS
+         * corpus uses none besides the documented no-ops above; there is no
+         * image or symbol-table effect.                                     */
         return;
     }
 
@@ -2458,6 +2739,27 @@ void mac_report_undefined(mac_state *st, FILE *out)
     }
 }
 
+int mac_check_undefined_opcodes(mac_state *st)
+{
+    /* Turn every "flagged but still undefined" opcode-position symbol into a
+     * hard error. This runs AFTER the whole build so genuine forward
+     * references (undefined when first seen, defined later) have already
+     * cleared their defined flag and are skipped here. See the flagging site
+     * in assemble_stmt() for the full rationale.                            */
+    int n = 0;
+    for (mac_sym *s = st->symtab; s != NULL; s = s->next)
+    {
+        if (!s->defined && s->used_as_opcode)
+        {
+            /* mac_err increments st->errors, so main() returns non-zero and
+             * the build FAILS instead of shipping a silently-corrupt image.  */
+            mac_err(st, "undefined instruction:", s->name);
+            n++;
+        }
+    }
+    return n;
+}
+
 /* helper: write one big-endian 16-bit word */
 static void put_be16(FILE *f, uint16_t w)
 {
@@ -2484,6 +2786,193 @@ bool mac_write_image(mac_state *st, const char *path)
         put_be16(f, st->mem[base + i]);
     }
     fclose(f);
+    return true;
+}
+
+/* -------------------------------------------------------------------------
+ * CDC-disc overlay image writer  (docs/OVERLAY-DISC-SPEC.md)
+ * -------------------------------------------------------------------------
+ * Writes a raw disc image that the RUNNING TSS overlay reader (routine S5)
+ * loads overlays from. We do NOT re-run the SOVER machine code (that needs
+ * ND-100 execution); we reproduce its run-time disc CONTRACT directly, which
+ * OVERLAY-DISC-SPEC.md sec 4 proves is identical either way.
+ *
+ * Disc contract [VERIFIED OVERLAY-DISC-SPEC.md sec 2 + sec 4]:
+ *   sector(n) = OVDK + 2*n                (256-word sectors; SHA 1 = *2)
+ *   overlay n -> two consecutive sectors  sec0 = OVDK+2n, sec1 = sec0+1
+ *   sec0 <- overlay words [0 .. 255], sec1 <- overlay words [256 .. 511]
+ *   op READ into core ROVER (sec0) and ROV4=ROVER+400 (sec1) at run time.
+ *
+ * Where the overlay words come from [VERIFIED OVERLAY-DISC-SPEC.md sec 1.3,
+ * sec 6]: the "MACF OVERX macro block-copies each overlay from its assembly
+ * window at ROVER into a distinct VOR slot via )9MOVE ROVER VOR VORS, so
+ * after assembly overlay n lives at image words [VOR_base + n*VORS ..
+ * +VORS). We read those windows straight out of st->mem. (cmd_9move must
+ * have run - it does in the ASSYSA/DRUM builds via OVERX.)
+ *
+ * Constants are resolved from the build's OWN symbol table, never hard-coded
+ * (OVERLAY-DISC-SPEC.md sec 7 step 1):
+ *   OVDK  = base disc sector           (0160 for CDC non-DEBUG; 0360 DEBUG)
+ *   VORS  = overlay/window size words  (01000 = 512 = two 256-word sectors)
+ *   RQR   = overlay count              (037 = 31; RQR bumps once per OVERL)
+ *   VOR   = final staging pointer      (077000); VOR_base = VOR - RQR*VORS.
+ *
+ * [INFERRED - OVERLAY-DISC-SPEC.md sec 8 item 1] The window-index ->
+ * overlay-number mapping is not fully pinned in the TSS source. We implement
+ * the straightforward PARALLEL mapping (window n -> overlay n -> sectors
+ * OVDK+2n), which is consistent with RQR incrementing in lockstep with the
+ * VOR advance (sec 5 cross-check: (077000-040000)/01000 = 037 = RQR). To let
+ * the boot test verify it, we emit to stderr a table of
+ * {window addr, sector, first 4 words} for every overlay.
+ *
+ * Image byte layout [VERIFIED task spec / nd100x disc device]: sector S
+ * starts at byte offset S*256*2; each word is big-endian (ND word order).
+ *
+ * PHYSICAL PLACEMENT: the running disc driver does NOT use the logical sector
+ * directly - it runs it through DKADR (a logical->physical address conversion)
+ * before loading the CDC controller's block-address register. So each overlay
+ * must be written at the PHYSICAL sector cdc_dkadr(logical), not at the linear
+ * logical sector. See cdc_dkadr() below and docs/OVERLAY-DISC-SPEC.md sec
+ * "DKADR physical addressing".                                               */
+
+/* -------------------------------------------------------------------------
+ * cdc_dkadr - forward transcription of the TSS DKADR routine's LOGICAL ->
+ * PHYSICAL disc-address mapping for the CDC N10 (DRUM) build.
+ *
+ * DKADR (TSS1.SYMB:3563-3623, "CONVERT NCR DISK ADDRESS TO CDC DISK ADDRESS")
+ * is what the running driver applies to a logical disc sector before it loads
+ * the CDC controller block-address register (IOX 503). The overlay reader path
+ * is  S5 (TSS1.SYMB:3069-3073) -> SDISK (9SDK) -> DKOP -> JPL I (DKADR ->
+ * IOX LBA. To be found by that read, each overlay must be placed at the SAME
+ * physical sector DKADR produces, not at the raw logical sector.
+ *
+ * The mapping was established by executing the ASSEMBLED DRUM build under
+ * nd100x and single-stepping DKADR (entry 010006). [VERIFIED - live boot trace]
+ * The built "N10 CDC" path is pure straight-line shift/multiply (no hardware
+ * divide is taken for a unit-0 address); for logical sector L it computes:
+ *     D := L << 5              = 32*L      (010026 SHD ZIN 5)
+ *     T := L << 5              = 32*L      (010027 RORA ; 010030 SHT 5)
+ *     A := L * 0o14 (=12 dec)  = 12*L      (010031 MPY (14, TSS1.SYMB:3598)
+ *     D := D - A   = 32L-12L   = 20*L      (010032 RSUB DD SA)
+ *     D := D + D               = 40*L      (010033 RADD DD SD)
+ *     T := T + D   = 32L+40L   = 72*L      (010034 RADD DT SD)  <- returned in A
+ * i.e.  DKADR(L) = 72 * L  =  0o110 * L   for a unit-0 sector.
+ * Trace check: DKADR(0156) returned 017360  (72 * 110dec = 7920 = 017360). [V]
+ *
+ * The overlay system disc is always unit 0, so the "displacement for unit 1"
+ * (0o52600, TSS1.SYMB:3600-3602) is never added, and the DKLIM=626 legality
+ * clamp (TSS1.SYMB:3604-3608) is never reached for the overlay range: the max
+ * overlay logical sector is OVDK+2*RQR-1 = 0o255, and 72*0o255 = 0o30250, well
+ * within limits. DKADR returns the un-clamped T=72*L regardless of the check
+ * (TSS1.SYMB:3610-3612 "COPY DA ST; EXIT AD1" returns T, untouched by the
+ * legality test). So a plain multiply reproduces it exactly for the overlays. */
+static uint32_t cdc_dkadr(uint16_t logical_sector)
+{
+    /* Keep only the 13-bit significant NCR sector field (TSS1.SYMB:3578
+     * "AND (17777"); unit bits 13..15 are 0 for the overlay disc, unit 0.   */
+    uint32_t L = (uint32_t)(logical_sector & 017777u);
+    return L * 72u;   /* 0o110 * L = 32*L + 40*L, verified from the live trace */
+}
+
+bool mac_write_cdc_disc(mac_state *st, const char *path)
+{
+    /* one 256-word sector, the CDC transfer unit (OVERLAY-DISC-SPEC sec 4) */
+    enum { SECTOR_WORDS = 256 };
+
+    uint16_t ovdk  = sym_lookup_value(st, "OVDK");
+    uint16_t vors  = sym_lookup_value(st, "VORS");
+    uint16_t count = sym_lookup_value(st, "RQR");
+    uint16_t vend  = sym_lookup_value(st, "VOR");
+
+    if (!sym_is_defined(st, "OVDK") || !sym_is_defined(st, "VORS") ||
+        !sym_is_defined(st, "RQR")  || !sym_is_defined(st, "VOR"))
+    {
+        fprintf(stderr, "mac_write_cdc_disc: need OVDK, VORS, RQR and VOR "
+                        "in the symbol table (this must be an overlay/OVERX "
+                        "build)\n");
+        return false;
+    }
+    if (vors == 0 || count == 0)
+    {
+        fprintf(stderr, "mac_write_cdc_disc: VORS=%o RQR=%o - nothing to "
+                        "write\n", vors, count);
+        return false;
+    }
+
+    /* sectors occupied by one overlay window (2 for the standard 512-word
+     * window); the disc formula sector = OVDK + spo*n generalises OVDK+2n.  */
+    uint16_t spo = (uint16_t)(vors / SECTOR_WORDS);
+    if (spo == 0)
+    {
+        spo = 1;
+    }
+    uint16_t vbase = (uint16_t)(vend - (uint16_t)(count * vors));
+
+    /* Image size: every overlay's PHYSICAL sector = cdc_dkadr(logical), which
+     * spaces sectors out by *72, so the image is large and sparse. Size it to
+     * cover the highest physical sector any overlay reaches. The largest
+     * logical sector is the last overlay's second half, ovdk+spo*count-1, and
+     * cdc_dkadr is monotonic in L, so that gives the max physical sector.     */
+    uint32_t max_logical = (uint32_t)ovdk + (uint32_t)spo * count - 1u;
+    uint32_t max_phys = cdc_dkadr((uint16_t)max_logical);
+    uint32_t total_sectors = max_phys + 1u;
+    uint32_t total_words = total_sectors * SECTOR_WORDS;
+
+    uint16_t *img = (uint16_t *)calloc(total_words, sizeof(uint16_t));
+    if (img == NULL)
+    {
+        fprintf(stderr, "mac_write_cdc_disc: out of memory\n");
+        return false;
+    }
+
+    fprintf(stderr, "=== CDC overlay disc image (OVDK=%o VORS=%o RQR=%o "
+                    "VOR=%o -> VOR_base=%o) DKADR physical placement ===\n",
+            ovdk, vors, count, vend, vbase);
+    fprintf(stderr, "  ovl  window  logsec  physsec  first 4 words\n");
+
+    for (uint16_t n = 0; n < count; n++)
+    {
+        uint16_t window = (uint16_t)(vbase + (uint16_t)(n * vors));
+        for (uint16_t sidx = 0; sidx < spo; sidx++)
+        {
+            /* logical sector the running reader computes (OVDK + 2n [+1]);
+             * physical sector = DKADR(logical) - where the read lands.       */
+            uint16_t logical = (uint16_t)((uint32_t)ovdk + (uint32_t)spo * n + sidx);
+            uint32_t sector = cdc_dkadr(logical);
+            uint32_t dst = sector * SECTOR_WORDS;
+            uint16_t srcbase = (uint16_t)(window + (uint16_t)(sidx * SECTOR_WORDS));
+            for (uint16_t w = 0; w < SECTOR_WORDS; w++)
+            {
+                img[dst + w] = st->mem[(uint16_t)(srcbase + w)];
+            }
+        }
+        /* diagnostic row: overlay #, window addr, logical sec0, PHYSICAL sec0,
+         * first 4 words of the window - the boot test diffs against this.     */
+        uint16_t log0  = (uint16_t)((uint32_t)ovdk + (uint32_t)spo * n);
+        uint32_t phys0 = cdc_dkadr(log0);
+        fprintf(stderr, "  %03o  %06o  %06o  %06o  %06o %06o %06o %06o\n",
+                n, window, (unsigned)log0, (unsigned)phys0,
+                st->mem[window], st->mem[(uint16_t)(window + 1)],
+                st->mem[(uint16_t)(window + 2)], st->mem[(uint16_t)(window + 3)]);
+    }
+
+    FILE *f = fopen(path, "wb");
+    if (f == NULL)
+    {
+        free(img);
+        fprintf(stderr, "mac_write_cdc_disc: cannot open %s\n", path);
+        return false;
+    }
+    for (uint32_t i = 0; i < total_words; i++)
+    {
+        put_be16(f, img[i]);   /* big-endian: matches the nd100x disc device */
+    }
+    fclose(f);
+    free(img);
+
+    fprintf(stderr, "  wrote %u sectors (%u words, %u bytes) to %s\n",
+            (unsigned)total_sectors, (unsigned)total_words,
+            (unsigned)(total_words * 2), path);
     return true;
 }
 
@@ -2576,7 +3065,38 @@ bool mac_write_bpun_range(mac_state *st, FILE *f, uint16_t lo, uint16_t hi,
     {
         fputc(0x00, f);
     }
-    fwrite(BPUN_OCTAL_LOADER, 1, sizeof(BPUN_OCTAL_LOADER), f);
+    /* The reproduced bootstrap ends with its own autostart token "164316!"
+     * (the last 7 bytes). When an 'entry' is given we replace THAT token with
+     * "<entry>!" so a loader that takes its start address from the octal
+     * preamble (e.g. nd100x's BPUN loader: boot = the address before '!' when
+     * it differs from the last opened '/' location) starts the loaded image at
+     * 'entry'. With entry==0 the tape stays byte-identical to the archived
+     * MAC.BPUN. TSS's image (0..033636) does not cover the high autostart cell
+     * (164361) the original loader jumps through, so this preamble autostart is
+     * how TSS is entered at its cold-start (ISTRT). */
+    if (entry != 0)
+    {
+        /* even parity on each octal digit, exactly as the rest of the loader */
+        fwrite(BPUN_OCTAL_LOADER, 1, sizeof(BPUN_OCTAL_LOADER) - 7, f);
+        char oct[8];
+        snprintf(oct, sizeof(oct), "%o", entry);
+        for (const char *p = oct; *p; p++)
+        {
+            unsigned char v = (unsigned char)(*p) & 0x7F;
+            int ones = 0;
+            for (int b = 0; b < 7; b++)
+                if (v & (1 << b))
+                    ones++;
+            if (ones & 1)
+                v |= 0x80;      /* set bit 7 to make the byte even parity */
+            fputc(v, f);
+        }
+        fputc('!', f);          /* 0x21 is already even parity */
+    }
+    else
+    {
+        fwrite(BPUN_OCTAL_LOADER, 1, sizeof(BPUN_OCTAL_LOADER), f);
+    }
 
     uint16_t base = lo;
     uint16_t count = (hi >= lo) ? (uint16_t)(hi - lo + 1) : 0;

@@ -1133,13 +1133,17 @@ static void test_remaining_commands(void)
     mac_line(&st, ")9TSS");
     check_true(")9TSS is an alias of )9EXIT ", st.end_of_file_seen);
 
-    /* ---- an unknown ')' command is accepted and ignored -------------- */
+    /* ---- )SOVER / )8DUMP are documented intentional no-ops ----------- */
+    /* Per docs/OVERLAY-DISC-SPEC.md they live only in the "NMACF / "TSBIN
+     * paths (never assembled in the MACF builds) and would need ND-100
+     * execution. mac-c correctly does nothing with them: no image effect,
+     * no error. (The overlay pipeline is reproduced by )9MOVE + the CDC
+     * writer instead - tested separately below.)                         */
     fresh(&st);
     st.loc = 01000;
     mac_line(&st, ")SOVER");
-    mac_line(&st, ")9MOVE ROVER VOR VORS");
     mac_line(&st, ")8DUMP");
-    check_int("unknown commands emit nothing", st.loc, 01000);
+    check_int(")SOVER/)8DUMP emit nothing  ", st.loc, 01000);
     check_int("...and raise no errors      ", st.errors, 0);
 }
 
@@ -1451,6 +1455,274 @@ static void test_file_assembly(void)
 }
 
 /* ---------------------------------------------------------------------- */
+/* 12. Overlay pipeline: )9MOVE block copy, )CHANGE via OLD/NEW/MASK,       */
+/*     )PUNCH object-stream routing, and the CDC-disc image writer.         */
+/*     Oracles: ND-60.096.01 (C.1.1.1 )9MOVE, 4.2.3.5 )CHANGE, line 2394    */
+/*     )PUNCH) and docs/OVERLAY-DISC-SPEC.md (sec 2/4 disc contract).       */
+/* ---------------------------------------------------------------------- */
+
+/* read one big-endian 16-bit word at word index 'w' from a raw image file */
+static uint16_t img_word_at(const char *path, uint32_t w)
+{
+    FILE *f = fopen(path, "rb");
+    if (f == NULL)
+    {
+        return 0xFFFF;
+    }
+    fseek(f, (long)(w * 2), SEEK_SET);
+    int hi = fgetc(f), lo = fgetc(f);
+    fclose(f);
+    if (lo < 0)
+    {
+        return 0xFFFF;
+    }
+    return (uint16_t)((hi << 8) | lo);
+}
+
+static void test_overlay_pipeline(void)
+{
+    printf("[12] overlay pipeline: )9MOVE, )CHANGE cells, )PUNCH stream, "
+           "CDC image\n");
+    mac_state st;
+    char buf[4096];
+
+    /* ---- )9MOVE: verbatim block copy within the image ---------------- */
+    /* [manual C.1.1.1] )9MOVE src dst count. Copy 4 words 02000->040000.  */
+    fresh(&st);
+    mac_line(&st, "ROVER=2000");   /* source base as a value symbol        */
+    mac_line(&st, "VOR=40000");    /* destination base                     */
+    mac_line(&st, "VORS=4");       /* word count                           */
+    st.loc = 02000;
+    mac_line(&st, "111; 222; 333; 444");
+    mac_line(&st, ")9MOVE ROVER VOR VORS");
+    check_word(")9MOVE copies word 0        ", st.mem[040000], 0111);
+    check_word(")9MOVE copies word 1        ", st.mem[040001], 0222);
+    check_word(")9MOVE copies word 2        ", st.mem[040002], 0333);
+    check_word(")9MOVE copies word 3        ", st.mem[040003], 0444);
+    check_word(")9MOVE does not clobber src ", st.mem[02000], 0111);
+    check_word(")9MOVE leaves gap untouched ", st.mem[040004], 0);
+    check_int(")9MOVE raises no error       ", st.errors, 0);
+
+    /* numeric operands (no symbols) also work: 3 words 03000->05000       */
+    fresh(&st);
+    st.loc = 03000;
+    mac_line(&st, "1; 2; 3");
+    mac_line(&st, ")9MOVE 3000 5000 3");
+    check_word(")9MOVE numeric operands     ", st.mem[05000], 1);
+    check_word(")9MOVE numeric operands 2   ", st.mem[05002], 3);
+
+    /* an undefined operand is a hard error, copies nothing */
+    fresh(&st);
+    mac_line(&st, ")9MOVE NOSRC NODST NOCNT");
+    check_true(")9MOVE undefined -> error   ", st.errors > 0);
+
+    /* ---- )CHANGE reads OLD/NEW/MASK memory cells (manual 4.2.3.5) ----- */
+    /* Deposit 177 into OLD, 0 into NEW, 0777 into MASK, then )CHANGE over
+     * an interval: low 9 bits == 177 get zeroed.                          */
+    fresh(&st);
+    st.loc = 0100;
+    mac_line(&st, "OLD, 177");     /* OLD=0100, mem[0100]=177              */
+    mac_line(&st, "NEW, 0");       /* NEW=0101, mem[0101]=0                */
+    mac_line(&st, "MASK, 777");    /* MASK=0102, mem[0102]=0777            */
+    st.loc = 02000;
+    mac_line(&st, "177; 177; 200");
+    mac_line(&st, "2000 < 2002");
+    mac_line(&st, ")CHANGE");
+    check_word(")CHANGE via OLD cell w0     ", st.mem[02000], 0);
+    check_word(")CHANGE via OLD cell w1     ", st.mem[02001], 0);
+    check_word(")CHANGE leaves non-match    ", st.mem[02002], 0200);
+
+    /* ---- )PUNCH goes to the OBJECT stream, not the list stream -------- */
+    /* [manual line 2394] Use two DISTINCT streams and confirm the octal
+     * dump lands on object and the list stream stays empty.               */
+    fresh(&st);
+    FILE *lst = tmpfile();
+    FILE *obj = tmpfile();
+    st.listing = lst;
+    st.object = obj;
+    st.loc = 01000;
+    mac_line(&st, "SAA 1");
+    mac_line(&st, "1000 < 1000");
+    mac_line(&st, ")PUNCH");
+    capture_text(obj, buf, sizeof(buf));
+    check_true(")PUNCH writes object stream ", strstr(buf, "001000/") != NULL);
+    check_true(")PUNCH shows word value     ", strstr(buf, "170401") != NULL);
+    capture_text(lst, buf, sizeof(buf));
+    check_true(")PUNCH silent on list stream", buf[0] == '\0');
+    fclose(lst);
+    fclose(obj);
+
+    /* ---- CDC-disc image writer -------------------------------------- */
+    /* Synthetic 2-overlay set. Constants read from the symbol table:
+     *   OVDK=4  VORS=01000(512)  RQR=2(count)  VOR=final=base+count*VORS
+     * VOR_base = VOR - RQR*VORS = 040000. Windows at 040000 and 041000.
+     * Overlay n -> sectors OVDK+2n / OVDK+2n+1 (OVERLAY-DISC-SPEC sec 2). */
+    fresh(&st);
+    mac_line(&st, "OVDK=4");
+    mac_line(&st, "VORS=1000");        /* 512 words = two 256-word sectors */
+    mac_line(&st, "RQR=2");            /* two overlays                     */
+    mac_line(&st, "VOR=42000");        /* 040000 + 2*01000                 */
+    /* deposit sentinels at known offsets inside each 512-word window      */
+    st.mem[040000] = 0xA000;           /* overlay0 sec0 word0              */
+    st.mem[040000 + 255] = 0xA0FF;     /* overlay0 sec0 last word          */
+    st.mem[040000 + 256] = 0xA100;     /* overlay0 sec1 word0              */
+    st.mem[040000 + 511] = 0xA1FF;     /* overlay0 sec1 last word          */
+    st.mem[041000] = 0xB000;           /* overlay1 sec0 word0              */
+    st.mem[041000 + 256] = 0xB100;     /* overlay1 sec1 word0              */
+
+    const char *cdc = "mac_test_cdc.img";
+    check_true("CDC writer succeeds         ", mac_write_cdc_disc(&st, cdc));
+
+    /* Overlays are placed at the PHYSICAL sector DKADR(logical) = 72*logical
+     * (0o110*logical), NOT at the linear logical sector - the running reader
+     * runs the logical sector through DKADR before the disc read (see
+     * cdc_dkadr / OVERLAY-DISC-SPEC "DKADR physical addressing"). With OVDK=4:
+     *   overlay0 sec0: logical 4 -> phys 72*4 = 288 ; sec1: logical 5 -> 360
+     *   overlay1 sec0: logical 6 -> phys 72*6 = 432 ; sec1: logical 7 -> 504
+     * sector S starts at word index S*256.                                  */
+    check_word("CDC ovl0 sec0 word0         ", img_word_at(cdc, 288 * 256), 0xA000);
+    check_word("CDC ovl0 sec0 last word     ", img_word_at(cdc, 288 * 256 + 255), 0xA0FF);
+    check_word("CDC ovl0 sec1 word0         ", img_word_at(cdc, 360 * 256), 0xA100);
+    check_word("CDC ovl0 sec1 last word     ", img_word_at(cdc, 360 * 256 + 255), 0xA1FF);
+    check_word("CDC ovl1 sec0 word0         ", img_word_at(cdc, 432 * 256), 0xB000);
+    check_word("CDC ovl1 sec1 word0         ", img_word_at(cdc, 504 * 256), 0xB100);
+    /* the base region before the first overlay's physical sector is zeroed */
+    check_word("CDC pre-overlay region zeroed", img_word_at(cdc, 0), 0);
+    check_word("CDC gap between phys sectors ", img_word_at(cdc, 289 * 256), 0);
+
+    /* file size covers up to the max physical sector: max logical = 7,
+     * phys = 72*7 = 504, so (504+1) sectors * 256 words * 2 bytes.         */
+    FILE *cf = fopen(cdc, "rb");
+    long sz = 0;
+    if (cf != NULL)
+    {
+        fseek(cf, 0, SEEK_END);
+        sz = ftell(cf);
+        fclose(cf);
+    }
+    check_int("CDC image size correct       ", sz, (72 * 7 + 1) * 256 * 2);
+
+    /* writer fails cleanly when the overlay symbols are absent            */
+    fresh(&st);
+    check_true("CDC writer needs OVDK/etc   ", !mac_write_cdc_disc(&st, cdc));
+    remove(cdc);
+
+    /* ---- forward references vs the )9MOVE snapshot ------------------- */
+    /* This pins the exact staging semantics that determine whether the CDC
+     * overlay image on disc holds the FINAL fixed-up words. In a MACF build
+     * each overlay body is assembled at ROVER, then the "MACF OVERX macro
+     * snapshots it to the next VOR window with )9MOVE ROVER VOR VORS
+     * (TSS3.SYMB:83). )9MOVE is a RAW block copy (ND-60.096.01 C.1.1.1) - it
+     * copies whatever words are in the source window AT THAT MOMENT.
+     *
+     * [VERIFIED live, 2026-07-21] Instrumenting every )9MOVE in the real
+     * DRUM build showed ZERO forward references or literal references still
+     * unresolved inside the source window at snapshot time: every overlay's
+     * internal forward labels and its )FILL'd literals are defined BEFORE the
+     * closing OVERX, so the snapshot already holds the patched words. The
+     * two cases below lock that contract in:
+     *   (a) a forward ref RESOLVED BEFORE )9MOVE -> patched in the VOR copy
+     *       and therefore on the CDC disc (the case TSS actually relies on);
+     *   (b) a forward ref RESOLVED AFTER )9MOVE -> the VOR copy keeps the
+     *       pre-patch word (faithful raw-copy semantics: the fixup patches
+     *       the ROVER source, which the next overlay reuses, never the copy).
+     * If a future change made )9MOVE snapshot too early, or retro-patched the
+     * copy, one of these assertions flips.                                  */
+
+    /* (a) forward ref resolved BEFORE the snapshot lands PATCHED in VOR.
+     * Mirror the "MACF OVERX sequence (TSS3.SYMB:80-93): )9MOVE while VOR
+     * still points at the window base (40000), THEN advance VOR by VORS.    */
+    fresh(&st);
+    mac_line(&st, "ROVER=2000");        /* source window base (a value sym) */
+    mac_line(&st, "OVDK=4");
+    mac_line(&st, "VORS=1000");         /* 512-word window = two sectors    */
+    mac_line(&st, "RQR=1");             /* one overlay                      */
+    mac_line(&st, "VOR=40000");         /* window base for this overlay     */
+    st.loc = 02000;
+    mac_line(&st, "LDA FWD");           /* P-relative forward ref @ 02000   */
+    mac_line(&st, "STZ 0");
+    mac_line(&st, "FWD, STZ 0");        /* FWD=02002 -> resolves @ 02000    */
+    check_word("overlay fwd-ref patched src ", st.mem[02000], 044002);
+    mac_line(&st, ")9MOVE ROVER VOR VORS");   /* snapshot 02000.. -> 40000.. */
+    check_word("overlay fwd-ref patched VOR ", st.mem[040000], 044002);
+    /* OVERX then advances the VOR window pointer to its final value; the
+     * writer derives VOR_base = VOR - RQR*VORS = 41000 - 1000 = 40000.      */
+    mac_line(&st, ")KILL VOR");
+    mac_line(&st, "VOR=41000");
+    /* it reaches the CDC disc at the DKADR physical sector 72*OVDK = 288    */
+    check_true("CDC writer (fwd-ref) ok     ", mac_write_cdc_disc(&st, cdc));
+    check_word("overlay fwd-ref on disc     ", img_word_at(cdc, 288 * 256), 044002);
+    remove(cdc);
+
+    /* (b) forward ref resolved AFTER the snapshot: VOR copy stays pre-patch */
+    fresh(&st);
+    mac_line(&st, "ROVER=2000");
+    mac_line(&st, "VORS=1000");
+    mac_line(&st, "VOR=40000");         /* window base                      */
+    st.loc = 02000;
+    mac_line(&st, "GBL2");              /* data word, GBL2 undefined here    */
+    mac_line(&st, ")9MOVE ROVER VOR VORS");   /* snapshot BEFORE GBL2 defined */
+    mac_line(&st, "GBL2=1234");         /* now define -> patches ROVER src   */
+    check_word("post-9MOVE def patches src  ", st.mem[02000], 01234);
+    check_word("post-9MOVE def leaves VOR   ", st.mem[040000], 0);
+}
+
+/* ---------------------------------------------------------------------- */
+/* 13. undefined-instruction guard                                         */
+/* An undefined symbol in the OPCODE position of a statement that carries an
+ * operand term is a hard error (mac_check_undefined_opcodes), so the build
+ * fails instead of silently emitting garbage. A bare undefined mark and a
+ * resolved forward reference must NOT trip it. Motivated by the N10/drum
+ * build's "RGDIV ST" (src/TSS1.SYMB:3588); see assemble_stmt().            */
+static void test_undefined_opcode_guard(void)
+{
+    printf("[13] undefined-instruction guard\n");
+    mac_state st;
+
+    /* ---- undefined opcode WITH operand -> hard error ----------------- */
+    /* "ZZZUNDEF ST": ZZZUNDEF is not a permsym/macro/label; ST=060 is a
+     * register. MAC's PLAIN fallback would emit (0)+(060)=000060 silently.  */
+    fresh(&st);
+    mac_line(&st, "ZZZUNDEF ST");
+    check_int("undef opcode: no error yet  ", st.errors, 0); /* one-pass: not yet */
+    check_int("undef opcode: swept as error", mac_check_undefined_opcodes(&st), 1);
+    check_true("undef opcode: st.errors set ", st.errors > 0);
+
+    /* ---- bare undefined single token -> NOT flagged (library mark) --- */
+    /* "ZZZMARK" alone is a library-mark / lone data word, never an opcode.  */
+    fresh(&st);
+    mac_line(&st, "ZZZMARK");
+    check_int("bare mark: not swept as error", mac_check_undefined_opcodes(&st), 0);
+    check_int("bare mark: no error          ", st.errors, 0);
+
+    /* ---- "SYM+5": one token with operators -> NOT flagged ------------ */
+    /* No whitespace-separated operand term, and '+' is not alphanumeric.    */
+    fresh(&st);
+    mac_line(&st, "ZZZEXPR+5");
+    check_int("SYM+const: not an opcode     ", mac_check_undefined_opcodes(&st), 0);
+
+    /* ---- forward reference resolved later -> NOT an error ------------- */
+    /* "FWD ST" flags FWD, but "FWD, 0" defines it before the sweep runs.    */
+    fresh(&st);
+    mac_line(&st, "FWD ST");        /* FWD used as opcode, still undefined   */
+    st.loc = 02000;
+    mac_line(&st, "FWD, 0");        /* now define FWD as a label             */
+    check_int("resolved fwd ref: no error   ", mac_check_undefined_opcodes(&st), 0);
+    check_int("resolved fwd ref: errors==0  ", st.errors, 0);
+
+    /* ---- the RGDIV fix: RGDIV=RDIV then "RGDIV ST" -> 0141660 -------- */
+    /* Mirrors the N10-gated equate added to src/TSS1.SYMB: RDIV=0141600, so
+     * the PLAIN sum "RGDIV ST" is 0141600|060 = 0141660, with no error.     */
+    fresh(&st);
+    mac_line(&st, "RGDIV=RDIV");    /* RDIV is a permsym = 0141600           */
+    uint16_t at = st.loc;
+    mac_line(&st, "RGDIV ST");
+    check_word("RGDIV ST assembles RDIV|ST  ", st.mem[at], 0141660);
+    check_int("RGDIV defined: no opcode err ", mac_check_undefined_opcodes(&st), 0);
+    check_int("RGDIV defined: errors==0     ", st.errors, 0);
+}
+
+/* ---------------------------------------------------------------------- */
 int main(void)
 {
     printf("=== MAC-C assembler unit tests ===\n\n");
@@ -1474,6 +1746,8 @@ int main(void)
     test_bpun_commands();
     test_save_load();
     test_file_assembly();
+    test_overlay_pipeline();
+    test_undefined_opcode_guard();
 
     printf("\n=== %d passed, %d failed ===\n", g_pass, g_fail);
     return g_fail == 0 ? 0 : 1;

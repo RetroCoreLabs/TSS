@@ -79,6 +79,16 @@ typedef struct mac_sym
                                                never listed by )LIST                  */
     mac_sym_class  cls;                   /**< statement class when leading token     */
     uint32_t       def_seq;               /**< definition sequence number, for )PCL   */
+    bool           used_as_opcode;        /**< set when this (still-undefined) symbol
+                                               appeared in the OPCODE position of a
+                                               statement that also had an operand term
+                                               (e.g. "RGDIV ST"). If it is STILL
+                                               undefined at end of assembly it is a
+                                               hard error: MAC's PLAIN fallback would
+                                               otherwise silently emit garbage for it.
+                                               A forward reference clears this by being
+                                               defined; a bare library mark never sets
+                                               it (single token, no operand).          */
     struct mac_sym *next;
 } mac_sym;
 
@@ -204,7 +214,10 @@ typedef struct
     /* MAC's three streams. The source stream is the file being read (see
      * mac_assemble_file / nested )9ASSM). The list stream receives )WRITE,
      * )WRUS, )WLOC, )WMNE, )PRINT, )9MSG and )CORE; the object stream
-     * receives )LIST, )PUNCH, )9ASCI and )BPUN (ND-60.096.01 sec 3.1.3).
+     * receives )LIST, )PUNCH and )BPUN (ND-60.096.01 sec 3.1.3). NOTE:
+     * )9ASCI goes to the LIST stream, not the object stream - the per-command
+     * text (manual line 2554) is explicit; an earlier version of this comment
+     * grouped it with the object stream and was wrong.
      * A NULL stream means the dummy device (output discarded); 'listing'
      * doubles as the list stream for backwards compatibility.             */
     FILE       *listing;              /**< list stream (NULL = dummy)         */
@@ -243,6 +256,14 @@ void mac_list_symbols(mac_state *st, FILE *out);
 /** Report symbols that remain referenced-but-undefined (UDEF check). */
 void mac_report_undefined(mac_state *st, FILE *out);
 
+/** End-of-assembly sweep: any symbol still undefined that was used in the
+ *  OPCODE position of a statement with an operand (used_as_opcode) is a hard
+ *  error ("undefined instruction: NAME"), incrementing st->errors so the
+ *  build fails instead of silently emitting garbage. Must be called AFTER all
+ *  source is assembled (so genuine forward references have had a chance to be
+ *  defined). Returns the number of undefined instructions found. */
+int mac_check_undefined_opcodes(mac_state *st);
+
 /** Value of a defined symbol, or 0 if absent/undefined (test + driver aid). */
 uint16_t sym_lookup_value(mac_state *st, const char *name);
 
@@ -275,6 +296,17 @@ void mac_close_streams(mac_state *st);
  *  block and verifies the additive checksum. This is the ')9READ' path.
  *  Returns false on I/O error, malformed tape, or checksum mismatch. */
 bool mac_read_bpun(mac_state *st, const char *path);
+
+/** Write a CDC-disc overlay image: reproduces the run-time overlay-load
+ *  contract (sector = OVDK + 2*overlay, two 256-word sectors per overlay,
+ *  big-endian words at byte offset sector*512) so the running TSS overlay
+ *  reader (routine S5) finds each overlay. Resolves OVDK/VORS/RQR/VOR from
+ *  the symbol table and reads the staged overlay windows from the assembled
+ *  image (populated by )9MOVE / OVERX). Emits a {window,sector,first-words}
+ *  table to stderr for boot verification. Returns false if the overlay
+ *  symbols are absent or the file cannot be written.
+ *  See docs/OVERLAY-DISC-SPEC.md. */
+bool mac_write_cdc_disc(mac_state *st, const char *path);
 
 /** Load an image written by mac_write_image back into memory at its base,
  *  marking those words used and updating lo/hi. Returns false on bad magic

@@ -89,6 +89,19 @@ typedef struct mac_sym
                                                A forward reference clears this by being
                                                defined; a bare library mark never sets
                                                it (single token, no operand).          */
+    bool           used_as_operand;       /**< set when this (still-undefined) symbol
+                                               was consumed as the VALUE OPERAND of a
+                                               DEFINED instruction (MRI/JUMP8/ARG8),
+                                               e.g. "SAT STR1" or "STT STRX,B". MAC's
+                                               undefined->0 fallback would otherwise
+                                               silently emit a wrong operand (SAT 0),
+                                               invisible to the golden ADDRESS dumps.
+                                               If STILL undefined at end of assembly it
+                                               is a hard error. A forward reference
+                                               clears it by being defined; library
+                                               marks (used only in "MARK conditionals
+                                               or bare mark-declaration lines, never as
+                                               an instruction operand) never set it.    */
     struct mac_sym *next;
 } mac_sym;
 
@@ -307,6 +320,14 @@ bool mac_read_bpun(mac_state *st, const char *path);
  *  symbols are absent or the file cannot be written.
  *  See docs/OVERLAY-DISC-SPEC.md. */
 bool mac_write_cdc_disc(mac_state *st, const char *path);
+
+/** Convert a LOGICAL overlay disc sector to the PHYSICAL CDC sector, exactly as
+ *  the running TSS DKADR routine does (src/TSS1.SYMB:3589-3646, unit 0). This
+ *  is the mapping mac_write_cdc_disc uses to place each overlay where the
+ *  reader will look for it: DKADR(L) = (8*floor(L*65537/12) + 64*L) & 0xFFFF.
+ *  [VERIFIED against the live nd100x DKADR trace: DKADR(0244)=0077300.]
+ *  NOTE: not monotonic in L. See cdc_dkadr() in mac.c for the full derivation. */
+uint32_t cdc_dkadr(uint16_t logical_sector);
 
 /** Load an image written by mac_write_image back into memory at its base,
  *  marking those words used and updating lo/hi. Returns false on bad magic

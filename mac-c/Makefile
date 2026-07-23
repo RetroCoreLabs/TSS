@@ -60,7 +60,7 @@ drum: mac-as
 
 # Standalone MINIT disc formatter -> Build/minit/minit.bpun.  Must exist
 # before a bare-disc bring-up (it writes the MIB free-track bitmap that
-# SINIT's GTRK needs).  See docs/DISK-INIT-USERS-AND-BOOT.md.
+# SINIT's GTRK needs).  See docs/TSS-BRINGUP.md.
 minit: mac-as
 	./build_minit.sh
 

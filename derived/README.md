@@ -48,7 +48,7 @@ the source defines those itself as `IOF`/`ION`. It is **untested against
 hardware** — the drum driver is a first approximation, and the Diablo probe
 in the `LEV6` scanner assembles NORD-1 `IOT` opcodes even in an N10 build.
 
-`../docs/BUILD-TSS.md` documents both build routes in full.
+`../docs/TSS-BRINGUP.md` documents both build routes in full.
 
 > Note: `../mac-c/build_tss_assysa.sh` does **not** use these files — it
 > feeds the real `../src/ASSYSA.SYMB` to the C assembler and strips the

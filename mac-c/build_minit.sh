@@ -5,7 +5,7 @@
 # MINIT is NOT part of the TSS OS image - it is the operator tool that lays
 # down the MIB free-track bitmap on a bare CDC disc *before* the first TSS
 # cold-boot. Without it, SINIT's GTRK finds no free tracks and cannot create
-# user SYSTEM (see docs/DISK-INIT-USERS-AND-BOOT.md).
+# user SYSTEM (see docs/TSS-BRINGUP.md).
 #
 # It is a self-contained program: entry is the symbol MINIT, which prompts
 # for FIRST/LAST NCR disc addresses and I/U/R, then writes the bitmap.

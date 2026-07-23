@@ -9,8 +9,8 @@ cd /mnt/e/Dev/Ronny/TSS/bringup
 ```
 
 For *how it is supposed to work* (control flow, with Mermaid diagrams), read
-[`../docs/TSS-BOOT-FLOW.md`](../docs/TSS-BOOT-FLOW.md) (cold-start) and
-[`../docs/TSS-LOGIN-FLOW.md`](../docs/TSS-LOGIN-FLOW.md) (login + the
+[`../docs/TSS-ARCHITECTURE.md`](../docs/TSS-ARCHITECTURE.md) (cold-start and
+login chapters, incl. the
 scheduler/interrupt mechanism). Those are the reference used while debugging.
 
 ---
@@ -30,7 +30,9 @@ scheduler/interrupt mechanism). Those are the reference used while debugging.
 
 ```bash
 cd /mnt/e/Dev/Ronny/TSS/mac-c
-make                 # mac-as + tests  (expect: 677 passed, 0 failed)
+make                 # mac-as + tests  (expect: 695 passed, 0 failed)
+                     # NOTE: "make test" alone does NOT relink mac-as —
+                     # always run plain "make" after assembler changes
 ./build_tss_drum.sh  # -> Build/drum/tss-drum.bpun + tss-cdc.img   (0 errors)
 ./build_minit.sh     # -> Build/minit/minit.bpun                   (0 errors)
 ```
@@ -55,6 +57,10 @@ make                 # mac-as + tests  (expect: 677 passed, 0 failed)
 - TSS `@ENTER` — the login prompt (one per terminal).
 - `PROJECT NUMBER P-` — needs a **positive** number; `0`/blank re-prompts.
 - SYSTEM is **passwordless**, so there is no `PASSWORD` prompt.
+- `AMBIGUOUS FILENAME` after the project number is **non-fatal** on a fresh disc
+  (the ()SCRATCH file does not exist yet); login continues.
+- `TYPE IN DATE (DD,MM,YYYY,HH,MM,SS)` — first login only; answer e.g.
+  `23,07,2026,15,30,00`. Then the `@` command prompt appears — try `HELP`.
 
 ---
 
@@ -104,7 +110,8 @@ Then connect a DAP client to `127.0.0.1:1777`:
 | cold-start never shows `@ENTER` | started at ISTRT, not 7 | ensure `--start=7` (the scripts set it) |
 | no console echo at all | wrong console charset/terminal | it is terminal 192 / the local console; check `--start=7` |
 | `verify-disc.py` shows 16 free after step 3 | SINIT never ran | you booted without `--opr=131313` or not at addr 7 |
-| login stalls after the name echo | **known open item** (2026-07-23) | see `docs/TSS-LOGIN-FLOW.md` "Where a login could stall" |
+| login loops silently after the project number | stale `mac-as`: `make test` does NOT relink it | run plain `make` in `mac-c/`, rebuild images, re-run steps 1-3; check with `python3 check-robj-encoding.py ../Build/bringup/tss.bpun` (must say FIXED) |
+| (historical) login "hang" after SYSTEM | forward-ref addend bug, FIXED 2026-07-23 | see `../docs/MAC-ASSEMBLER.md` (defect record); regression-pinned by test [15] |
 
 ---
 

@@ -34,7 +34,7 @@ wsl -d Ubuntu -- bash -lc "cd /mnt/e/Dev/Ronny/TSS/mac-c && make test"
 | command (from `mac-c/`) | purpose |
 |---|---|
 | `make` | build `mac-as` + `test_mac` (must stay warning-free under `-Wall -Wextra`) |
-| `make test` | run the whole suite (~617 assertions, must be 0 failures) |
+| `make test` | run the whole suite (695 assertions, must be 0 failures) — builds `test_mac` but does NOT relink `mac-as`; run plain `make` before any `build_tss_*.sh` |
 | `./check_coverage.sh` | assert every public function and every implemented `)` command is referenced by a test |
 | `./run_tss.sh` | assemble the five TSS parts directly |
 | `./build_tss_assysa.sh` | **the real end-to-end test** — runs the original `ASSYSA`/`ASSYSB` command streams; writes to `../Build/` |
@@ -43,7 +43,7 @@ wsl -d Ubuntu -- bash -lc "cd /mnt/e/Dev/Ronny/TSS/mac-c && make test"
 | `./verify_repo.sh` | everything at once: layout, no duplicates, build, tests, coverage, both TSS builds, oracle scores, markdown links |
 
 There is no single-test runner; `test_mac.c` is one binary with numbered
-sections (`[1]`, `[1b]`, … `[11]`). To run one section, comment out the
+sections (`[1]`, `[1b]`, … `[15]`). To run one section, comment out the
 others in `main()` or add a temporary early `return`.
 
 `MACTRACE=1` makes the assembler print which line ended each source stream
@@ -69,7 +69,7 @@ primary source and record the evidence in a comment plus a test:
 2. `D:\ND\BPUN\MAC.BPUN` — the real 1978 MAC binary. Its permanent symbol
    table at `0xE9B3` is where every opcode value in `mac_permsym.c` came
    from (3-word entries, names packed 5 chars × 6 bits). Ghidra MCP tools
-   work on it; see `docs/MAC-BPUN-Analysis.md`.
+   work on it; see `docs/MAC-ASSEMBLER.md`.
 3. The golden dumps — arithmetic on symbol addresses localises a missing or
    extra word precisely.
 4. `archive/*.SYMB` — the original 8-bit bytes, when a parity-stripped file
@@ -87,6 +87,12 @@ instruction's **encoding**, not just the corpus totals.
 `TCL` per routine), which a second pass would destroy. Forward references
 are recorded in `g_pending` (per-symbol chains) and patched when the symbol
 is defined; literal references go in `g_litrefs` and are patched at `)FILL`.
+**Fixups must carry the expression's constant addend** (`mac_fixup.addend`):
+`JMP RFN+2` with RFN forward is sym+2, not sym. Dropping it silently
+retargeted TSS2 ROBJ's error exits and made LOGON's ()SCRATCH open loop
+forever — the login "hang". Pinned by test [15]; the golden dumps cannot
+see this class (addresses unchanged, only content). Also: `make test` does
+NOT relink `mac-as` — run plain `make` before any `build_tss_*.sh`.
 
 **Statement dispatch order in `assemble_stmt()` is load-bearing.** It is
 interval `<` → text string `'…'` → location-set `EXPR/` → label `NAME,` →

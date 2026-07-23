@@ -19,7 +19,7 @@
 #
 # Interpretation:
 #   * PIL=2 count > 0 and LEV2 == 1  -> the console process WAS auto-created and
-#     dispatched (no keypress needed; INIT seeds PRT1[5]=0, see docs/LOGON-PATH.md).
+#     dispatched (no keypress needed; INIT seeds PRT1[5]=0, see docs/TSS-ARCHITECTURE.md (login chapter)).
 #   * LOGON == 0 while ERMSG/FERMS-region churns -> blocked at the ERMSG=GOVER OV15
 #     start-up-message overlay call, before `JPL I (LOGON`.  This is the verified
 #     final blocker; fix = stage OV15 (and the other overlays) loadably on the CDC

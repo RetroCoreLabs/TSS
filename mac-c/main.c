@@ -21,7 +21,7 @@ static void usage(const char *argv0)
         "  -l FILE      write the symbol list ()LIST format) to FILE\n"
         "  -o FILE      write the assembled image (MACIMG format)\n"
         "  -c FILE      write a CDC-disc overlay image (see\n"
-        "               docs/OVERLAY-DISC-SPEC.md). Requires an overlay/OVERX\n"
+        "               docs/TSS-ARCHITECTURE.md (overlay chapter)). Requires an overlay/OVERX\n"
         "               build so OVDK/VORS/RQR/VOR are defined.\n"
         "  -b FILE      write a bootable BPUN paper tape\n"
         "  -e ENTRY     BPUN autostart address: an octal number or a symbol\n"
@@ -160,7 +160,7 @@ int main(int argc, char **argv)
     }
     /* CDC-disc overlay image: the overlays were staged into the VOR windows
      * by )9MOVE inside the OVERX macro during assembly; this dumps them onto
-     * the disc sectors the run-time reader expects. See OVERLAY-DISC-SPEC.md
+     * the disc sectors the run-time reader expects. See TSS-ARCHITECTURE.md (overlay chapter)
      * and mac_write_cdc_disc. */
     if (cdcfile != NULL && !mac_write_cdc_disc(&st, cdcfile))
     {

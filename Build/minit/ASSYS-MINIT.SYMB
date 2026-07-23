@@ -1,0 +1,8 @@
+% MINIT NORD-10 (ND-100) build - project-made command stream, not an original.
+% N10 selects the IOX I/O path; MINIT.SYMB already carries the CDC mark.
+% The object device is MSYMB:SYMB and )LIST dumps the symbol table there, so
+% MINIT's entry address (needed to boot the formatter) is recorded.
+N10
+)9ASSM MINIT,"LISTM:SYMB","MSYMB:SYMB"
+)LIST
+)9EXIT

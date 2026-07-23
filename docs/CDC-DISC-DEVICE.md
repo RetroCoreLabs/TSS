@@ -200,12 +200,20 @@ place until a device clear.
   (OVDK = 0160 octal). **[VERIFIED]** reader `TSS1.SYMB:3071`, writer
   `TSS3.SYMB:38`.
 - **[VERIFIED]** The running TSS driver converts the logical overlay sector to a
-  PHYSICAL disc address via **`DKADR`** (`TSS1.SYMB:3563-3623`) **before** loading
-  LBA (`TSS2.SYMB:551`). So the LBA value that arrives is already the physical
-  sector. This device therefore treats the LBA value **directly as the linear
-  physical sector** (`cdc_lba_to_sector` is the identity); DKADR is applied once,
-  at overlay-WRITE time, by `mac-as -c` (mac-c `cdc_dkadr`). **Do NOT add DKADR
-  here** — that double-converts.
+  PHYSICAL disc address via **`DKADR`** (`TSS1.SYMB:3589-3646`) **before** loading
+  LBA. So the LBA value that arrives is already the physical sector. This device
+  therefore treats the LBA value **directly as the linear physical sector**
+  (`cdc_lba_to_sector` is the identity); DKADR is applied once, at overlay-WRITE
+  time, by `mac-as -c` (mac-c `cdc_dkadr`). **Do NOT add DKADR here** — that
+  double-converts.
+- **The DKADR map is `DKADR(L) = 32*floor(L/12) + 2*(L mod 12)`**, verified
+  per-instruction from the live machine (`DKADR(0244)=0o660`, seen at
+  `IOX 503 A=000660`). Two earlier formulas are superseded: `72*L` (the `RGDIV`
+  divide was undefined) and `8*floor(L*65537/12)+64*L=077300` (mac-c had
+  miscompiled the `SHR` shift modifier as an additive LEFT shift; now fixed in
+  `mac-c/mac.c` `eval_expr`). The corrected map is dense and small: overlays pack
+  into physical sectors `0o450..0o712` (max `458` dec) over `0160..0257`. See
+  `docs/OVERLAY-DISC-SPEC.md` "DKADR physical addressing".
 - The backing image is likewise **linear**: sector `S` occupies bytes
   `[S*512, +512)`, raw big-endian ND word order.
 
@@ -246,8 +254,10 @@ place until a device clear.
 - Raw big-endian 16-bit words; sector `S` at byte `S*512`. Loaded on attach; a
   larger file grows the surface. WRITE transfers are persisted on exit
   (`Cdc_Destroy`), like the drum.
-- Default in-memory surface = **16384 sectors (8 MiB)**, covering the max overlay
-  physical sector (`72 * 0o255 = 12456`).
+- Default in-memory surface = **512 sectors (256 KiB)**, covering the corrected
+  DKADR overlay physical range (`0o450..0o712`, max `458` dec) with headroom. A
+  larger backing file still grows the surface; the 459-sector (235 008-byte)
+  overlay image fits within the default.
 
 ---
 
@@ -280,5 +290,5 @@ reserved for a future Winchester controller sharing the 500-507 slot.
   distributed as `501×3 503×3 507×3 505×3 504×15` = **3 clean overlay transfers**
   (load core/block/word-count, activate, then status polling). No regression into
   the old retry loop.
-- **Runtime**: `CDC disc device created: CDC DISC 500 ident 1 level 11 (16384
-  sectors, 4194304 words surface)`.
+- **Runtime**: `CDC disc device created: CDC DISC 500 ident 1 level 11 (65536
+  sectors, 16777216 words surface)` (grows to the ~28 MB overlay backing image).

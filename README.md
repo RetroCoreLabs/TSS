@@ -54,7 +54,7 @@ Each has its own README with the detail.
 | [`derived/`](derived/README.md) | files this project made: the extracted drum driver, and build variants including a NORD-10 + drum configuration |
 | [`mac-c/`](mac-c/README.md) | a MAC assembler in C — 695 unit tests, runs the 1973 build scripts |
 | [`Build/`](Build/README.md) | **output only**, disposable — everything the assembler produces |
-| [`bringup/`](bringup/README.md) | scripts that take a bare disc to a TSS login, plus validation tools |
+| [`bringup/`](bringup/README.md) | bring-up validation tools (the bring-up itself is `make help` at the root) |
 | [`docs/`](docs/TSS-ARCHITECTURE.md) | the four documents above |
 | [`ppt/`](ppt/README.md) | *Intro to TSS* — the guided tour |
 

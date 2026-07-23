@@ -36,15 +36,16 @@ nd100x ND-100 emulator. Two facts drive everything:
 
 Layout: `archive/` originals (never edit) → `src/` clean source → `reference/`
 golden oracle → `Build/` output (disposable) → `mac-c/` the assembler →
-`bringup/` the driver scripts.
+top-level `Makefile` (the bring-up driver; `make help`) → `bringup/` the
+validation tools.
 
 ### 1.2 The verified end state [VERIFIED, 2026-07-23]
 
 The **full chain works**, end to end:
 
 ```
-make (mac-c)  →  build_tss_drum.sh + build_minit.sh
-  →  1-prepare-disc.sh                    (padded CDC image)
+make build                                (mac-as + tests + all artifacts)
+  →  make prepare                         (padded CDC image)
   →  MINIT format: 4470 / 4670 / I       (16 free tracks in the MIB)
   →  cold-start --start=7 --opr=131313    (SINIT creates SYSTEM, disc-verified)
   →  normal boot --start=7                (@ENTER)
@@ -66,26 +67,27 @@ assembly errors; `verify_repo.sh` fully green.
 1. **Cold-start at ADDRESS 7, not the BPUN autostart.** The tape's built-in
    start (`ISTRT`) is the *normal-running* entry and skips the
    operator-switch (`OPR`) test that dispatches `SINIT`. Enter at
-   **`--start=7`** (the bringup scripts set it). See §6.
+   **`--start=7`** (`make coldstart`/`make login` set it). See §6.
 2. **Pre-size the CDC disc.** The emulated CDC device does not grow on
    writes; the user area (NCR `4470`) maps to a high physical sector, so the
-   backing file must be padded (the scripts pad to 8192 sectors / 4 MB).
+   backing file must be padded (`make prepare` pads to 8192 sectors / 4 MB).
    See §5.1.
 
-### 1.4 The four verified steps (script form)
+### 1.4 The four verified steps (make targets)
 
-Run everything from WSL (`cd /mnt/e/Dev/Ronny/TSS/bringup`):
+Everything is driven by the top-level `Makefile`. Run from WSL
+(`cd /mnt/e/Dev/Ronny/TSS`); `make help` lists every target:
 
-| step | script | what you do | verify |
+| step | target | what you do | verify |
 |---|---|---|---|
-| 1 | `./1-prepare-disc.sh` | nothing — makes a fresh padded disc in `Build/bringup/` | — |
-| 2 | `./2-format-minit.sh` | type `4470` ⏎ `4670` ⏎ `I` ⏎ ; at `FINISHED` press **Ctrl-C** | `python3 verify-disc.py` → *16 free tracks* |
-| 3 | `./3-create-system.sh` | wait for `@ENTER`; press **Ctrl-C** | `python3 verify-disc.py` → *15 free + SYSTEM* |
-| 4 | `./4-login.sh` | at `@ENTER` type `SYSTEM` ⏎ then `1` ⏎ | you reach the `@` command prompt |
+| 1 | `make prepare` | nothing — makes a fresh padded disc in `Build/bringup/` | — |
+| 2 | `make format` | type `4470` ⏎ `4670` ⏎ `I` ⏎ ; at `FINISHED` press **Ctrl-C** | `make verify` → *16 free tracks* |
+| 3 | `make coldstart` | wait for `@ENTER`; press **Ctrl-C** | `make verify` → *15 free + SYSTEM* |
+| 4 | `make login` | at `@ENTER` type `SYSTEM` ⏎ then `1` ⏎ | you reach the `@` command prompt |
 
 **Always stop the emulator with Ctrl-C (SIGINT)** — that flushes the CDC
 surface back to `cdc.img`. Killing it another way loses disc writes.
-`bringup/stop-emulator.sh` does this safely for a backgrounded instance.
+`make stop` does this safely for a backgrounded instance.
 
 ---
 
@@ -300,7 +302,7 @@ nd100x --mms1 --boot=bpun --image=tss.bpun --cdc=cdc.img --drum=drum.img \
 - Always run on **copies** of the disc images, and stop with SIGINT to flush
   the CDC surface (§1.4).
 
-`bringup/debug-with-dap.sh {minit|cold|login}` launches each stage
+`make dap-format` / `make dap-coldstart` / `make dap-login` launches each stage
 pre-configured on port 1777.
 
 ---
@@ -373,7 +375,7 @@ cp Build/drum/tss-drum.bpun <work>/tss.bpun
 
 Padding only appends zeros; the overlays (physical sector ~296+) are
 untouched. **[VERIFIED]** an 8192-sector image lets MINIT format NCR
-`4470`–`4670` cleanly. `bringup/1-prepare-disc.sh` does all of this.
+`4470`–`4670` cleanly. `make prepare` does all of this.
 
 ### 5.2 What MINIT is
 
@@ -774,8 +776,8 @@ pattern. Full defect records: [`MAC-ASSEMBLER.md`](MAC-ASSEMBLER.md).
 |---|---|---|
 | `verify-disc.py` | `bringup/` | reads `Build/bringup/cdc.img` (or a given path); reports the MIB free-track count and whether SYSTEM is in the user table, and says which bring-up step to run next |
 | `check-robj-encoding.py` | `bringup/` | byte-checks a built BPUN/image for the fixed vs broken ROBJ forward-reference pattern — **must print FIXED** (stale-assembler detector, §2.2) |
-| `stop-emulator.sh` | `bringup/` | SIGINTs the port-1777 emulator — the safe stop that flushes the CDC surface |
-| `debug-with-dap.sh {minit\|cold\|login}` | `bringup/` | launches a bring-up stage under the DAP debugger on port 1777 |
+| `make stop` | top-level `Makefile` | SIGINTs the bring-up emulator — the safe stop that flushes the CDC surface |
+| `make dap-format` / `dap-coldstart` / `dap-login` | top-level `Makefile` | launches a bring-up stage under the DAP debugger on port 1777 |
 | `verify_repo.sh` | `mac-c/` | everything at once: layout, build, tests, coverage, both TSS builds, oracle scores, markdown links |
 | `compare_asymb.sh` / `first_divergence.sh` | `mac-c/` | score a symbol dump against the golden oracle / find the first diverging symbol |
 | `MACTRACE=1` | mac-c env | the assembler prints which line ended each source stream and the conditional state on exit — the tool for "the build silently stopped early" |
@@ -842,14 +844,14 @@ Disc addresses (NCR): `MIB/DKBIT` `50` · `USTBL` ≈ `51` · overlays `160`+ ·
 
 | symptom | cause | fix |
 |---|---|---|
-| MINIT prints `DISK ERROR` on every track | CDC image too small (device does not grow) | re-run `1-prepare-disc.sh` (pads to 8192 sectors) |
+| MINIT prints `DISK ERROR` on every track | CDC image too small (device does not grow) | re-run `make prepare` (pads to 8192 sectors) |
 | cold-start never shows `@ENTER` | started at ISTRT, not 7 | ensure `--start=7` (the scripts set it) |
 | no console echo at all | wrong console/terminal | the TSS console is terminal 192 / the local console; check `--start=7`; not reachable via `--telnet` |
 | `verify-disc.py` shows 16 free after step 3 | SINIT never ran | you booted without `--opr=131313` or not at addr 7 |
 | login loops silently after the project number | stale `mac-as` (`make test` does NOT relink it) | run plain `make` in `mac-c/`, rebuild images, re-run steps 1–3; `check-robj-encoding.py` must say FIXED |
 | boot hangs in `DWAIT`, CDC status `062024` | wrong CDC op-decode model (compare instead of read) | the device must decode the op at control-word bits 11–12 (§4.3) |
 | WSL nd100x build fails "Exec format error" | stale Windows-PE `mkptypes` | rebuild it: `cc -O2 -o mkptypes mkptypes.c` (§3.1) |
-| disc changes lost after a run | emulator not stopped with SIGINT | always Ctrl-C / `stop-emulator.sh` — that flushes the CDC surface |
+| disc changes lost after a run | emulator not stopped with SIGINT | always Ctrl-C / `make stop` — that flushes the CDC surface |
 | build "silently stopped early" | a conditional swallowed the rest of a stream | `MACTRACE=1` shows which line ended each stream |
 
 ### 8.6 Config
@@ -857,7 +859,7 @@ Disc addresses (NCR): `MIB/DKBIT` `50` · `USTBL` ≈ `51` · overlays `160`+ ·
 The bringup scripts accept environment overrides:
 
 ```bash
-ND=/path/to/nd100x  DAP_PORT=1780  ./3-create-system.sh
+make coldstart ND=/path/to/nd100x DAP_PORT=1780
 ```
 
 Working images go to `Build/bringup/` (disposable; re-created by step 1).

@@ -37,15 +37,15 @@ for s in range(MIB_SEC, MIB_SEC + 40):
 if found:
     print(f"SYSTEM user: FOUND in USTBL at sector {found[0]} (oct {found[0]:o}), byte {found[1]}")
 else:
-    print("SYSTEM user: not found (run 3-create-system.sh)")
+    print("SYSTEM user: not found (run: make coldstart)")
 
 print()
 if setbits == 0 and not found:
-    print("STATE: prepared, not yet formatted -> run 2-format-minit.sh")
+    print("STATE: prepared, not yet formatted -> run: make format")
 elif setbits == 16 and not found:
-    print("STATE: formatted, no users yet     -> run 3-create-system.sh")
+    print("STATE: formatted, no users yet     -> run: make coldstart")
 elif 0 < setbits < 16 and found:
-    print("STATE: SYSTEM created              -> run 4-login.sh")
+    print("STATE: SYSTEM created              -> run: make login")
 else:
     print(f"STATE: {setbits} free tracks, SYSTEM={'yes' if found else 'no'} "
           "(non-standard range is fine if you widened MINIT LAST)")

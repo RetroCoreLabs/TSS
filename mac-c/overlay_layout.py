@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """overlay_layout.py - derive the NORD TSS overlay-on-disc layout.
 
-READ-ONLY analysis helper for the OVERLAY-DISC-SPEC.md work. It does NOT
+READ-ONLY analysis helper for the TSS-ARCHITECTURE.md (overlay chapter) work. It does NOT
 touch mac.c/main.c or any TSS source; it only reads a golden symbol dump
 (reference/ASYMB.SYMB or BSYMB.SYMB) and prints, for every overlay symbol
 OVn, the disc sector pair it occupies using the run-time/SOVER contract:

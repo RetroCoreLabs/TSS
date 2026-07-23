@@ -152,7 +152,7 @@ I/O: symbol listing in the archived `ASYMB:SYMB` format; image save/load
 ## The overlay-to-disc pipeline (implemented)
 
 TSS ships its 31 code overlays on the CDC system disc and pages them in at
-run time. mac-c now reproduces that pipeline (see `docs/OVERLAY-DISC-SPEC.md`):
+run time. mac-c now reproduces that pipeline (see `docs/TSS-ARCHITECTURE.md (overlay chapter)`):
 
 - **`)9MOVE src dst count`** (ND-60.096.01 §C.1.1.1) — a verbatim block copy
   of `count` assembled words within the image, **no relocation**. The `"MACF`
@@ -170,14 +170,14 @@ run time. mac-c now reproduces that pipeline (see `docs/OVERLAY-DISC-SPEC.md`):
   overlay→sector table to stderr so the boot test can verify the mapping.
   The window-index → overlay-number mapping is the straightforward parallel
   choice (window *n* → overlay *n*); it is not fully pinned in the TSS source
-  (`OVERLAY-DISC-SPEC.md` §8) which is why the diagnostic table is emitted.
+  (`TSS-ARCHITECTURE.md (overlay chapter)` §8) which is why the diagnostic table is emitted.
 
 ## Not implemented (and why)
 
 - `)SOVER`, `)8DUMP` — `)SYMBOL`-style invocations of assembled ND-100
   routines that would need **ND-100 execution** to run. They live only in the
   `"NMACF` / `"TSBIN` paths, which the MACF/DRUM builds never assemble
-  (`OVERLAY-DISC-SPEC.md` §1.3, §6), so on the builds mac-c targets they are a
+  (`TSS-ARCHITECTURE.md (overlay chapter)` §1.3, §6), so on the builds mac-c targets they are a
   **documented intentional no-op** — and unnecessary, because the run-time
   disc contract they implement is reproduced directly by `)9MOVE` + the CDC
   image writer above. mac-c does **not** fake ND-100 execution.

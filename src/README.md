@@ -56,5 +56,5 @@ Notation that trips people up:
 - Names are significant to **five characters, counting from the end**
   (`TIMOUT` and `IMOUT` are the same symbol).
 
-`../docs/TSS-Analysis.md` explains the file layout and the configuration
+`../docs/PROJECT-DESCRIPTION.md` explains the file layout and the configuration
 marks; `../ppt/Intro to TSS.pdf` is a guided tour of the architecture.

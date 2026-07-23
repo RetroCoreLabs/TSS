@@ -10,8 +10,8 @@
 #   -b  the bootable BPUN tape  (what the emulator loads)
 #   -o  the flat MACIMG image   (for inspection / range checking)
 #
-# The DRUM variant is EXPERIMENTAL (see docs/BUILD-TSS.md drum notes and
-# docs/DRUM-DEVICE-SPEC.md): XDRUM talks to a drum controller at IOX 540.
+# The DRUM variant is EXPERIMENTAL (see docs/TSS-BRINGUP.md drum notes and
+# docs/TSS-ARCHITECTURE.md (drum chapter)): XDRUM talks to a drum controller at IOX 540.
 # Output goes under Build/drum/ so it never collides with the golden ASSYSA
 # build in Build/.
 set -u
@@ -43,13 +43,13 @@ echo
 cd "$BUILD"
 # -e ISTRT: record TSS's cold-start (ISTRT=025076) as the BPUN autostart, so an
 # emulator that reads the start address from the tape enters TSS correctly
-# without needing a separate --start override. See docs/RUNNING-TSS-ON-EMULATOR.md.
+# without needing a separate --start override. See docs/TSS-BRINGUP.md.
 # -c tss-cdc.img: also emit the CDC-disc overlay image. )9MOVE (inside the
 # "MACF OVERX macro) stages each overlay into its VOR window during assembly;
 # mac_write_cdc_disc then places each overlay on CDC-disc sectors OVDK+2n so
 # the running TSS overlay reader (routine S5) finds them. The overlay->sector
 # table it prints (to build.err) lets the boot test verify the mapping.
-# See docs/OVERLAY-DISC-SPEC.md.
+# See docs/TSS-ARCHITECTURE.md (overlay chapter).
 "$MAC" ASSYS-DRUM.SYMB -b tss-drum.bpun -o tss-drum.img -c tss-cdc.img -e ISTRT \
     >build.out 2>build.err
 status=$?

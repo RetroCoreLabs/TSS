@@ -4,12 +4,12 @@
 Reads a MAC ")LIST" symbol dump (default: ../Build/drum/DSYMB.SYMB, the DRUM/N10
 build) and prints the addresses of the cells involved in TSS's cold-boot /
 interrupt / overlay-dispatch bring-up, together with the recommended emulator
-init derived in docs/COLD-BOOT-INIT.md.
+init derived in docs/TSS-ARCHITECTURE.md (cold-start chapter).
 
 It NEVER writes to mac.c/main.c or to any TSS source; it only parses a symbol
 dump and prints. Purely diagnostic.
 
-Background (all VERIFIED from src/TSS*.SYMB -- see docs/COLD-BOOT-INIT.md):
+Background (all VERIFIED from src/TSS*.SYMB -- see docs/TSS-ARCHITECTURE.md (cold-start chapter)):
   * GOVX (the overlay dispatcher) skips the disc read when the requested overlay
     number equals the contents of the OVLAY cell (GOVX: LDA 0,X; SUB I 9OVL;
     JAZ *+7, with 9OVL -> OVLAY, TSS2:182,187).
@@ -88,7 +88,7 @@ def main():
     ov = syms.get("OVLAY", "??????")
     sv = syms.get("SYSOV", "??????")
     init = syms.get("INIT", "??????")
-    print("\nRecommended Rank-1 emulator init (see docs/COLD-BOOT-INIT.md):")
+    print("\nRecommended Rank-1 emulator init (see docs/TSS-ARCHITECTURE.md (cold-start chapter)):")
     print("  start PC          = %s   (INIT, NOT ISTRT)" % init)
     print("  patch OVLAY @%s <- 177777   (force GOVX to trigger a load)" % ov)
     print("  patch SYSOV @%s <- 177777   (force S5 to actually read)" % sv)

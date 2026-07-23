@@ -15,7 +15,7 @@
 #  * A blank/zero project number re-prompts — enter a positive number.
 #
 # NOTE (2026-07-23): over the DAP debugger the interactive login currently stalls
-# after the name echo (see docs/TSS-LOGIN-FLOW.md "Where a login could stall").
+# after the name echo (see docs/TSS-ARCHITECTURE.md "Where a login could stall").
 # Trying it in the LOCAL CONSOLE here is one of the things to validate.
 source "$(dirname "$0")/_common.sh"
 

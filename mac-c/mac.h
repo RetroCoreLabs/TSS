@@ -111,9 +111,11 @@ typedef struct mac_sym
  * is patched according to how it was consumed.                            */
 typedef enum
 {
-    MAC_FIX_FULL,   /**< add full 16-bit value into the word               */
-    MAC_FIX_PREL8,  /**< value is an address: patch ((val - pc) & 0377)    */
-    MAC_FIX_ARG8    /**< patch (val & 0377) into the low byte              */
+    MAC_FIX_FULL,   /**< add full 16-bit value into the word (the word
+                         already holds the expression's constant part)    */
+    MAC_FIX_PREL8,  /**< value is an address: patch
+                         (((val + addend) - pc) & 0377)                   */
+    MAC_FIX_ARG8    /**< patch ((val + addend) & 0377) into the low byte  */
 } mac_fix_kind;
 
 typedef struct mac_fixup
@@ -121,6 +123,20 @@ typedef struct mac_fixup
     uint16_t         addr;   /**< word that needs patching                 */
     uint16_t         pc;     /**< location counter of the instruction, for
                                   P-relative displacement computation      */
+    uint16_t         addend; /**< constant part of the expression the
+                                  undefined symbol appeared in, e.g. the 2
+                                  of "JMP RFN+2" when RFN is a forward
+                                  reference. MUST be added to the symbol
+                                  value when patching PREL8/ARG8 words.
+                                  Dropping it silently retargeted every
+                                  forward "JMP SYM+n" to SYM: TSS2 ROBJ's
+                                  "SAA 11; JMP RFN+2" fell into "SAA -1",
+                                  turning error 9 (index out of range)
+                                  into -1 (empty object), which made LOGON's
+                                  ()SCRATCH open enumerate the file
+                                  directory forever = the login hang.
+                                  (FULL fixups instead keep the constant
+                                  pre-stored in the word and add to it.)  */
     mac_fix_kind     kind;
     struct mac_fixup *next;
 } mac_fixup;
@@ -318,7 +334,7 @@ bool mac_read_bpun(mac_state *st, const char *path);
  *  image (populated by )9MOVE / OVERX). Emits a {window,sector,first-words}
  *  table to stderr for boot verification. Returns false if the overlay
  *  symbols are absent or the file cannot be written.
- *  See docs/OVERLAY-DISC-SPEC.md. */
+ *  See docs/TSS-ARCHITECTURE.md (overlay chapter). */
 bool mac_write_cdc_disc(mac_state *st, const char *path);
 
 /** Convert a LOGICAL overlay disc sector to the PHYSICAL CDC sector, exactly as

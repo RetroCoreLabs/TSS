@@ -109,6 +109,15 @@ const mac_permsym_entry MAC_PERMSYM[] =
     { "RCLR", 0146100, MAC_CLS_PLAIN },
     { "CM1", 0200, MAC_CLS_PLAIN },
     { "CM2", 0600, MAC_CLS_PLAIN },
+    /* CLD = clear-destination register-operation sub-field, bit 6.
+     * MISSED by the original 0xE9B3 extraction (COPY=RADD|CLD=0146100 gives it
+     * away). Confirmed EMPIRICALLY on the real MAC: it assembles
+     *   "SWAP CLD DT SA" -> 144156   and   "SWAP DT SA" -> 144056
+     * whose difference is exactly 0100. Without this entry mac-c silently
+     * dropped the clear bit on every "SWAP CLD ..." (5 sites in TSS). Adding it
+     * is FAITHFUL to real MAC, not a deviation. TODO: re-audit the permsym
+     * extraction for other missing register-op modifiers.                      */
+    { "CLD", 0100, MAC_CLS_PLAIN },
     { "REXO", 0145000, MAC_CLS_PLAIN },
     { "RORA", 0145400, MAC_CLS_PLAIN },
     { "RAND", 0144400, MAC_CLS_PLAIN },

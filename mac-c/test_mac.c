@@ -243,12 +243,25 @@ static void test_register_class_forms(void)
     check_word("SKP IF DX UEQ 0             ",
                asm1_at(&st, 01000, "SKP IF DX UEQ 0"),
                0140000 + 07 + 02000);
+    /* SHR = "shift right, gives negative shift counter" (ND-60.096.01 sec
+     * 2.3.8; MAC.BPUN permsym SHR=0200). The count term following SHR is
+     * SUBTRACTED, so these are RIGHT shifts. Old (buggy) values summed the
+     * count and produced left shifts - corrected below.                    */
+    check_word("SHA SHR 6                   ",
+               asm1_at(&st, 01000, "SHA SHR 6"),
+               0154400 + 0200 - 6);          /* = 0154572 */
+    check_word("SHA SHR 3                   ",
+               asm1_at(&st, 01000, "SHA SHR 3"),
+               0154400 + 0200 - 3);          /* = 0154575 */
     check_word("SHA ZIN SHR 1               ",
                asm1_at(&st, 01000, "SHA ZIN SHR 1"),
-               0154400 + 02000 + 0200 + 1);
+               0154400 + 02000 + 0200 - 1);  /* = 0156577 */
     check_word("SHA ROT SHR 10              ",
                asm1_at(&st, 01000, "SHA ROT SHR 10"),
-               0154400 + 01000 + 0200 + 010);
+               0154400 + 01000 + 0200 - 010);/* = 0155170 */
+    check_word("SAD ZIN SHR 20              ",
+               asm1_at(&st, 01000, "SAD ZIN SHR 20"),
+               0154600 + 02000 + 0200 - 020);/* = 0156760 (DKADR divide setup) */
     check_word("BSET ZRO 70 DA              ",
                asm1_at(&st, 01000, "BSET ZRO 70 DA"),
                0174000 + 0 + 070 + 05);
@@ -517,6 +530,41 @@ static void test_forward_references(void)
     mac_line(&st, "STZ 0");
     mac_line(&st, "FWD, STZ 0");
     check_word("LDA forward label P-rel     ", st.mem[03000], 044002);
+
+    /* REGRESSION (mac.c tokenizer): a digit-leading, ALL-digit SYMBOL whose
+     * digits are not valid octal (contain 8 or 9) must resolve as a SYMBOL,
+     * not a number. TSS defines pointer literals like `9377, 377` (the 377
+     * byte-mask used by WBUF/RBUF). A tokenizer that classified `9377` as a
+     * number via isdigit() then ran strtol("9377",8), which stops at the
+     * non-octal '9' and returns 0 -- silently miscompiling `AND 9377` to
+     * `AND 0` (AND with the instruction word itself), zeroing every console
+     * character on the way into the type-ahead ring and hanging LOGON. */
+    fresh(&st);
+    st.loc = 01000;
+    mac_line(&st, "AND 9377");      /* forward ref to a digit-named symbol   */
+    mac_line(&st, "9377, 377");     /* 9377 defined at 01001, holds data 377 */
+    /* AND (070000) P-relative to 01001 from 01000 -> disp 1 -> 070001, NOT 0 */
+    check_word("AND 9377 resolves to symbol ", st.mem[01000], 070001);
+    check_word("9377 data word is 377       ", st.mem[01001], 000377);
+
+    /* backward reference to the same digit-named symbol also resolves */
+    fresh(&st);
+    st.loc = 01000;
+    mac_line(&st, "9377, 377");     /* 9377 at 01000                         */
+    mac_line(&st, "AND 9377");      /* at 01001, disp = 01000-01001 = -1     */
+    check_word("AND 9377 backward ref       ", st.mem[01001], 070377);
+
+    /* a genuine octal number is STILL a number (not a symbol) */
+    fresh(&st);
+    st.loc = 01000;
+    mac_line(&st, "377");           /* bare data word = octal 377            */
+    check_word("octal 377 still numeric     ", st.mem[01000], 000377);
+
+    /* a decimal literal (trailing '.') is STILL decimal */
+    fresh(&st);
+    st.loc = 01000;
+    mac_line(&st, "95.");           /* bare data word = decimal 95 = 0137    */
+    check_word("decimal 95. still numeric   ", st.mem[01000], 0000137);
 }
 
 /* ---------------------------------------------------------------------- */
@@ -1571,27 +1619,49 @@ static void test_overlay_pipeline(void)
     st.mem[041000 + 256] = 0xB100;     /* overlay1 sec1 word0              */
 
     const char *cdc = "mac_test_cdc.img";
+
+    /* First pin cdc_dkadr itself - the LOGICAL->PHYSICAL map the running DKADR
+     * applies. The live anchor (nd100x --mms1 --trace, IOX 503 A=000660 for
+     * logical 0244) is ground truth; the closed form is
+     *   DKADR(L) = 32*floor(L/12) + 2*(L mod 12)
+     * verified per-instruction off the live A/D/T trace with SHR fixed (see the
+     * cdc_dkadr header in mac.c). TWO old formulas are superseded: 72*L (from a
+     * DKADR whose RGDIV divide was undefined) and 8*floor(L*65537/12)+64*L =
+     * 077300 (from a DKADR whose "SHR" shifts were miscompiled as additive left
+     * shifts before the eval_expr SHR fix). */
+    check_int("cdc_dkadr live anchor 0244   ", (int)cdc_dkadr(0244), 0660);
+    check_int("cdc_dkadr(4)                 ", (int)cdc_dkadr(4), 8);
+    check_int("cdc_dkadr(5)                 ", (int)cdc_dkadr(5), 10);
+    check_int("cdc_dkadr(6)                 ", (int)cdc_dkadr(6), 12);
+    check_int("cdc_dkadr(7)                 ", (int)cdc_dkadr(7), 14);
+    /* Track boundary: 12 logical sectors per track. L=013(11.)->2*11=22.;
+     * L=014(12.) crosses to track 1 -> 32*1+0 = 32. */
+    check_int("cdc_dkadr last of track 0    ", (int)cdc_dkadr(013), 22);
+    check_int("cdc_dkadr track 1 boundary   ", (int)cdc_dkadr(014), 32);
+    check_int("cdc_dkadr masks to 13 bits   ", (int)cdc_dkadr(0244), (int)cdc_dkadr(0244 | 060000));
+
     check_true("CDC writer succeeds         ", mac_write_cdc_disc(&st, cdc));
 
-    /* Overlays are placed at the PHYSICAL sector DKADR(logical) = 72*logical
-     * (0o110*logical), NOT at the linear logical sector - the running reader
-     * runs the logical sector through DKADR before the disc read (see
-     * cdc_dkadr / OVERLAY-DISC-SPEC "DKADR physical addressing"). With OVDK=4:
-     *   overlay0 sec0: logical 4 -> phys 72*4 = 288 ; sec1: logical 5 -> 360
-     *   overlay1 sec0: logical 6 -> phys 72*6 = 432 ; sec1: logical 7 -> 504
+    /* Overlays are placed at the PHYSICAL sector DKADR(logical), NOT at the
+     * linear logical sector - the running reader runs the logical sector
+     * through DKADR before the disc read (see cdc_dkadr / OVERLAY-DISC-SPEC
+     * "DKADR physical addressing"). With OVDK=4 and DKADR=32*floor(L/12)+2*(L%12):
+     *   overlay0 sec0: logical 4 -> phys  8 ; sec1: logical 5 -> 10
+     *   overlay1 sec0: logical 6 -> phys 12 ; sec1: logical 7 -> 14
      * sector S starts at word index S*256.                                  */
-    check_word("CDC ovl0 sec0 word0         ", img_word_at(cdc, 288 * 256), 0xA000);
-    check_word("CDC ovl0 sec0 last word     ", img_word_at(cdc, 288 * 256 + 255), 0xA0FF);
-    check_word("CDC ovl0 sec1 word0         ", img_word_at(cdc, 360 * 256), 0xA100);
-    check_word("CDC ovl0 sec1 last word     ", img_word_at(cdc, 360 * 256 + 255), 0xA1FF);
-    check_word("CDC ovl1 sec0 word0         ", img_word_at(cdc, 432 * 256), 0xB000);
-    check_word("CDC ovl1 sec1 word0         ", img_word_at(cdc, 504 * 256), 0xB100);
-    /* the base region before the first overlay's physical sector is zeroed */
+    check_word("CDC ovl0 sec0 word0         ", img_word_at(cdc, 8 * 256), 0xA000);
+    check_word("CDC ovl0 sec0 last word     ", img_word_at(cdc, 8 * 256 + 255), 0xA0FF);
+    check_word("CDC ovl0 sec1 word0         ", img_word_at(cdc, 10 * 256), 0xA100);
+    check_word("CDC ovl0 sec1 last word     ", img_word_at(cdc, 10 * 256 + 255), 0xA1FF);
+    check_word("CDC ovl1 sec0 word0         ", img_word_at(cdc, 12 * 256), 0xB000);
+    check_word("CDC ovl1 sec1 word0         ", img_word_at(cdc, 14 * 256), 0xB100);
+    /* sector 0 is not an overlay physical sector here, so it stays zeroed    */
     check_word("CDC pre-overlay region zeroed", img_word_at(cdc, 0), 0);
-    check_word("CDC gap between phys sectors ", img_word_at(cdc, 289 * 256), 0);
+    /* phys sectors 8,10,12,14 are used; 9 is an odd-sector gap between them   */
+    check_word("CDC gap between phys sectors ", img_word_at(cdc, 9 * 256), 0);
 
-    /* file size covers up to the max physical sector: max logical = 7,
-     * phys = 72*7 = 504, so (504+1) sectors * 256 words * 2 bytes.         */
+    /* file size covers up to the MAX physical sector over ALL overlay sectors:
+     * max over {4,5,6,7} is DKADR(7)=14, so (14+1) sectors * 256 words * 2 bytes. */
     FILE *cf = fopen(cdc, "rb");
     long sz = 0;
     if (cf != NULL)
@@ -1600,7 +1670,7 @@ static void test_overlay_pipeline(void)
         sz = ftell(cf);
         fclose(cf);
     }
-    check_int("CDC image size correct       ", sz, (72 * 7 + 1) * 256 * 2);
+    check_int("CDC image size correct       ", sz, (14 + 1) * 256 * 2);
 
     /* writer fails cleanly when the overlay symbols are absent            */
     fresh(&st);
@@ -1649,9 +1719,9 @@ static void test_overlay_pipeline(void)
      * writer derives VOR_base = VOR - RQR*VORS = 41000 - 1000 = 40000.      */
     mac_line(&st, ")KILL VOR");
     mac_line(&st, "VOR=41000");
-    /* it reaches the CDC disc at the DKADR physical sector 72*OVDK = 288    */
+    /* it reaches the CDC disc at the DKADR physical sector DKADR(OVDK=4)=8 */
     check_true("CDC writer (fwd-ref) ok     ", mac_write_cdc_disc(&st, cdc));
-    check_word("overlay fwd-ref on disc     ", img_word_at(cdc, 288 * 256), 044002);
+    check_word("overlay fwd-ref on disc     ", img_word_at(cdc, 8 * 256), 044002);
     remove(cdc);
 
     /* (b) forward ref resolved AFTER the snapshot: VOR copy stays pre-patch */
@@ -1723,6 +1793,57 @@ static void test_undefined_opcode_guard(void)
 }
 
 /* ---------------------------------------------------------------------- */
+/* 14. undefined-OPERAND guard + CLD permsym                               */
+/* An undefined symbol consumed as the VALUE OPERAND of a defined instr
+ * (e.g. "SAT STR1", the STR->XTR rename casualty) would silently emit
+ * "SAT 0". The guard flags used_as_operand and hard-errors at end. Also
+ * checks CLD (=0100), the register-op modifier the extraction had missed,
+ * against the values verified on the REAL MAC.                            */
+static void test_undefined_operand_guard(void)
+{
+    printf("[14] undefined-operand guard + CLD\n");
+    mac_state st;
+
+    /* ---- ARG8 (SAT) undefined operand -> silently SAT 0, hard error --- */
+    fresh(&st);
+    uint16_t at = st.loc;
+    mac_line(&st, "SAT ZZZUNDEF");
+    check_word("SAT undef: emitted SAT 0     ", st.mem[at], 0171000);
+    check_int("SAT undef: swept as error    ", mac_check_undefined_opcodes(&st), 1);
+    check_true("SAT undef: st.errors set     ", st.errors > 0);
+
+    /* ---- MRI (STT ,B) undefined operand -> hard error ---------------- */
+    fresh(&st);
+    mac_line(&st, "STT ZZZUNDEF,B");
+    check_int("STT undef,B: swept as error  ", mac_check_undefined_opcodes(&st), 1);
+
+    /* ---- resolved forward-ref operand -> NOT an error ---------------- */
+    fresh(&st);
+    mac_line(&st, "SAT FWDOP");
+    st.loc = 02000;
+    mac_line(&st, "FWDOP, 0");
+    check_int("resolved operand fwd: no error", mac_check_undefined_opcodes(&st), 0);
+    check_int("resolved operand fwd: errs==0 ", st.errors, 0);
+
+    /* ---- bare mark line: undefined but NOT an operand -> not flagged -- */
+    fresh(&st);
+    mac_line(&st, "ZZZMARK2");
+    check_int("bare mark2: not an operand    ", mac_check_undefined_opcodes(&st), 0);
+
+    /* ---- CLD = 0100: verified on REAL MAC (SWAP CLD DT SA -> 144156,
+     *      SWAP DT SA -> 144056; difference 0100). Confirms the added
+     *      permsym encodes the clear-destination bit and CLD is defined.  */
+    fresh(&st);
+    at = st.loc;
+    mac_line(&st, "SWAP CLD DT SA");
+    check_word("SWAP CLD DT SA = 144156      ", st.mem[at], 0144156);
+    at = st.loc;
+    mac_line(&st, "SWAP DT SA");
+    check_word("SWAP DT SA = 144056          ", st.mem[at], 0144056);
+    check_int("CLD defined: no undef error   ", mac_check_undefined_opcodes(&st), 0);
+}
+
+/* ---------------------------------------------------------------------- */
 int main(void)
 {
     printf("=== MAC-C assembler unit tests ===\n\n");
@@ -1748,6 +1869,7 @@ int main(void)
     test_file_assembly();
     test_overlay_pipeline();
     test_undefined_opcode_guard();
+    test_undefined_operand_guard();
 
     printf("\n=== %d passed, %d failed ===\n", g_pass, g_fail);
     return g_fail == 0 ? 0 : 1;

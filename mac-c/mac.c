@@ -294,7 +294,19 @@ static uint16_t eval_term(mac_state *st, const char *tok, mac_sym **undef_sym,
         bool all_digits = (digits > 0);
         for (size_t i = 0; i < digits; i++)
         {
-            if (!isdigit((unsigned char)tok[i]))
+            unsigned char c = (unsigned char)tok[i];
+            /* The token is a NUMBER only if every character is valid IN ITS
+             * RADIX. MAC numbers are octal by default (0-7); a trailing '.'
+             * makes them decimal (0-9). A digit-leading token that is not a
+             * valid number in its radix is a SYMBOL - TSS defines all-digit
+             * pointer literals like 9377/9177/9427 (the 377 byte-mask etc.).
+             * BUG (fixed): using isdigit() here accepted 8/9 as "digits", so
+             * `AND 9377` was classified as a number and strtol(...,8) stopped
+             * at the '9' and returned 0 -> the instruction silently became
+             * `AND 0` (AND with itself), zeroing every console character in
+             * WBUF/RBUF and hanging LOGON. Octal digits are 0-7 ONLY. */
+            bool valid = decimal ? isdigit(c) : (c >= '0' && c <= '7');
+            if (!valid)
             {
                 all_digits = false;
                 break;
@@ -335,6 +347,11 @@ static uint16_t eval_expr(mac_state *st, const char *expr, mac_sym **undef_sym,
     int ti = 0;
     bool have_shift = false;
     uint16_t shift_amt = 0;
+    /* SHR - "Shift right, gives negative shift counter" (ND-60.096.01 sec
+     * 2.3.8). When the SHR shift modifier has just been summed, the shift-
+     * count term that FOLLOWS it must be SUBTRACTED (see the detailed note
+     * at the term-add below).                                              */
+    bool shr_pending = false;
 
     for (const char *p = expr;; p++)
     {
@@ -370,7 +387,32 @@ static uint16_t eval_expr(mac_state *st, const char *expr, mac_sym **undef_sym,
                     acc = (uint16_t)(acc << (shift_amt & 0x0F));
                     have_shift = false;
                 }
-                acc = (uint16_t)(acc + sign * v);
+                /* SHR - "Shift right, gives negative shift counter" - inverts
+                 * the sign of the shift-count term that FOLLOWS it. In a NORD
+                 * shift instruction (SHT/SHD/SHA/SAD) the low 7 bits (0-6) are
+                 * a SIGNED shift counter, so a right shift is a NEGATIVE count.
+                 * MAC's permanent-symbol value for SHR is 0200 (verified in
+                 * MAC.BPUN's permsym table at 0xE9B3), which is bit-identical
+                 * to SHD's register-select bit - so a plain additive SHR
+                 * wrongly produced e.g. "SHA SHR 6" = 0154606 = "SAD 6", a
+                 * LEFT shift of A+D. The correct behaviour (ND-60.096.01 sec
+                 * 2.3.8: "SHR - Shift right, gives negative shift counter.
+                 * Note that SHR must precede the specified shift counter") is:
+                 * SHR still contributes its own 0200, then the NEXT numeric
+                 * term is SUBTRACTED, forming a 7-bit two's-complement
+                 * negative counter:
+                 *   SHA SHR 6      = 0154400 + 0200 - 6        = 0154572
+                 *   SHA ZIN SHR 1  = 0154400 + 02000 + 0200 -1 = 0156577
+                 *   SAD ZIN SHR 20 = 0154600 + 02000 + 0200-020= 0156760 (DKADR)
+                 * ROT/ZIN/LIN (01000/02000/03000, the shift-TYPE bits 9-10)
+                 * are genuinely additive and are NOT touched here.           */
+                int eff_sign = shr_pending ? -sign : sign;
+                shr_pending = false;
+                acc = (uint16_t)(acc + eff_sign * v);
+                if (strcmp(tok, "SHR") == 0)
+                {
+                    shr_pending = true; /* negate the following count term */
+                }
                 ti = 0;
                 /* a blank does not change the sign; '+'/'-' below do */
                 if (isspace((unsigned char)c))
@@ -1801,6 +1843,10 @@ static void assemble_stmt(mac_state *st, char *stmt)
             if (here > st->hi_used) st->hi_used = here;
             st->loc++;
             pending_add(oper.undef, here, here, MAC_FIX_PREL8);
+            /* Flag: undefined VALUE OPERAND of a defined MRI (e.g. "STT STRX,B").
+             * A real forward ref clears this by being defined; if still
+             * undefined at end, mac_check_undefined_opcodes() hard-errors.   */
+            oper.undef->used_as_operand = true;
             return;
         }
 
@@ -1853,6 +1899,7 @@ static void assemble_stmt(mac_state *st, char *stmt)
             if (here > st->hi_used) st->hi_used = here;
             st->loc++;
             pending_add(oper.undef, here, here, MAC_FIX_PREL8);
+            oper.undef->used_as_operand = true; /* undefined JUMP8 target */
             return;
         }
         int disp = (int)oper.disp - (int)here;
@@ -1878,6 +1925,10 @@ static void assemble_stmt(mac_state *st, char *stmt)
             if (here > st->hi_used) st->hi_used = here;
             st->loc++;
             pending_add(uo, here, here, MAC_FIX_ARG8);
+            /* Flag: undefined VALUE OPERAND of a defined ARG8 instr, e.g.
+             * "SAT STR1" (the STR->XTR rename casualty) -> silently SAT 0.
+             * Errors at end of assembly if still undefined.                  */
+            uo->used_as_operand = true;
             return;
         }
         emit(st, (uint16_t)(opc + (arg & 0x00FF)));
@@ -2749,11 +2800,26 @@ int mac_check_undefined_opcodes(mac_state *st)
     int n = 0;
     for (mac_sym *s = st->symtab; s != NULL; s = s->next)
     {
-        if (!s->defined && s->used_as_opcode)
+        if (s->defined)
         {
-            /* mac_err increments st->errors, so main() returns non-zero and
-             * the build FAILS instead of shipping a silently-corrupt image.  */
+            continue;
+        }
+        /* mac_err increments st->errors, so main() returns non-zero and the
+         * build FAILS instead of shipping a silently-corrupt image. Two cases:
+         *   - used_as_opcode : undefined symbol in the OPCODE position
+         *     (e.g. "RGDIV ST" in a non-N10 build).
+         *   - used_as_operand: undefined symbol consumed as the VALUE OPERAND
+         *     of a defined instruction (e.g. "SAT STR1" -> silently SAT 0,
+         *     the STR->XTR rename casualty). Both are silent-miscompile bugs
+         *     that the golden ADDRESS dumps cannot see (word count unchanged). */
+        if (s->used_as_opcode)
+        {
             mac_err(st, "undefined instruction:", s->name);
+            n++;
+        }
+        else if (s->used_as_operand)
+        {
+            mac_err(st, "undefined operand:", s->name);
             n++;
         }
     }
@@ -2837,41 +2903,99 @@ bool mac_write_image(mac_state *st, const char *path)
 
 /* -------------------------------------------------------------------------
  * cdc_dkadr - forward transcription of the TSS DKADR routine's LOGICAL ->
- * PHYSICAL disc-address mapping for the CDC N10 (DRUM) build.
+ * PHYSICAL CDC disc-address mapping for the CDC N10 (DRUM) build, unit 0.
  *
- * DKADR (TSS1.SYMB:3563-3623, "CONVERT NCR DISK ADDRESS TO CDC DISK ADDRESS")
- * is what the running driver applies to a logical disc sector before it loads
- * the CDC controller block-address register (IOX 503). The overlay reader path
- * is  S5 (TSS1.SYMB:3069-3073) -> SDISK (9SDK) -> DKOP -> JPL I (DKADR ->
- * IOX LBA. To be found by that read, each overlay must be placed at the SAME
- * physical sector DKADR produces, not at the raw logical sector.
+ * DKADR (src/TSS1.SYMB:3589-3646, "CONVERT NCR DISK ADDRESS TO CDC DISK
+ * ADDRESS") is what the running driver applies to a logical disc sector before
+ * it loads the CDC controller block-address register (IOX 503). The overlay
+ * reader path is  S5 (TSS1.SYMB:3069-3073) -> SDISK (9SDK) -> DKOP -> JPL I
+ * (DKADR -> IOX LBA. To be found by that read, each overlay must be placed at
+ * the SAME physical sector DKADR produces, not at the raw logical sector.
  *
- * The mapping was established by executing the ASSEMBLED DRUM build under
- * nd100x and single-stepping DKADR (entry 010006). [VERIFIED - live boot trace]
- * The built "N10 CDC" path is pure straight-line shift/multiply (no hardware
- * divide is taken for a unit-0 address); for logical sector L it computes:
- *     D := L << 5              = 32*L      (010026 SHD ZIN 5)
- *     T := L << 5              = 32*L      (010027 RORA ; 010030 SHT 5)
- *     A := L * 0o14 (=12 dec)  = 12*L      (010031 MPY (14, TSS1.SYMB:3598)
- *     D := D - A   = 32L-12L   = 20*L      (010032 RSUB DD SA)
- *     D := D + D               = 40*L      (010033 RADD DD SD)
- *     T := T + D   = 32L+40L   = 72*L      (010034 RADD DT SD)  <- returned in A
- * i.e.  DKADR(L) = 72 * L  =  0o110 * L   for a unit-0 sector.
- * Trace check: DKADR(0156) returned 017360  (72 * 110dec = 7920 = 017360). [V]
+ * ---- HISTORY / two superseded formulas ----
+ * (1) An early version returned 72*L. It was traced while DKADR's divide-by-12
+ *     ("RGDIV ST") was UNDEFINED, so the divide never ran and DKADR degenerated
+ *     to a plain multiply. Fixed by RGDIV=RDIV (TSS1.SYMB:3616).
+ * (2) A second version returned 8*floor(L*65537/12) + 64*L (giving 077300 for
+ *     L=0244). It was traced while the mac-c assembler MISCOMPILED the shift
+ *     modifier "SHR": MAC's SHR permsym is 0200 (MAC.BPUN permsym table at
+ *     0xE9B3), which is bit-identical to SHD's register-select bit, so a plain
+ *     ADDITIVE SHR turned every "... SHR n" right shift into a LEFT shift of a
+ *     different register. In DKADR that broke three shifts:
+ *        "SAD ZIN SHR 20" (010016), "SHT ZIN SHR 5" (010026), "SHA SHR 6"
+ *     making the SAD divide-setup a no-op and mis-scaling the result.
+ *     With SHR fixed (eval_expr: SHR subtracts the following count, per
+ *     ND-60.096.01 sec 2.3.8 "shift right, gives negative shift counter") the
+ *     three shifts assemble to their correct RIGHT-shift encodings
+ *     (0156760 / 0156173 / 0154572) and DKADR runs its TRUE algorithm.
  *
- * The overlay system disc is always unit 0, so the "displacement for unit 1"
- * (0o52600, TSS1.SYMB:3600-3602) is never added, and the DKLIM=626 legality
- * clamp (TSS1.SYMB:3604-3608) is never reached for the overlay range: the max
- * overlay logical sector is OVDK+2*RQR-1 = 0o255, and 72*0o255 = 0o30250, well
- * within limits. DKADR returns the un-clamped T=72*L regardless of the check
- * (TSS1.SYMB:3610-3612 "COPY DA ST; EXIT AD1" returns T, untouched by the
- * legality test). So a plain multiply reproduces it exactly for the overlays. */
-static uint32_t cdc_dkadr(uint16_t logical_sector)
+ * ---- The TRUE as-built algorithm (SHR fixed) ----
+ * [VERIFIED by single-stepping the running DKADR under nd100x --mms1 for
+ * logical 0244, PC 010006..010052; EVERY register value below was read off the
+ * live --trace, A/D/T columns. See mac-c/dkadr_trace.sh + dkadr_pairs.awk.]
+ *
+ * Registers are 16-bit; AD is the 32-bit double accumulator (A high, D low).
+ * The driver passes the logical sector L in A/T at entry.
+ *
+ *   010012 AND (17777    A := L & 017777    (13 significant NCR sector bits)
+ *   010013 COPY DD SA    D := A = L
+ *   010016 SAD ZIN SHR 20  AD >>= 16 (0o20=16, RIGHT shift, zero-in): with
+ *                        A=D=L before, AD=(L<<16)|L; after: A=0, D=L. So the
+ *                        DIVIDEND becomes exactly L (not (L<<16)|L). This is the
+ *                        step the SHR bug had neutralised. [VERIFIED: 010017
+ *                        A=000000 D=000244 for L=0244.]  (TSS1.SYMB:3617)
+ *   010017 SAT 14        T := 12 decimal   (0o14 = 12, the divisor)
+ *   010020 RDIV ST       AD / T -> quotient A, remainder D:
+ *                        Q := L / 12 ,  R := L mod 12
+ *                        [VERIFIED: L=0244(164.) -> A=0o15(Q=13) D=0o10(R=8)]
+ *   010021 COPY DT SA    T := A = Q
+ *   010026 SHT ZIN SHR 5 T := T >> 5 (T=0 here after LDT DKTT, so no-op)
+ *   010027 RORA DT SA    T := A = Q                             (TSS1:3624)
+ *   010030 SHT 5         T := (Q << 5) & 0xFFFF                 (TSS1:3624)
+ *   010031 MPY (14       A := (Q * 12) & 0xFFFF                 (TSS1:3628)
+ *   010032 RSUB DD SA    D := (L - 12*Q) & 0xFFFF = R           (TSS1:3628)
+ *   010033 RADD DD SD    D := (D + D) & 0xFFFF = 2*R            (TSS1:3628)
+ *   010034 RADD DT SD    T := (T + D) & 0xFFFF = 32*Q + 2*R
+ *                                                  <-- RESULT   (TSS1:3628)
+ *   010035..010052       unit-1 displacement (0o52600, TSS1:3632) is NEVER added
+ *                        for the overlay disc (unit 0: the SSK skip at 010037 is
+ *                        taken); the returned value is ALWAYS T ("COPY DA ST;
+ *                        EXIT AD1", TSS1:3642). The DKLIM=626 legality clamp
+ *                        (TSS1:3636-3638) extracts the cylinder via the now-
+ *                        correct "SHA SHR 6" (A := T>>6 = 6 for L=0244) and only
+ *                        decides success vs failure; it does not change T.
+ *                        [VERIFIED - live trace returns T=0660 and takes the
+ *                        legal path; IOX 503 loads A=000660.]
+ *
+ * Closed form, all arithmetic mod 2^16:
+ *     DKADR(L) = 32*floor(L/12) + 2*(L mod 12)
+ * This is a base-12 -> "track*32 + 2*sector" repack (12 = sectors per track).
+ * Live anchor: DKADR(0244) = 32*13 + 2*8 = 432 = 0o660.
+ * [VERIFIED - IOX 503 A=000660 in --trace, and matched writer==reader by the
+ * reboot test for every overlay sector the boot touches.]
+ *
+ * The mapping is monotonic and DENSE (unlike the buggy 077300 scatter): over the
+ * overlay logical range 0160..0257 the physical sector runs 0o560..0o716, so the
+ * image is small (< 512 sectors). mac_write_cdc_disc still SCANS all overlay
+ * sectors to size the image, which is correct for any monotonic or scattered
+ * mapping.                                                                     */
+uint32_t cdc_dkadr(uint16_t logical_sector)
 {
-    /* Keep only the 13-bit significant NCR sector field (TSS1.SYMB:3578
-     * "AND (17777"); unit bits 13..15 are 0 for the overlay disc, unit 0.   */
+    /* Keep only the 13 significant NCR sector bits (TSS1.SYMB:3593 "AND (17777");
+     * the unit bits are 0 for the overlay disc (unit 0).                      */
     uint32_t L = (uint32_t)(logical_sector & 017777u);
-    return L * 72u;   /* 0o110 * L = 32*L + 40*L, verified from the live trace */
+
+    /* "SAD ZIN SHR 20" (010016) shifts AD right 16 so the dividend is L itself,
+     * then "RDIV ST" with T=12 (SAT 14) divides: Q = L/12, R = L mod 12.
+     * [VERIFIED live: L=0244 -> Q=0o15, R=0o10.] (TSS1.SYMB:3617-3618)         */
+    uint32_t Q = L / 12u;
+    uint32_t R = L % 12u;
+
+    /* Result T = (Q<<5) + 2*R = 32*Q + 2*R, masked to 16 bits exactly as the
+     * ND-100 T register does. Built by SHT 5 (T=Q<<5, 010030), then
+     * RSUB/RADD/RADD adding 2*R (010032-010034). (TSS1.SYMB:3624-3628)         */
+    uint32_t T = ((Q << 5) + (R << 1)) & 0xFFFFu;
+    return T;
 }
 
 bool mac_write_cdc_disc(mac_state *st, const char *path)
@@ -2908,13 +3032,24 @@ bool mac_write_cdc_disc(mac_state *st, const char *path)
     }
     uint16_t vbase = (uint16_t)(vend - (uint16_t)(count * vors));
 
-    /* Image size: every overlay's PHYSICAL sector = cdc_dkadr(logical), which
-     * spaces sectors out by *72, so the image is large and sparse. Size it to
-     * cover the highest physical sector any overlay reaches. The largest
-     * logical sector is the last overlay's second half, ovdk+spo*count-1, and
-     * cdc_dkadr is monotonic in L, so that gives the max physical sector.     */
-    uint32_t max_logical = (uint32_t)ovdk + (uint32_t)spo * count - 1u;
-    uint32_t max_phys = cdc_dkadr((uint16_t)max_logical);
+    /* Image size: every overlay's PHYSICAL sector = cdc_dkadr(logical). The
+     * CORRECTED DKADR mapping (32*floor(L/12)+2*(L mod 12)) is dense and small
+     * over the overlay range, but to stay robust for ANY mapping we still scan
+     * EVERY overlay sector and take the true maximum physical sector, so the
+     * image (and every write below) stays in bounds.                          */
+    uint32_t max_phys = 0u;
+    for (uint16_t mn = 0; mn < count; mn++)
+    {
+        for (uint16_t ms = 0; ms < spo; ms++)
+        {
+            uint16_t mlog = (uint16_t)((uint32_t)ovdk + (uint32_t)spo * mn + ms);
+            uint32_t mp = cdc_dkadr(mlog);
+            if (mp > max_phys)
+            {
+                max_phys = mp;
+            }
+        }
+    }
     uint32_t total_sectors = max_phys + 1u;
     uint32_t total_words = total_sectors * SECTOR_WORDS;
 
@@ -2955,6 +3090,14 @@ bool mac_write_cdc_disc(mac_state *st, const char *path)
                 st->mem[window], st->mem[(uint16_t)(window + 1)],
                 st->mem[(uint16_t)(window + 2)], st->mem[(uint16_t)(window + 3)]);
     }
+    /* Surface summary: the CORRECTED DKADR (32*floor(L/12)+2*(L mod 12)) packs
+     * overlays into a small, dense physical range. Report the true max physical
+     * sector and the resulting image size so the boot test and the nd100x CDC
+     * device (CDC_DEFAULT_SECTORS) can be sized to cover it.                   */
+    fprintf(stderr, "  max phys sector = %06o (%u dec) -> image %u sectors, "
+                    "%u bytes\n",
+            (unsigned)max_phys, (unsigned)max_phys,
+            (unsigned)total_sectors, (unsigned)(total_words * 2u));
 
     FILE *f = fopen(path, "wb");
     if (f == NULL)

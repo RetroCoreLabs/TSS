@@ -1182,7 +1182,7 @@ static void test_remaining_commands(void)
     check_true(")9TSS is an alias of )9EXIT ", st.end_of_file_seen);
 
     /* ---- )SOVER / )8DUMP are documented intentional no-ops ----------- */
-    /* Per docs/OVERLAY-DISC-SPEC.md they live only in the "NMACF / "TSBIN
+    /* Per docs/TSS-ARCHITECTURE.md (overlay chapter) they live only in the "NMACF / "TSBIN
      * paths (never assembled in the MACF builds) and would need ND-100
      * execution. mac-c correctly does nothing with them: no image effect,
      * no error. (The overlay pipeline is reproduced by )9MOVE + the CDC
@@ -1506,7 +1506,7 @@ static void test_file_assembly(void)
 /* 12. Overlay pipeline: )9MOVE block copy, )CHANGE via OLD/NEW/MASK,       */
 /*     )PUNCH object-stream routing, and the CDC-disc image writer.         */
 /*     Oracles: ND-60.096.01 (C.1.1.1 )9MOVE, 4.2.3.5 )CHANGE, line 2394    */
-/*     )PUNCH) and docs/OVERLAY-DISC-SPEC.md (sec 2/4 disc contract).       */
+/*     )PUNCH) and docs/TSS-ARCHITECTURE.md (overlay chapter) (sec 2/4 disc contract).       */
 /* ---------------------------------------------------------------------- */
 
 /* read one big-endian 16-bit word at word index 'w' from a raw image file */
@@ -1604,7 +1604,7 @@ static void test_overlay_pipeline(void)
     /* Synthetic 2-overlay set. Constants read from the symbol table:
      *   OVDK=4  VORS=01000(512)  RQR=2(count)  VOR=final=base+count*VORS
      * VOR_base = VOR - RQR*VORS = 040000. Windows at 040000 and 041000.
-     * Overlay n -> sectors OVDK+2n / OVDK+2n+1 (OVERLAY-DISC-SPEC sec 2). */
+     * Overlay n -> sectors OVDK+2n / OVDK+2n+1 (TSS-ARCHITECTURE.md overlay chapter sec 2). */
     fresh(&st);
     mac_line(&st, "OVDK=4");
     mac_line(&st, "VORS=1000");        /* 512 words = two 256-word sectors */
@@ -1644,7 +1644,7 @@ static void test_overlay_pipeline(void)
 
     /* Overlays are placed at the PHYSICAL sector DKADR(logical), NOT at the
      * linear logical sector - the running reader runs the logical sector
-     * through DKADR before the disc read (see cdc_dkadr / OVERLAY-DISC-SPEC
+     * through DKADR before the disc read (see cdc_dkadr / TSS-ARCHITECTURE.md overlay chapter
      * "DKADR physical addressing"). With OVDK=4 and DKADR=32*floor(L/12)+2*(L%12):
      *   overlay0 sec0: logical 4 -> phys  8 ; sec1: logical 5 -> 10
      *   overlay1 sec0: logical 6 -> phys 12 ; sec1: logical 7 -> 14
@@ -1843,6 +1843,81 @@ static void test_undefined_operand_guard(void)
     check_int("CLD defined: no undef error   ", mac_check_undefined_opcodes(&st), 0);
 }
 
+/* [15] Forward-reference expressions keep their constant addend.
+ *
+ * Found LIVE on nd100x (login debug session 2026-07-23): TSS2 ROBJ ends
+ *     RF4,  SAA 4;  JMP RFN+2
+ *     RF9,  SAA 11; JMP RFN+2
+ *     RFN,  STZ I (BTEMP-4; SAA -1; STA AREG,B; JPL I (UNLOK; RET
+ * RFN is a forward reference, and the old PREL8/ARG8 patch wrote
+ * (sym - pc) into the displacement, DISCARDING the +2/+3 - so all three
+ * exits landed on RFN itself. RF9's error 9 ("index out of range") was
+ * then rewritten by "SAA -1" to -1 ("empty object"), GBARR treated that
+ * as a valid empty directory slot, and LOGON's OPEN of ()SCRATCH
+ * enumerated the SYSTEM user's file directory forever (observed index
+ * 124505 octal and climbing) = the interactive-login hang. The golden
+ * symbol dumps cannot see this class: word COUNT is unchanged.
+ * Real MAC must add the constant: the 1973-78 TSS ran in production, so
+ * ROBJ's error exits worked there.                                        */
+static void test_forward_ref_addend(void)
+{
+    printf("[15] forward-ref expression addend\n");
+    mac_state st;
+
+    /* ---- the exact ROBJ shape: JMP RFN+2 across a forward label ------- */
+    fresh(&st);
+    uint16_t at = st.loc;
+    mac_line(&st, "SAA 11; JMP RFN+2");           /* at, at+1              */
+    mac_line(&st, "RFN, STZ I (BTEMP2; SAA -1; STA 5,B"); /* at+2,+3,+4    */
+    /* JMP at at+1 must target RFN+2 = at+4 -> disp 3 (target - here)      */
+    check_word("JMP RFN+2 fwd: disp keeps +2 ", st.mem[at + 1], 0124003);
+
+    /* ---- forward JUMP8 with +3 (the R2 "JMP RFN+3" success exit) ------ */
+    fresh(&st);
+    at = st.loc;
+    mac_line(&st, "JMP FW3+3");
+    mac_line(&st, "FW3, 0; 0; 0; 0");
+    check_word("JMP FW3+3 fwd: disp = 4      ", st.mem[at], 0124004);
+
+    /* ---- forward JUMP8 with a NEGATIVE addend ------------------------- */
+    fresh(&st);
+    at = st.loc;
+    mac_line(&st, "JMP FWN-1");                    /* target = FWN-1 = at+1 */
+    mac_line(&st, "0");                            /* at+1                  */
+    mac_line(&st, "FWN, 0");                       /* at+2                  */
+    check_word("JMP FWN-1 fwd: disp = 1      ", st.mem[at], 0124001);
+
+    /* ---- forward MRI address operand with +1 (LDA FWD+1) -------------- */
+    fresh(&st);
+    at = st.loc;
+    mac_line(&st, "LDA FWM+1");
+    mac_line(&st, "FWM, 0; 0");                    /* FWM=at+1, +1 -> at+2  */
+    check_word("LDA FWM+1 fwd: disp = 2      ", st.mem[at], 0044002);
+
+    /* ---- forward ARG8 value operand with +2 (SAA CON+2) --------------- */
+    fresh(&st);
+    at = st.loc;
+    mac_line(&st, "SAA FCON+2");
+    mac_line(&st, "FCON=5");
+    check_word("SAA FCON+2 fwd: arg = 7      ", st.mem[at], 0170407);
+
+    /* ---- backward reference with addend: unchanged behaviour ---------- */
+    fresh(&st);
+    mac_line(&st, "BK, 0; 0");
+    at = st.loc;
+    mac_line(&st, "JMP BK+2");                     /* target = at itself... */
+    /* BK = at-2, BK+2 = at -> disp 0                                      */
+    check_word("JMP BK+2 back: disp = 0      ", st.mem[at], 0124000);
+
+    /* ---- plain forward ref (no addend) still exact -------------------- */
+    fresh(&st);
+    at = st.loc;
+    mac_line(&st, "JMP FW0");
+    mac_line(&st, "0");
+    mac_line(&st, "FW0, 0");                       /* FW0 = at+2 -> disp 2  */
+    check_word("JMP FW0 fwd: disp = 2        ", st.mem[at], 0124002);
+}
+
 /* ---------------------------------------------------------------------- */
 int main(void)
 {
@@ -1870,6 +1945,7 @@ int main(void)
     test_overlay_pipeline();
     test_undefined_opcode_guard();
     test_undefined_operand_guard();
+    test_forward_ref_addend();
 
     printf("\n=== %d passed, %d failed ===\n", g_pass, g_fail);
     return g_fail == 0 ? 0 : 1;

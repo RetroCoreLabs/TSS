@@ -26,7 +26,7 @@
 ** dump exactly (currently 679/693, all 14 misses are macro-body names    **
 ** MAC lists from its own image - see README.md). The overlay-to-disc     **
 ** pipeline ()9MOVE block copy + the CDC-disc image writer) is            **
-** implemented per docs/OVERLAY-DISC-SPEC.md; )SOVER/)8DUMP need ND-100   **
+** implemented per docs/TSS-ARCHITECTURE.md (overlay chapter); )SOVER/)8DUMP need ND-100   **
 ** execution and are documented intentional no-ops (see the catch-all).  **
 **                                                                       **
 ** Ronny Hansen                                                          **
@@ -111,15 +111,21 @@ static void sym_resolve_fixups(mac_state *st, mac_sym *sym, mac_fixup **head)
             /* P-relative: EA = (P) + disp where P is the instruction's OWN
              * address (ND-60.096.01 sec 2.3.1; verified against MAC.BPUN:
              * JMP *0xdef6 at 0xdf11 encodes disp 0345 = -27 = target-here).
-             * f->pc holds the instruction address.                          */
-            int disp = (int)sym->value - (int)f->pc;
+             * f->pc holds the instruction address.
+             * f->addend is the constant part of the operand expression
+             * ("JMP RFN+2" -> 2): the true target is sym + addend. Found
+             * live on nd100x: without it TSS2 ROBJ's three "JMP RFN+2/+3"
+             * exits all landed on RFN, rewriting error 9 to -1 and looping
+             * LOGON's ()SCRATCH open forever (the login hang).            */
+            int disp = (int)(uint16_t)(sym->value + f->addend) - (int)f->pc;
             st->mem[f->addr] = (uint16_t)((st->mem[f->addr] & 0xFF00) |
                                           (disp & 0x00FF));
             break;
         }
         case MAC_FIX_ARG8:
+            /* same addend rule for argument instructions (SAA FOO+2)      */
             st->mem[f->addr] = (uint16_t)((st->mem[f->addr] & 0xFF00) |
-                                          (sym->value & 0x00FF));
+                                          ((sym->value + f->addend) & 0x00FF));
             break;
         }
         free(f);
@@ -174,12 +180,19 @@ static mac_fixup **pending_chain_for(mac_sym *sym)
     return &p->chain;
 }
 
-static void pending_add(mac_sym *sym, uint16_t addr, uint16_t pc, mac_fix_kind k)
+/* addend: the already-evaluated constant part of the expression the
+ * undefined symbol sits in (eval_expr sums undefined symbols as 0, so for
+ * "RFN+2" the accumulator holds 2). FULL fixups keep that constant in the
+ * emitted word itself and pass 0 here; PREL8/ARG8 words hold opcode+mode
+ * in the field being patched, so the constant must travel in the fixup.   */
+static void pending_add(mac_sym *sym, uint16_t addr, uint16_t pc,
+                        mac_fix_kind k, uint16_t addend)
 {
     mac_fixup **head = pending_chain_for(sym);
     mac_fixup *f = (mac_fixup *)calloc(1, sizeof(mac_fixup));
     f->addr = addr;
     f->pc = pc;
+    f->addend = addend;
     f->kind = k;
     f->next = *head;
     *head = f;
@@ -911,7 +924,7 @@ static void cmd_fill(mac_state *st)
             {
                 st->mem[st->loc] = L->extra;
                 st->used[st->loc] = 1;
-                pending_add(s, st->loc, st->loc, MAC_FIX_FULL);
+                pending_add(s, st->loc, st->loc, MAC_FIX_FULL, 0);
                 st->loc++;
             }
         }
@@ -1210,13 +1223,13 @@ static void cmd_change(mac_state *st)
  * destination address 3. word count." It is an FMAC/MACF extension, not a
  * base-MAC command.
  *
- * [VERIFIED docs/OVERLAY-DISC-SPEC.md sec 1.3, line 83-87] "It is a raw
+ * [VERIFIED docs/TSS-ARCHITECTURE.md (overlay chapter) sec 1.3, line 83-87] "It is a raw
  * block copy of assembled words - no relocation/patching." In the TSS
  * corpus it appears once, in the "MACF variant of the OVERX macro
  * (TSS3.SYMB:83 ")9MOVE ROVER VOR VORS"), staging each 1000-octal-word
  * overlay from its assembly window at ROVER into the next VOR slot so all
  * 31 overlays survive in MAC's memory image (VOR advances by VORS=01000 per
- * overlay: 040000, 041000, ... 076000). See OVERLAY-DISC-SPEC.md sec 6.
+ * overlay: 040000, 041000, ... 076000). See TSS-ARCHITECTURE.md (overlay chapter) sec 6.
  *
  * Operands may be a symbol or a number (each is run through eval_expr, so a
  * small expression works too). If any operand is undefined we flag an error
@@ -1836,13 +1849,16 @@ static void assemble_stmt(mac_state *st, char *stmt)
         {
             /* forward ref: emit opcode + any mode bits now; the displacement
              * is patched P-relative (address operand) when the label is
-             * defined. TSS forward references are P-relative labels.        */
+             * defined. TSS forward references are P-relative labels.
+             * oper.disp carries the expression's constant part (undefined
+             * symbols evaluate as 0), e.g. the +1 of "LDA FWD+1" - it rides
+             * in the fixup so the patch targets FWD+1, not FWD.             */
             st->mem[here] = (uint16_t)(opc + oper.mode);
             st->used[here] = 1;
             if (here < st->lo_used) st->lo_used = here;
             if (here > st->hi_used) st->hi_used = here;
             st->loc++;
-            pending_add(oper.undef, here, here, MAC_FIX_PREL8);
+            pending_add(oper.undef, here, here, MAC_FIX_PREL8, oper.disp);
             /* Flag: undefined VALUE OPERAND of a defined MRI (e.g. "STT STRX,B").
              * A real forward ref clears this by being defined; if still
              * undefined at end, mac_check_undefined_opcodes() hard-errors.   */
@@ -1898,7 +1914,9 @@ static void assemble_stmt(mac_state *st, char *stmt)
             if (here < st->lo_used) st->lo_used = here;
             if (here > st->hi_used) st->hi_used = here;
             st->loc++;
-            pending_add(oper.undef, here, here, MAC_FIX_PREL8);
+            /* oper.disp = constant part of "JMP RFN+2" (2); without it all
+             * three ROBJ error exits landed on RFN itself - see mac.h note */
+            pending_add(oper.undef, here, here, MAC_FIX_PREL8, oper.disp);
             oper.undef->used_as_operand = true; /* undefined JUMP8 target */
             return;
         }
@@ -1924,7 +1942,8 @@ static void assemble_stmt(mac_state *st, char *stmt)
             if (here < st->lo_used) st->lo_used = here;
             if (here > st->hi_used) st->hi_used = here;
             st->loc++;
-            pending_add(uo, here, here, MAC_FIX_ARG8);
+            /* arg = constant part of the expression (undef sym counted 0)  */
+            pending_add(uo, here, here, MAC_FIX_ARG8, arg);
             /* Flag: undefined VALUE OPERAND of a defined ARG8 instr, e.g.
              * "SAT STR1" (the STR->XTR rename casualty) -> silently SAT 0.
              * Errors at end of assembly if still undefined.                  */
@@ -2052,12 +2071,12 @@ static void assemble_stmt(mac_state *st, char *stmt)
         uint16_t here = st->loc;
         if (u != NULL)
         {
-            st->mem[here] = v;
+            st->mem[here] = v;   /* constant part pre-stored; FULL patch ADDS */
             st->used[here] = 1;
             if (here < st->lo_used) st->lo_used = here;
             if (here > st->hi_used) st->hi_used = here;
             st->loc++;
-            pending_add(u, here, here, MAC_FIX_FULL);
+            pending_add(u, here, here, MAC_FIX_FULL, 0);
             return;
         }
         emit(st, v);
@@ -2371,7 +2390,7 @@ void mac_line(mac_state *st, const char *line)
         if (strncmp(s, ")9MOVE", 6) == 0)
         {
             /* FMAC/MACF block-copy of assembled words - drives the "MACF
-             * OVERX overlay staging (see cmd_9move + OVERLAY-DISC-SPEC.md). */
+             * OVERX overlay staging (see cmd_9move + TSS-ARCHITECTURE.md (overlay chapter)). */
             cmd_9move(st, s + 6);
             return;
         }
@@ -2571,7 +2590,7 @@ void mac_line(mac_state *st, const char *line)
          * matches first and returns, so control never reached it. Removed.  */
 
         /* )SOVER and )8DUMP: INTENTIONAL, documented no-ops.
-         * [VERIFIED docs/OVERLAY-DISC-SPEC.md HEADLINE + sec 1.3 + sec 6]
+         * [VERIFIED docs/TSS-ARCHITECTURE.md (overlay chapter) HEADLINE + sec 1.3 + sec 6]
          * )SOVER exists only inside the "NMACF variant of the OVERX macro
          * (TSS3.SYMB:78); every golden build (ASSYSA/ASSYSB/DRUM) sets the
          * MACF mark, so "NMACF is FALSE and )SOVER is never assembled at all.
@@ -2583,7 +2602,7 @@ void mac_line(mac_state *st, const char *line)
          * ND-100 EXECUTION, which this host assembler deliberately does not
          * do - and it is unnecessary: the run-time disc contract is
          * reproduced directly by )9MOVE (image staging) + the CDC-disc image
-         * writer (mac_write_cdc_disc), per OVERLAY-DISC-SPEC.md sec 7. So on
+         * writer (mac_write_cdc_disc), per TSS-ARCHITECTURE.md (overlay chapter) sec 7. So on
          * the builds mac-c targets these commands correctly do nothing.
          * We do NOT fake ND-100 execution.                                  */
 
@@ -2856,20 +2875,20 @@ bool mac_write_image(mac_state *st, const char *path)
 }
 
 /* -------------------------------------------------------------------------
- * CDC-disc overlay image writer  (docs/OVERLAY-DISC-SPEC.md)
+ * CDC-disc overlay image writer  (docs/TSS-ARCHITECTURE.md (overlay chapter))
  * -------------------------------------------------------------------------
  * Writes a raw disc image that the RUNNING TSS overlay reader (routine S5)
  * loads overlays from. We do NOT re-run the SOVER machine code (that needs
  * ND-100 execution); we reproduce its run-time disc CONTRACT directly, which
- * OVERLAY-DISC-SPEC.md sec 4 proves is identical either way.
+ * TSS-ARCHITECTURE.md (overlay chapter) sec 4 proves is identical either way.
  *
- * Disc contract [VERIFIED OVERLAY-DISC-SPEC.md sec 2 + sec 4]:
+ * Disc contract [VERIFIED TSS-ARCHITECTURE.md (overlay chapter) sec 2 + sec 4]:
  *   sector(n) = OVDK + 2*n                (256-word sectors; SHA 1 = *2)
  *   overlay n -> two consecutive sectors  sec0 = OVDK+2n, sec1 = sec0+1
  *   sec0 <- overlay words [0 .. 255], sec1 <- overlay words [256 .. 511]
  *   op READ into core ROVER (sec0) and ROV4=ROVER+400 (sec1) at run time.
  *
- * Where the overlay words come from [VERIFIED OVERLAY-DISC-SPEC.md sec 1.3,
+ * Where the overlay words come from [VERIFIED TSS-ARCHITECTURE.md (overlay chapter) sec 1.3,
  * sec 6]: the "MACF OVERX macro block-copies each overlay from its assembly
  * window at ROVER into a distinct VOR slot via )9MOVE ROVER VOR VORS, so
  * after assembly overlay n lives at image words [VOR_base + n*VORS ..
@@ -2877,13 +2896,13 @@ bool mac_write_image(mac_state *st, const char *path)
  * have run - it does in the ASSYSA/DRUM builds via OVERX.)
  *
  * Constants are resolved from the build's OWN symbol table, never hard-coded
- * (OVERLAY-DISC-SPEC.md sec 7 step 1):
+ * (TSS-ARCHITECTURE.md (overlay chapter) sec 7 step 1):
  *   OVDK  = base disc sector           (0160 for CDC non-DEBUG; 0360 DEBUG)
  *   VORS  = overlay/window size words  (01000 = 512 = two 256-word sectors)
  *   RQR   = overlay count              (037 = 31; RQR bumps once per OVERL)
  *   VOR   = final staging pointer      (077000); VOR_base = VOR - RQR*VORS.
  *
- * [INFERRED - OVERLAY-DISC-SPEC.md sec 8 item 1] The window-index ->
+ * [INFERRED - TSS-ARCHITECTURE.md (overlay chapter) sec 8 item 1] The window-index ->
  * overlay-number mapping is not fully pinned in the TSS source. We implement
  * the straightforward PARALLEL mapping (window n -> overlay n -> sectors
  * OVDK+2n), which is consistent with RQR incrementing in lockstep with the
@@ -2898,7 +2917,7 @@ bool mac_write_image(mac_state *st, const char *path)
  * directly - it runs it through DKADR (a logical->physical address conversion)
  * before loading the CDC controller's block-address register. So each overlay
  * must be written at the PHYSICAL sector cdc_dkadr(logical), not at the linear
- * logical sector. See cdc_dkadr() below and docs/OVERLAY-DISC-SPEC.md sec
+ * logical sector. See cdc_dkadr() below and docs/TSS-ARCHITECTURE.md (overlay chapter) sec
  * "DKADR physical addressing".                                               */
 
 /* -------------------------------------------------------------------------
@@ -3000,7 +3019,7 @@ uint32_t cdc_dkadr(uint16_t logical_sector)
 
 bool mac_write_cdc_disc(mac_state *st, const char *path)
 {
-    /* one 256-word sector, the CDC transfer unit (OVERLAY-DISC-SPEC sec 4) */
+    /* one 256-word sector, the CDC transfer unit (TSS-ARCHITECTURE.md overlay chapter sec 4) */
     enum { SECTOR_WORDS = 256 };
 
     uint16_t ovdk  = sym_lookup_value(st, "OVDK");

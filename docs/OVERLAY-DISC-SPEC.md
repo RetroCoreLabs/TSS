@@ -411,12 +411,12 @@ Minimal per-overlay result: overlay `num` → CDC-disc sectors `160+2*num` and
    OVDK disc sectors at generation time.**~~ **RESOLVED (2026-07-21).** For the
    reproduction it is `mac_write_cdc_disc` (`mac-c/mac.c`): for each overlay *n*
    it copies the 512-word `VOR` window (`VOR_base + n*VORS`) to the CDC-disc
-   **physical** sectors `DKADR(OVDK+2n)` and `DKADR(OVDK+2n+1)` = `72*(OVDK+2n)`
-   [+1]. This was **byte-verified**: the produced `Build/drum/tss-cdc.img`
-   matches the `Build/drum/tss-drum.img` `VOR` windows **word-for-word** across
-   all 512 words for OV1 (window 040000 → phys sec 017600), OV15 (window 072000
-   → phys sec 027040) and OV19 (window 076000 → phys sec 030140). Evidence:
-   `mac-c` diagnostic run + the standalone byte-diff, 2026-07-21.
+   **physical** sectors `cdc_dkadr(OVDK+2n)` and `cdc_dkadr(OVDK+2n+1)` — where
+   `cdc_dkadr` is the corrected `DKADR` map (see "DKADR physical addressing"
+   below; NOT the superseded `72*L` or `077300` forms). Overlay 032 (window
+   072000, logical `0244`) lands at physical sector `0o660`, matching the running
+   reader's `IOX 503` exactly. The overlay bodies in the `VOR` windows are **byte-verified** fully
+   fixed-up (see next paragraph).
 
    The `VOR` windows themselves hold the **fully fixed-up** overlay bodies: an
    instrumented build showed **zero** forward-reference or literal fixups still
@@ -432,11 +432,16 @@ Minimal per-overlay result: overlay `num` → CDC-disc sectors `160+2*num` and
    the CDC `XDISK`/`DKADR` path does not use it for overlays. Whether anything
    patches `DKBAS` to non-zero at boot was not traced. For the CDC overlay path
    it does not enter the address computation.
-3. **Exact `DKADR` linear→physical output.** ~~COULD NOT DETERMINE~~ **RESOLVED**
-   — see the new section "DKADR physical addressing" below. Verified by executing
-   the assembled DRUM build under nd100x: the built path is a pure `DKADR(L)=72*L`
-   (`0o110*L`) for the unit-0 overlay disc (there is no CHS divide on that path).
-   Both the mac-c overlay writer and the nd100x CDC device are aligned to it.
+3. **Exact `DKADR` linear→physical output.** ~~COULD NOT DETERMINE~~ ~~`72*L`~~
+   ~~`8*floor(L*65537/12)+64*L`~~ **RESOLVED (corrected 2026-07-21)** — see the
+   section "DKADR physical addressing" below. The real map is
+   `DKADR(L) = 32*floor(L/12) + 2*(L mod 12)` (verified per-instruction from the
+   live machine, `DKADR(0244)=0o660`). Both earlier formulas came from tracing a
+   broken `DKADR`: `72*L` (the `RGDIV` divide was undefined) and `077300` (mac-c
+   miscompiled the `SHR` shift modifier). The `SHR` assembler bug is now fixed in
+   `mac-c/mac.c` `eval_expr`, so `DKADR`'s three `SHR` shifts assemble correctly
+   and its legality clamp passes; the mac-c overlay writer and the nd100x CDC
+   device are aligned to the corrected map.
 4. **The N10-build address of `ROVER`** (and other labels). The golden dump is
    the NN10 A build (`ROVER=031522`); the N10/DRUM build shifts addresses. Read
    `ROVER` from the DRUM build's own `)LIST`/symbol dump (`DSYMB`). Overlay
@@ -449,81 +454,94 @@ Minimal per-overlay result: overlay `num` → CDC-disc sectors `160+2*num` and
 
 ## DKADR physical addressing
 
-Section 8 item 3 previously listed the exact `DKADR` output as *COULD NOT
-DETERMINE*. It is now **[VERIFIED]** by executing the assembled DRUM build
-under nd100x and single-stepping `DKADR`, and the overlay writer + CDC device
-have been aligned to it.
+> **CORRECTED (2026-07-21): `DKADR(L) = 32*floor(L/12) + 2*(L mod 12)`.**
+> Two earlier formulas are superseded:
+> * `72*L` — traced while `DKADR`'s divide-by-12 (`RGDIV ST`) was UNDEFINED, so
+>   the divide never ran (fixed by `RGDIV=RDIV`, `TSS1.SYMB:3616`).
+> * `8*floor(L*65537/12)+64*L = 077300` — traced while the mac-c assembler
+>   MISCOMPILED the `SHR` shift modifier as an additive LEFT shift. That bug is
+>   now fixed (see below), so `DKADR`'s three `SHR` shifts assemble correctly and
+>   the routine runs its TRUE algorithm.
 
-### The mapping (verified from the live machine, not hand-decoded source)
+### The `SHR` assembler fix (root cause of the second wrong formula)
 
-The nd100x boot trace of the DRUM build (`--start=000301 --trace`) shows the
-running disc driver calls `DKADR` at address **010006**. The *built* `"N10 CDC"`
-path is pure straight-line shift/multiply (the hardware divide in the source is
-**not** taken for a unit-0 address). For a logical sector `L` it executes:
+Per `ND-60.096.01` §2.3.8 ("`SHR` — Shift right, gives negative shift counter.
+Note that `SHR` must precede the specified shift counter"), `SHR` makes the
+7-bit shift **counter negative**. MAC's permanent-symbol value for `SHR` is
+`0200` (verified in `MAC.BPUN`'s permsym table at `0xE9B3`), which is
+bit-identical to `SHD`'s register-select bit — so treating `SHR` as a plain
+additive `0200` turned every `… SHR n` right shift into a LEFT shift of a
+different register (`SHA SHR 6` → `0154606` = `SAD 6`).
+
+mac-c now handles `SHR` in `eval_expr` (`mac-c/mac.c`): `SHR` still contributes
+its `0200`, then the **following** shift-count term is SUBTRACTED, forming a
+7-bit two's-complement negative counter. `ROT`/`ZIN`/`LIN` (the shift-type bits
+9–10) stay additive. Pinned by `test_mac.c` (`SHA SHR 6`=`0154572`,
+`SHA ZIN SHR 1`=`0156577`, `SAD ZIN SHR 20`=`0156760`, …).
+
+Inside `DKADR` this repairs three shifts:
+
+| source (`TSS1.SYMB`) | PC | wrong (additive `SHR`) | correct (`SHR` negates) |
+|---|---|---|---|
+| `SAD ZIN SHR 20` (3617) | 010016 | `0157020` (left, no-op) | `0156760` (AD right 16) |
+| `SHT ZIN SHR 5` (3624)  | 010026 | `0156205` (left) | `0156173` (T right 5) |
+| `SHA SHR 6` (3637)      | 010046 | `0154606` = `SAD 6` (left) | `0154572` (A right 6) |
+
+### The corrected mapping (unit 0), verified per-instruction from the live machine
+
+The nd100x boot trace of the DRUM build (`--mms1 --start=000301 --trace`) shows
+the running disc driver call `DKADR` at address **010006**. Every register value
+below was read off the live `--trace` (A/D/T columns) for logical sector `0244`.
+Registers are 16-bit; `AD` is the 32-bit double accumulator (`A` high, `D` low):
 
 ```
-010026 SHD ZIN 5    D := L << 5   = 32*L
-010027 RORA ; 010030 SHT 5    T := L << 5   = 32*L
-010031 MPY (14      A := L * 0o14(=12dec) = 12*L      (TSS1.SYMB:3598)
-010032 RSUB DD SA   D := D - A    = 32L-12L = 20*L
-010033 RADD DD SD   D := D + D    = 40*L
-010034 RADD DT SD   T := T + D    = 32L+40L = 72*L     <- returned in A
+010012 AND (17777    A := L & 017777
+010013 COPY DD SA    D := A = L
+010016 SAD ZIN SHR 20  AD >>= 16 : with A=D=L, AD=(L<<16)|L -> A=0, D=L  (dividend = L)
+010017 SAT 14        T := 12 (decimal); the divisor
+010020 RDIV ST       AD/T:  Q := L/12 , R := L mod 12       (A=Q, D=R)
+010030 SHT 5         T := (Q << 5) & 0xFFFF = 32*Q
+010032 RSUB DD SA    D := (L - 12*Q) & 0xFFFF = R
+010033 RADD DD SD    D := (D + D) & 0xFFFF = 2*R
+010034 RADD DT SD    T := (T + D) & 0xFFFF = 32*Q + 2*R      <-- RESULT (returned in A)
 ```
 
-So, for a unit-0 overlay sector:
+Closed form, all arithmetic mod 2^16:
 
 ```
-DKADR(L) = 72 * L   =   0o110 * L
+DKADR(L) = 32*floor(L/12) + 2*(L mod 12)
 ```
 
-**[VERIFIED]** trace: `DKADR(0156)` returns `017360` (72 × 110dec = 7920 =
-`017360`). The unit-1 displacement `0o52600` (`TSS1.SYMB:3600-3602`) is never
-added (overlay disc is unit 0), and the `DKLIM=626` legality clamp
-(`TSS1.SYMB:3604-3608`) is never reached for the overlay range (max logical
-`0o255` → `72*0o255 = 0o30250`); `DKADR` returns the un-clamped `T=72*L`
-regardless (`TSS1.SYMB:3610-3612 COPY DA ST; EXIT AD1`).
+This is a base-12 → `track*32 + 2*sector` repack (12 = sectors per track).
 
-> **Note on the boot-observed input.** In the trace the read that was looping is
-> `L=0156`, **not** `0254`. At that boot stage `OVLAY = 0177777 (-1)` (trace
-> 007063-007064), so S5 computes `L = 2*(-1)+OVDK = 0156` (trace 007065-007067).
-> `0156` is the zero-filled gap just below the first overlay's physical sector,
-> so its read now returns zeros in-bounds and no longer errors. `017360 = 72*0156`,
-> which confirms the ×72 mapping directly against the hardware.
+**[VERIFIED live]** `DKADR(0244) = 32*13 + 2*8 = 432 = 0o660`, seen loaded into
+the CDC block-address register as `IOX 503 A=000660`. The unit-1 displacement
+`0o52600` (`TSS1.SYMB:3632`) is never added (overlay disc is unit 0), and the
+returned value is always `T` (`TSS1.SYMB:3642 COPY DA ST; EXIT AD1`). The
+`DKLIM=626` clamp extracts the cylinder via the now-correct `SHA SHR 6`
+(`A := T>>6 = 6`) and passes (6 < 626).
 
-### The fix (both sides now agree on the PHYSICAL sector)
+**Dense, small:** over the overlay logical range `0160..0257` the physical
+sector runs `0o450..0o712` (max `458` dec). The writer still **scans all**
+overlay sectors to size the image (correct for any mapping).
 
-* **Writer** — `mac-c/mac.c` `cdc_dkadr(L)` returns `72*L`; `mac_write_cdc_disc`
-  places overlay *n*'s two halves at physical sectors `DKADR(OVDK+2n)` and
-  `DKADR(OVDK+2n+1)` and sizes the image up to the max physical sector
-  (`72*0o255 = 0o30250` → ~6.4 MB, sparse). The stderr table now prints both the
-  logical and the physical sector.
-* **Device** — `nd100x/src/devices/cdc/deviceCDC.c` stays a dumb linear-by-
-  **physical**-sector store (`cdc_lba_to_sector` = identity); `DKADR` is applied
-  once, at write time, in mac-c. `CDC_DEFAULT_SECTORS` raised to `16384` (8 MiB)
-  so the max overlay physical sector (12456 dec) is covered.
+### The writer/reader alignment fix
 
-### Boot result after the fix
+* **Writer** — `mac-c/mac.c` `cdc_dkadr(L)` implements the closed form above
+  (public, declared in `mac.h`; every ported step cites its `TSS1.SYMB` line and
+  the live-trace PC). `mac_write_cdc_disc` places each overlay sector at
+  `cdc_dkadr(logical)` and sizes the image by scanning all overlay sectors for
+  the true max (`458+1 = 459` sectors → 235 008 bytes). The stderr table prints
+  logical + physical per overlay plus a `max phys sector` summary line.
+* **Device** — `nd100x/src/devices/cdc/deviceCDC.c` stays a dumb
+  linear-by-**physical**-sector store (`cdc_lba_to_sector` is the identity);
+  `DKADR` is applied once, at write time. `CDC_DEFAULT_SECTORS` lowered to `512`
+  (256 KiB) to cover the corrected overlay range with headroom; the surface also
+  grows to the backing-file size if a larger image is attached.
 
-Booting `tss-drum.bpun` + the regenerated `tss-cdc.img` at `000301`:
-
-* The read to physical `017360` is now **in-bounds and succeeds** (returns the
-  zero gap). The `~318k`-instruction DKOP retry loop at `01031x` is **gone** —
-  only ~3 disc GOs occur, `DKADR` is called just twice (`A=0156`, `A=0157`),
-  both reads complete.
-* Execution advances into the resident **level-5 scheduler** (`LEV5=006324`) and
-  runs its dispatch loop, servicing the RTC and repeatedly touching the console
-  terminal (`IOX 306`) through to the run's end — a **live idle**, not a hang.
-* It does **not** yet reach `LOGON` (`032735`) / `XSTAR` (`033601`). The overlay
-  actually loaded was `OVLAY=-1` (the gap); nothing has requested the real
-  `XSTAR` (OV19) overlay yet. Why `OVLAY` is `-1` at that point is a separate
-  boot/scheduler question, outside this disc-address alignment. **[VERIFIED]**
-  the disc-addressing blocker itself is resolved.
-* **Follow-up (2026-07-21):** the reason no real overlay is ever requested is
-  now pinned — `GOVER OVn` never reaches the overlay dispatcher `GOVX` at user
-  level (PIL 2), so `OVLAY` is never set and `S5` never reads. This is a
-  runtime paging / user page-0 mapping issue, **not** a disc-staging or
-  `mac-c` issue (the OV15 disc body is byte-verified correct). Full evidence:
-  `docs/LOGON-PATH.md` sec 6 item 2.
+**[VERIFIED live]** With the aligned writer, overlay 032 (logical `0244`) is
+placed at physical `0o660`, exactly where the running reader's `IOX 503` reads
+it. Writer == reader.
 
 ### Appendix: reusable script
 

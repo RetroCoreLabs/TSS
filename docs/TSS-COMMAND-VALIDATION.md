@@ -344,6 +344,185 @@ in (§3a, device names are file names) and whether `PAUSE` can be escaped
 
 ---
 
+# PART III — ROOT CAUSES
+
+Investigated 2026-07-25 after the sweep. Each entry separates what is
+**proven** (read from source, or measured) from what is **inferred**.
+
+## Summary
+
+| # | defect | root cause | is it a TSS bug? |
+|---|---|---|---|
+| 1 | `MEMORY <lo> <hi>` hangs | CPU spins in the **swapper**, before any I/O | open — see below |
+| 2 | `LOAD-SYSTEM` never returns | works as designed; needs front-panel LOAD hardware | **no** — emulator gap |
+| 3 | date/time garbage | TSS is a **32-bit-float** program; nd100x has 48-bit FP only | **no** — CPU-model mismatch |
+| 4 | `SET-REGISTER` no effect | `"N10` variant drives **live** CPU registers, not the saved block | **yes** (plus an off-by-one) |
+| 5 | `CREATE-USER` false error | all `CRUSE` failures wired to the `ALREADY EXISTS` label | **yes** |
+| 6 | no file can be created | create marker is a **quoted pair**; then blocked on track quota | **no** — doc error + provisioning |
+
+## 3. Date/time — a 32-bit vs 48-bit floating-point mismatch  **[PROVEN]**
+
+`TBANG` (`src/TSS2.SYMB:1123`) is the **only floating-point code in TSS**. It
+converts the tick counter using four `[` constants:
+
+```
+K1, [4.32E6   ticks/day     K2, [1.8E5   ticks/hour
+K3, [3000     ticks/minute  K4, [50      ticks/second
+```
+
+- **Proven:** the archived golden dump shows `TBANG..RDATE` spanning **55
+  words**, which only balances if K1–K4 are **2 words each** (4x2=8, not
+  4x3=12) — recorded in `mac-c/src/mac_stmt.c:600-608`. The 1978 build was
+  therefore a **32-bit-float** system, where `STF`/`LDF` move 2 words and the
+  `DATA TIME,3` buffers simply carry slack.
+- **Proven:** nd100x implements **48-bit FP only**
+  (`~/repos/nd100x/src/cpu/float.c`: "48-bit floating point arithmetic for
+  the ND-100"), with no CPU-model dependence — `--cputype` cannot change it.
+- **Proven by partition:** in `RDATE`, year and month are produced by
+  **integer** arithmetic and print **correctly**; day, hour, minute and
+  second come from `TBANG`'s **floating-point** results and are garbage. The
+  failure follows the FP boundary exactly.
+- **Ruled out:** clock speed. Re-running with `--throttle` (CPU at real-time
+  0.5275 MHz) produced the same garbage (`64 JULY` -> `120 JULY` -> `30 JULY`).
+
+This single cause explains all four symptoms — `DATE`, `TIME-USED`,
+`RESPONSE-TIME` and `LOGOUT` all route through `TBANG`/`FOTIM`.
+
+**Fix options:** run TSS on a 32-bit-FP machine model, or add 32-bit FP to
+nd100x, or rebuild TSS with `mac_state.float48` so the constants match the
+emulated FP (this shifts addresses and breaks the golden-dump match, so it is
+a runtime-only variant).
+
+## 2. `LOAD-SYSTEM` — works as designed  **[PROVEN]**
+
+`LOADV` (`src/TSS5.SYMB:609`) deliberately stops the machine and restarts it
+from location 0:
+
+```
+	IOF                            % I/O off
+	LDA (*+6; IRW 0 DP; POF        % paging off
+	SAA -1; MCL PIE; INTEN; INTDS
+L2,	SAX 0; SAT 0; SAA 1; JPL I (SDISK
+	IOF; RCLR DP                   % clear P -> restart at 0
+```
+
+`RCLR DP` clears the P register, handing control to the machine's front-panel
+LOAD/bootstrap logic. nd100x provides no such hardware, so the CPU runs into
+cleared memory and stops. Not a TSS defect.
+
+## 4. `SET-REGISTER` / `STATUS` — the NORD-10 variant is wrong  **[PROVEN]**
+
+Two independent bugs, both in the `"N10` conditional block:
+
+**(a) Live registers instead of the saved block.** The `"NN10` (NORD-1)
+variant reads and writes `RBLOK`, the user's **saved** register block. The
+`"N10` variant instead executes `IRR`/`IRW` against the **live CPU
+registers**:
+
+```
+"N10
+   LDA CNT,B; ORA (IRR 10; EXR SA        % REGS  (STATUS)
+   LDA SSXT,X; ORA (IRW 10; STA ADR,B    % SETX  (SET-REGISTER)
+```
+
+So `STATUS` reports the command interpreter's own registers (hence all zeros)
+and `SET-REGISTER`'s write is destroyed the moment it returns. Measured:
+`P`, `T`, `B` and `X` all had no effect; `A 1234` left a transient
+`STS = 234`.
+
+**(b) Table overrun for `B`.** `STATUS`'s own `REGM` table gives the machine
+register numbering `0=STS 1=D 2=P 3=B 4=L 5=A 6=T 7=X`. `SETX`'s translation
+table is `SSXT, 2; 7; 6; 5; 1; 4; 3` — **seven entries, indices 0-6**, with
+`B` correctly at index 6. But the letter decoder assigns
+`SAT ##B; SKP IF DA UEQ ST; SAX 7` — index **7**, one past the table.
+`SET-REGISTER B` therefore builds its `IRW` from whatever word follows
+`SSXT`. Fix: `SAX 6`.
+
+## 5. `CREATE-USER` — every failure reported as ALREADY EXISTS  **[PROVEN]**
+
+`CRUSE` (`src/TSS4.SYMB`) documents three distinct failure codes:
+
+```
+%A = 1 IF NO MORE TRACKS   %A = 2 IF TOO MANY USERS   %A = 3 IF USER ALREADY EXISTS
+```
+
+and allocates the new user's track with `JPL I (GTRK; JMP CF1`. But the
+caller `CRUSR` discards `A` and sends the failure return to a single label:
+
+```
+	JPL I (CRUSE; JMP CF3
+CF3,	LDX (MS3; JMP CFF        % MS3 = 'ALREADY EXISTS'
+```
+
+So a **track-allocation failure prints ALREADY EXISTS**. The user-table entry
+is written before the allocation, which is why `TESTU` both errored and
+appeared in `LIST-USERS`.
+
+## 6. File creation — a documentation error over a provisioning gap  **[PROVEN]**
+
+**The create marker is a quoted PAIR, not a leading quote.** In `OPEN`
+(`src/TSS3.SYMB`):
+
+```
+O16,  LDA NEWF,B; JAP *+2; JMP I (OF8   % name ended normally + create -> BAD FILENAME
+O15,  LDA NEWF,B; JAZ *+2; JMP O17      % second '"' seen + create -> SUCCESS path
+```
+
+`O15` is reachable only when a **second `"`** appears. Measured:
+`OPEN-FILE "SCRATCH:DATA,WX` -> `BAD FILENAME`, but
+`OPEN-FILE "SCRATCH:DATA",WX` -> **`NO MORE TRACKS AVAILABLE`** — a different
+error, proving the create path was reached.
+
+The remaining blocker is **track quota**, not syntax: `LIST-TRACKS SYSTEM`
+reports `0 TRACKS LEFT`, and `TRANSFER` refuses for the same reason.
+
+Also recovered: `OPEN`'s error codes — `OF8` = `57`, `OFX` = `10` (NO SUCH
+FILE) or `37` = **31 decimal = AMBIGUOUS FILENAME**, which is exactly the
+error `LOGON` reports on a fresh disc.
+
+## 1. The `MEMORY` hang — spinning in the swapper  **[PARTLY PROVEN]**
+
+**Proven by measurement.** Pausing the CPU over DAP four times, seconds
+apart, gives an identical stack every time:
+
+```
+PC 000013 , caller 006762
+```
+
+`006762` is **`SWAPR`+207** (`SWAPR` = `006443` in
+`Build/drum/DSYMB.SYMB`) — the **swapper**. The CPU is in a tight loop there
+and never leaves.
+
+**Proven by source.** `MEM` -> `CKMEM` (`src/TSS2.SYMB:458`) -> `CRMEM`
+(`src/TSS2.SYMB:489`), which writes a page-table entry and then posts
+`SAA 40; MST PID` — an interrupt request to **level 5**, the resident page
+reader. Both loops in `CKMEM` terminate by inspection, so the wedge is on the
+level-5 / swapper side, not in the command.
+
+**Proven by measurement.** Neither `drum.img` nor `cdc.img` was modified
+during the hang. The swapper therefore spins **before performing any I/O** —
+it is waiting on a resource, not on a missing completion interrupt.
+
+**Inferred, not proven.** The resource is most likely backing store for the
+new page: the same zero-track-quota condition that blocks defects 5 and 6.
+Three independent commands report `NO MORE TRACKS AVAILABLE` on this disc.
+
+**The discriminating experiment** (not yet run): give `SYSTEM` a real track
+quota, then retry `MEMORY 40000 44000`. If it completes, the hang and defects
+5 and 6 are one provisioning bug. If it still hangs, the swapper has an
+independent fault.
+
+## The open contradiction
+
+`DISK-SPACE` reports **15 free tracks out of 4096**, and
+`bringup/verify-disc.py` independently confirms 15 free in the MIB — yet
+**every allocation fails**. So either cold-start (`SINIT`) leaves the
+per-user quota pool empty while the disc itself has space, or `GTRK` and the
+MIB disagree about what "free" means. Resolving that one question would close
+defects 5, 6 and probably 1.
+
+---
+
 # PART II — RESULTS
 
 Executed 2026-07-25 on copies of the verified disc under

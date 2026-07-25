@@ -73,21 +73,61 @@ assembly errors; `verify_repo.sh` fully green.
    backing file must be padded (`make prepare` pads to 8192 sectors / 4 MB).
    See §5.1.
 
-### 1.4 The four verified steps (make targets)
+### 1.4 Bring-up — the automated path and the manual inputs
 
-Everything is driven by the top-level `Makefile`. Run from WSL
-(`cd /mnt/e/Dev/Ronny/TSS`); `make help` lists every target:
+Everything is driven by the top-level `Makefile` (run from WSL,
+`cd /mnt/e/Dev/Ronny/TSS`; `make help` lists every target).
 
-| step | target | what you do | verify |
+**Recommended — one command, fully unattended:**
+
+```bash
+make build      # once: mac-as + 695 tests + the TSS/MINIT artifacts
+make auto       # prepare + format + cold-start, driven over DAP; disc PERSISTS
+make login      # interactive: log in and use TSS
+```
+
+`make auto` runs the format and cold-start under the DAP debugger, auto-answers
+the MINIT prompts, and stops each phase with a **clean debugger-terminate** so the
+CDC disc is reliably written back (see the persistence note below). Nothing is
+typed. Afterwards `make verify` shows *15 free tracks + SYSTEM*, and you `make login`.
+
+**Manual steps (interactive) — every input spelled out:**
+
+| step | command | exactly what you type / wait for | verify |
 |---|---|---|---|
 | 1 | `make prepare` | nothing — makes a fresh padded disc in `Build/bringup/` | — |
-| 2 | `make format` | type `4470` ⏎ `4670` ⏎ `I` ⏎ ; at `FINISHED` press **Ctrl-C** | `make verify` → *16 free tracks* |
-| 3 | `make coldstart` | wait for `@ENTER`; press **Ctrl-C** | `make verify` → *15 free + SYSTEM* |
-| 4 | `make login` | at `@ENTER` type `SYSTEM` ⏎ then `1` ⏎ | you reach the `@` command prompt |
+| 2 | `make format` | `4470` ⏎ , then `4670` ⏎ , then `I` ⏎ ; wait for `FINISHED` | `make verify` → *16 free tracks* |
+| 3 | `make coldstart` | nothing — wait for `NORD TSS VERSION 3.0A IS UP` then `@ENTER` | `make verify` → *15 free + SYSTEM* |
+| 4 | `make login` | at `@ENTER`: `SYSTEM` ⏎ ; at `PROJECT NUMBER P-`: `1` ⏎ ; on the *first* login, at `TYPE IN DATE (DD,MM,YYYY,HH,MM,SS):` e.g. `24,07,2026,15,30,00` ⏎ | you reach the `@` prompt |
 
-**Always stop the emulator with Ctrl-C (SIGINT)** — that flushes the CDC
-surface back to `cdc.img`. Killing it another way loses disc writes.
-`make stop` does this safely for a backgrounded instance.
+What every input means:
+- **MINIT**: `4470` = first user-area disc address (FSYS start), `4670` = last
+  (gives 16 free tracks), `I` = INITIALIZE (vs `U` update / `R` regenerate). Full
+  dialogue in §5.6.
+- **Cold-start**: driven by the operator switches **`--opr=131313`** and the boot
+  entry **`--start=7`** (both set by `make coldstart`; see §6). SINIT creates user
+  SYSTEM; **no console input is needed**.
+- **Login**: SYSTEM is **passwordless** (no PASSWORD prompt). `PROJECT NUMBER`
+  must be a **positive** integer. The `AMBIGUOUS FILENAME` on the first login is
+  **harmless** — it's the missing per-user scratch file `SCRATCH:DATA` (see the
+  User Manual, `TSS-USER-MANUAL.md` §5). The date is asked on the first login only.
+
+> **Disc persistence [FIXED 2026-07-24].** The CDC and drum devices in nd100x are
+> now **write-through**: every disc sector is written to the image file the instant
+> the guest writes it and flushed (patch to `deviceCDC.c` / `deviceDrum.c`,
+> `CDC_OP_WRITE` / `DRUM_FUNC_WRITE`). So the manual steps above **persist
+> correctly when stopped with Ctrl-C.** *Verified:* a SIGINT-stopped MINIT format
+> keeps its 16 free tracks and a SIGINT-stopped cold-start keeps SYSTEM.
+>
+> *Background (why this mattered):* CDC/drum previously buffered the whole disc
+> surface in RAM and wrote it back only on a clean shutdown
+> (`cleanup_machine → *_Destroy`, reached at `CPU_SHUTDOWN`). A plain Ctrl-C/SIGINT
+> calls `exit(0)` and skips that path, so it *lost* format/cold-start writes —
+> while SMD (SINTRAN) and floppy, which write straight through to their image
+> `FILE*`, were never affected. The write-through patch removes the difference.
+> **This requires the patched nd100x.** On an unpatched build, use **`make auto`**
+> (DAP-driven, clean terminate) for the steps that must persist. `make login`
+> needs no persistence either way — it only reads the disc.
 
 ---
 
@@ -299,11 +339,17 @@ nd100x --mms1 --boot=bpun --image=tss.bpun --cdc=cdc.img --drum=drum.img \
   byte `0x0D` (a literal `\r` is echoed as backslash-r):
   `SYSTEM`+CR = `hex 53 59 53 54 45 4D 0D`; `4470`+CR = `hex 34 34 37 30 0D`;
   `I`+CR = `hex 49 0D`.
-- Always run on **copies** of the disc images, and stop with SIGINT to flush
-  the CDC surface (§1.4).
+- Always run on **copies** of the disc images.
+- Stopping: with the write-through nd100x (§1.4) any stop — SIGINT (`make stop`),
+  DAP terminate, or a crash — persists CDC/drum writes, because each sector is
+  written to the image immediately. (On an *unpatched* nd100x only a clean DAP
+  `disconnect{terminateDebuggee}` flushes CDC/drum; SIGINT would lose them.)
 
 `make dap-format` / `make dap-coldstart` / `make dap-login` launches each stage
-pre-configured on port 1777.
+pre-configured on port 1777. For a fully-scripted, self-terminating run of the
+whole format + cold-start (the reliable persist path), use **`make auto`**, which
+drives `bringup/dap_bringup.py` (a minimal DAP client that auto-answers the
+prompts and terminates cleanly).
 
 ---
 

@@ -512,7 +512,64 @@ quota, then retry `MEMORY 40000 44000`. If it completes, the hang and defects
 5 and 6 are one provisioning bug. If it still hangs, the swapper has an
 independent fault.
 
-## The open contradiction
+
+## The track-quota question — RESOLVED, and my earlier inference was WRONG
+
+**Measured 2026-07-25** (`Build/cmdtest/quota`, one session):
+
+```
+DISK-SPACE           15 TRACKS LEFT      LIST-TRACKS SYSTEM   0 TRACKS LEFT
+CREATE-USER U1  ->   ALREADY EXISTS      DISK-SPACE           14 TRACKS LEFT
+CREATE-USER U2  ->   ALREADY EXISTS      DISK-SPACE           13 TRACKS LEFT
+LIST-TRACKS U1  ->   0 TRACKS LEFT
+```
+
+**`GTRK` is NOT failing.** Every `CREATE-USER` allocates a disc track — the
+free count drops by one each time — and the user still ends with **zero
+quota**. The track is allocated and then **leaked**. The earlier inference
+that these commands failed for lack of free tracks is therefore **wrong** and
+is retracted.
+
+The real cause is in `CRUSE` (`src/TSS4.SYMB`):
+
+```
+	LDT AREG,B; LDA DREG,B; SAX 0
+	JPL I (IUSER; JPL I (FTLER      % IUSER: %X = NUMBER OF TRACKS -> SAX 0 = ZERO
+	LDA AREG,B; AAA -1; JAZ *+5     % user number == 1 (SYSTEM) -> SKIP the grant
+	SAA 1; SAT 1; JPL I (UTRK; JMP CF
+	MIN LREG,B; JMP CF+1
+```
+
+1. **Every user is initialised with `X = 0` tracks.** `IUSER`'s documented
+   interface is `%X = NUMBER OF TRACKS`, and `CRUSE` passes `SAX 0`.
+2. **User 1 (SYSTEM) is explicitly skipped** from the `UTRK` grant that
+   follows — `JAZ *+5` jumps straight to the success return.
+3. For every other user the `UTRK` grant is attempted, **fails**, and sends
+   the whole of `CRUSE` to its failure return — leaking the track just
+   obtained from `GTRK`, and surfacing as `ALREADY EXISTS` via the
+   error-label bug (defect 5).
+
+**Consequence:** a freshly cold-started TSS has an operator account with no
+track quota, and **no command can grant it any** — `TRANSFER` needs a donor,
+and every other account ends at zero too. That is why nothing can be created
+(defect 6). It is a property of the recovered source, not of the bring-up
+procedure.
+
+## The MEMORY hang — the discriminating experiment did NOT discriminate
+
+`MEMORY 40000 44000` was retried after the above. It **hung identically**.
+
+But the experiment's precondition was never met: `TRANSFER` could not give
+SYSTEM a quota (no donor had one), so the retry ran under the *same*
+zero-quota state as before. **It therefore tells us nothing new**, and the
+question "is the swapper hang a consequence of zero quota, or an independent
+fault?" remains **open**.
+
+To actually discriminate, quota must be granted by a route that does not go
+through the command processor — patch the user-table entry in `cdc.img`
+directly, or single-step level 5 under DAP from the `MST PID` in `CRMEM`.
+
+## The open contradiction (SUPERSEDED — see above)
 
 `DISK-SPACE` reports **15 free tracks out of 4096**, and
 `bringup/verify-disc.py` independently confirms 15 free in the MIB — yet

@@ -422,7 +422,14 @@ cleared memory and stops. Not a TSS defect.
 > saved register block. That is the correct intent and the exact equivalent
 > of the NORD-1 variant's `RBLOK`. The original analysis is withdrawn.
 
-**Revised explanation [INFERRED — not yet verified]:** `IRR`/`IRW` are
+> **[SECOND RETRACTION 2026-07-26]** The ring/privilege explanation below is
+> also **wrong**. Measured at runtime, **every program level reports
+> `Ring[3]`**, which passes nd100x's `CheckPriv()`. Privilege gating is
+> therefore not why `IRR`/`IRW` appear inert. **Defect 4's mechanism is
+> currently UNEXPLAINED.** The `SSXT` index-7 overrun below remains a real,
+> independent bug.
+
+**Superseded explanation [WRONG]:** `IRR`/`IRW` are
 **privileged**. nd100x gates them on the **ring field of PCR**
 (`CheckPriv()`; `cpu_instr.c:3713` — *"Real PCR content is ring (0-1), the
 MMS2 enable (2) and PT/APT (7-14)"*), requiring ring 2 or 3. Rings are an
@@ -513,7 +520,64 @@ Also recovered: `OPEN`'s error codes — `OF8` = `57`, `OFX` = `10` (NO SUCH
 FILE) or `37` = **31 decimal = AMBIGUOUS FILENAME**, which is exactly the
 error `LOGON` reports on a fresh disc.
 
-## 1. The MEMORY hang — CLOSED: a fatal-error trap in the swapper  **[PROVEN]**
+## 1. The MEMORY hang — CLOSED: swapper finds no free page -> FTLER  **[PROVEN by memory read]**
+
+> **Correction history:** this section first named the `PDTBL[..]$COUNT<=0`
+> guard, was then wrongly retracted on the basis of a flat-`.img` lookup
+> (the image file is **not** 1:1 with memory, and `PC` is a *virtual*
+> address), and is now re-established by reading memory **through the MMU**
+> and decoding the instructions. The call site is `SW6`, not the `PDTBL`
+> guard.
+
+**Measured at the hang** (DAP, level-5 context):
+
+```
+P = 000013   L = 006764   A = 177777 (-1)   PIL = 5   PVL = 6
+000013: 124000      <- JMP *   (FTLER)
+000014: 124000      <- JMP *   (TRERR)
+```
+
+`124000` is `JMP` with displacement 0 — jump-to-self — matching
+`FTLER, JMP *` / `TRERR, JMP *` (`src/TSS1.SYMB:165`). Confirmed by reading
+through the MMU, not from the image file.
+
+**The call site, decoded from memory at `L-1`:**
+
+```
+006757: 044342   LDA IDXA
+006760: 130004   JAP SWP6
+006761: 044341   LDA IDXB
+006762: 130002   JAP SWP6
+006763: 135330   JPL I 9FTLE     (opcode 23 = JPL, indirect)
+006764: 004332                    <- L (return address) points here
+```
+
+instruction-for-instruction identical to
+
+```
+SW6,	LDA IDXA; JAP SWP6; LDA IDXB; JAP SWP6; JPL I 9FTLE
+%       FTLER() IF IDXA<0 AND IDXB<0
+```
+
+and corroborated by `A = 177777` — `IDXB` still holding the `-1` that `SW4`
+initialised it to.
+
+**The chain:** `MEMORY <lo> <hi>` -> `CKMEM` -> `CRMEM` writes the `VCTBL`
+entry and posts `SAA 40; MST PID` to level 5 -> the swapper runs -> `SW4`
+scans `PDTBL` for a physical page to back the new virtual page -> **none is
+found**, so `IDXA` and `IDXB` both stay `-1` -> `SW6` calls `FTLER` ->
+`JMP *`.
+
+**Why the whole system dies, not just the process:** `PIL = 5`. The spin is
+at interrupt **level 5**, which blocks every lower level including the
+command processor — hence the permanently dead console. (`JMP *` is a
+preemptible idle spin, the ND idiom for "stop this program level"; higher
+levels still run.)
+
+**Open:** why no free physical page is available on a system whose page map
+reports all eight pages `EMPTY`.
+
+## 1b. (superseded analysis)
 
 The chain, every step evidenced:
 

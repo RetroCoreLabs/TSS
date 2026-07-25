@@ -375,7 +375,8 @@ K3, [3000     ticks/minute  K4, [50      ticks/second
   4x3=12) — recorded in `mac-c/src/mac_stmt.c:600-608`. The 1978 build was
   therefore a **32-bit-float** system, where `STF`/`LDF` move 2 words and the
   `DATA TIME,3` buffers simply carry slack.
-- **Proven:** nd100x implements **48-bit FP only**
+- **Measured, with a caveat:** no 32-bit FP option was found in this
+  nd100x build
   (`~/repos/nd100x/src/cpu/float.c`: "48-bit floating point arithmetic for
   the ND-100"), with no CPU-model dependence — `--cputype` cannot change it.
 - **Proven by partition:** in `RDATE`, year and month are produced by
@@ -410,7 +411,39 @@ L2,	SAX 0; SAT 0; SAA 1; JPL I (SDISK
 LOAD/bootstrap logic. nd100x provides no such hardware, so the CPU runs into
 cleared memory and stops. Not a TSS defect.
 
-## 4. `SET-REGISTER` / `STATUS` — the NORD-10 variant is wrong  **[PROVEN]**
+## 4. `SET-REGISTER` / `STATUS` — RETRACTED AND REVISED
+
+> **[RETRACTION 2026-07-25]** This section previously claimed the `"N10`
+> variant drives the **live** CPU registers instead of a saved block. **That
+> is wrong.** `IRR`/`IRW` bits 3-6 are a **program level** field
+> (ND-06.014.2A, ND-100 Reference Manual: *"Bits 3-6 specify the program
+> level number"*). TSS assembles `ORA (IRR 10` / `ORA (IRW 10`, and
+> `0153600 + 010 = 0153610` decodes to **level = 1** — the user program's
+> saved register block. That is the correct intent and the exact equivalent
+> of the NORD-1 variant's `RBLOK`. The original analysis is withdrawn.
+
+**Revised explanation [INFERRED — not yet verified]:** `IRR`/`IRW` are
+**privileged**. nd100x gates them on the **ring field of PCR**
+(`CheckPriv()`; `cpu_instr.c:3713` — *"Real PCR content is ring (0-1), the
+MMS2 enable (2) and PT/APT (7-14)"*), requiring ring 2 or 3. Rings are an
+**ND-100** protection concept; TSS 3.0 is a **NORD-10** program that drives
+the MMU the Paging-System-I (MMS1) way and has no notion of them. If it
+leaves the ring field at 0, every `IRR`/`IRW` silently becomes a no-op —
+which is exactly what was measured (reads return nothing, writes never
+stick, no error reported).
+
+If that holds, defect 4 is an **ND-10 vs ND-100 architecture difference**,
+not a TSS bug. **To verify:** read `STS`/`PONI` and `PCR[CurrLEVEL]` at the
+moment `STATUS` executes and check the ring bits.
+
+**Still a genuine bug, independent of the above:** the `B` decode overruns
+the table. `STATUS`'s `REGM` gives the machine numbering
+`0=STS 1=D 2=P 3=B 4=L 5=A 6=T 7=X`; `SETX`'s `SSXT, 2; 7; 6; 5; 1; 4; 3`
+has **seven entries, indices 0-6**, with `B` at index 6 — but the decoder
+does `SAT ##B; SKP IF DA UEQ ST; SAX 7`, index **7**, one past the end.
+Fix: `SAX 6`.
+
+### (superseded analysis follows)
 
 Two independent bugs, both in the `"N10` conditional block:
 
@@ -502,9 +535,14 @@ The chain, every step evidenced:
 4. It reads `PDTBL[0]` — the entry the INDX field points at — whose usage
    count is **0**, because `CRMEM` never allocated a physical page to back
    the entry it just created. The guard fires.
-5. `FTLER` is at **address 000013** and its entire body is
-   **`FTLER, JMP *`** (`src/TSS1.SYMB:165`) — jump-to-self. An infinite loop
-   with no diagnostic.
+5. `FTLER` is at **address 000013**, labelled `%FATAL ERROR` in the source,
+   and its entire body is **`FTLER, JMP *`** (`src/TSS1.SYMB:165`), as is
+   `TRERR` beside it. Mechanically `JMP *` is a **preemptible idle spin**,
+   not a CPU halt: higher-level interrupts still run, and the level resumes
+   the same instruction afterwards. It is the ND idiom for "stop this
+   program level". **Open:** which level it spins on. If it is level 5 (the
+   swapper's level) it blocks every lower level, which would explain the
+   totally dead console; if lower, only the user's process is stuck.
 
 **Every observation is accounted for:**
 

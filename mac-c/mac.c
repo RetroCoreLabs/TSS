@@ -2723,6 +2723,23 @@ bool mac_assemble_file(mac_state *st, const char *spec)
     char line[1024];
     while (fgets(line, sizeof(line), f) != NULL)
     {
+        /* Strip the ND parity bit (bit 7) from every ingested source byte.
+         * The 1973 tape files carry 8-bit bytes with odd/even parity in bit 7
+         * (see archive/README.md); the derived src/ copies were produced by
+         * exactly this operation:  perl -pe 's/(.)/chr(ord($1)&0x7f)/ge'.
+         * Doing it here means mac-c can assemble the parity-set ORIGINALS in
+         * archive/ directly, and it is a strict NO-OP on the already-stripped
+         * src/ copies (their bytes are all <0200), so the golden dumps are
+         * byte-for-byte unaffected. Source text is 7-bit ASCII throughout —
+         * including inside '..' strings and #ab char constants — so clearing
+         * bit 7 never destroys a legitimate source character. (The 0x9D->0x1D
+         * caveat in archive/README concerns the LIST *dump* files, not source.)
+         *
+         * We stop at the fgets NUL terminator; a genuine 0200 byte would strip
+         * to NUL, but source files contain none (only the ASYMB/BSYMB dumps
+         * carry the 0200 leader, and those are never assembled).            */
+        for (char *p = line; *p != '\0'; ++p)
+            *p = (char)((unsigned char)*p & 0x7f);
         mac_line(st, line);
         if (st->end_of_file_seen)
         {

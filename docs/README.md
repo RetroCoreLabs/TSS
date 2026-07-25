@@ -1,8 +1,9 @@
-# docs/ — the four documents
+# docs/ — the documents
 
 | document | contents |
 |---|---|
 | [`TSS-ARCHITECTURE.md`](TSS-ARCHITECTURE.md) | the OS, top to bottom: memory/paging, scheduler, interrupt levels, cold start, overlays, terminal I/O and login, file system, users/accounting, command processor, device drivers, and the emulated CDC/drum devices |
+| [`TSS-USER-MANUAL.md`](TSS-USER-MANUAL.md) | **user manual / command reference** — logging in, the command processor, and all 60 `@`-prompt commands documented from their source handlers, plus the full error-message table and device list |
 | [`TSS-BRINGUP.md`](TSS-BRINGUP.md) | from clean checkout to a logged-in `@` prompt: build, emulator, MINIT format, cold-start, login, validation and debugging (scripts: [`../bringup/`](../bringup/README.md)) |
 | [`PROJECT-DESCRIPTION.md`](PROJECT-DESCRIPTION.md) | history and provenance: what TSS 3.0 is, authorship, the `.ORG`-vs-`.SYMB` restoration, how it was built and booted in 1973 |
 | [`MAC-ASSEMBLER.md`](MAC-ASSEMBLER.md) | the assembler: MAC/FMAC family, MAC.BPUN reverse engineering, and the full mac-c defect record |

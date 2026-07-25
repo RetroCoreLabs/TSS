@@ -130,6 +130,12 @@ login: need-nd ## STEP 4 (interactive): normal boot; type SYSTEM, then 1 — you
 	@echo ">>> First login also asks TYPE IN DATE (DD,MM,YYYY,HH,MM,SS). Then: @ — try HELP."
 	$(ND) --boot=bpun --image=$(BPUN) --cdc=$(CDC) --drum=$(DRUM) --start=7
 
+auto: prepare need-nd ## ONE-COMMAND bring-up: prepare + format + cold-start, fully unattended (DAP-driven, disc PERSISTS). Then: make login
+	@echo ">>> Automated bring-up: format + cold-start, driven over DAP and stopped"
+	@echo ">>> with a CLEAN debugger-terminate so the CDC disc is actually written back."
+	python3 bringup/dap_bringup.py $(CURDIR) --nd $(ND)
+	@python3 bringup/verify-disc.py
+
 verify: ## check the bring-up disc: MIB free tracks + SYSTEM user present
 	python3 bringup/verify-disc.py
 

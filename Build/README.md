@@ -7,8 +7,8 @@ clear the rest.
 
 ```bash
 cd ../mac-c
-./build_tss_assysa.sh    # the 1973 build scripts, end to end
-./run_tss.sh             # or: assemble the five parts directly
+./scripts/build/build_tss_assysa.sh    # the 1973 build scripts, end to end
+./scripts/build/run_tss.sh             # or: assemble the five parts directly
 ```
 
 ## What lands here
@@ -30,9 +30,9 @@ From `run_tss.sh`: `asymb.list`, `write.txt`, `err.txt`.
 
 ```bash
 cd ../mac-c
-./compare_asymb.sh ../Build/ASYMB.SYMB ../reference/ASYMB.SYMB
+./scripts/verify/compare_asymb.sh ../Build/ASYMB.SYMB ../reference/ASYMB.SYMB
 ```
 
 A good build reports `errors : 0` and **679 of 693** exact symbol matches
 (version B: 675 of 689). If that number drops, something regressed — use
-`./first_divergence.sh` to find the first symbol that moved.
+`./scripts/verify/first_divergence.sh` to find the first symbol that moved.

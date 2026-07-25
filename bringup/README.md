@@ -48,6 +48,23 @@ you are in.
 | `verify-disc.py` | reads `Build/bringup/cdc.img` (or a path argument): MIB free-track count, SYSTEM present, and which step to run next |
 | `check-robj-encoding.py` | byte-checks a built BPUN/image for the fixed-vs-broken ROBJ encoding — catches the stale-`mac-as` trap (`make test` does not relink `mac-as`) |
 
+### Emulator configuration
+
+| file | purpose |
+|---|---|
+| `tss.cfg` | nd100x configuration for booting the DRUM/N10 build directly: `nd100x --config=/mnt/e/Dev/Ronny/TSS/bringup/tss.cfg`. Boots `Build/drum/tss-drum.bpun`, whose autostart address (`ISTRT=025076`) the BPUN itself carries, and points the swapping drum at `Build/drum.img` — deliberately **not** `Build/drum/`, which `build_tss_drum.sh` wipes. It also records why the run must be MMS1: TSS 3.0 programs the MMU the Paging-System-I way (single 16-bit page-table words to `0177400`, then `PON` — `src/TSS1.SYMB` `IPGTB`), and MMS2 mis-decodes those PCR values so user virtual page 0 never maps to the resident vector page and `GOVER` loops. |
+
+### Trace probes — for when a bring-up step misbehaves
+
+These are diagnostic, not part of the procedure. Both boot the emulator on
+**copies** of the disc images, so they cannot damage a working disc set.
+
+| file | purpose |
+|---|---|
+| `logon_trace_probe.sh` | **locates where the cold console-login path stops.** Enters at `INIT=000301`, streams the CPU `--trace` through awk, and tallies instructions per interrupt level (PIL) plus execution counts for the eight addresses on the login path (`INIT`, `LEV5`, `SWAPR`, `LEV2`, `SXBRK`, `ERMSG`, `LOGON`, `XSTAR`). Its header gives the reading: `PIL=2 > 0` with `LEV2 == 1` means the console process was auto-created and dispatched; `LOGON == 0` while the `ERMSG` region churns means it is blocked at the `ERMSG = GOVER OV15` start-up-message overlay call, before `JPL I (LOGON`. Usage: `./logon_trace_probe.sh [max_instructions]` (default 6000000). |
+| `dkadr_trace.sh` | **captures the live `DKADR` logical→physical sector mapping.** Boots the DRUM+N10 build with `--trace`, writes the full trace to `$OUT` (default `bringup/dkadr_trace_$$.txt`), then summarises: total trace lines, how many fell in the `DKADR` entry region (PC `010006`..`010060`), every `IOX 503` (CDC block-address load) with its A register, and the distinct `IOX` opcodes seen. Usage: `./dkadr_trace.sh [max_instructions]` (default 4000000). |
+| `dkadr_pairs.awk` | post-processor for that trace, run **separately** — `dkadr_trace.sh` does not invoke it. Pairs each `DKADR` entry (PC `010006`, `T` = logical sector) with the following `IOX 503` (`A` = physical CDC block) and prints `logical -> physical`. Usage: `awk -f dkadr_pairs.awk dkadr_trace_NNN.txt`. |
+
 ## What each prompt means
 
 - MINIT `FIRST/LAST DISK ADDRESS (NCR)` — octal disc addresses; `4470` is the

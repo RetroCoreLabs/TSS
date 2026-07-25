@@ -50,6 +50,6 @@ in the `LEV6` scanner assembles NORD-1 `IOT` opcodes even in an N10 build.
 
 `../docs/TSS-BRINGUP.md` documents both build routes in full.
 
-> Note: `../mac-c/build_tss_assysa.sh` does **not** use these files — it
+> Note: `../mac-c/scripts/build/build_tss_assysa.sh` does **not** use these files — it
 > feeds the real `../src/ASSYSA.SYMB` to the C assembler and strips the
 > wrapper itself. These exist for running under a genuine MAC.

@@ -82,11 +82,11 @@ test: ## run the mac-c unit-test suite (695 assertions, must be 0 failures)
 
 golden: ## rebuild the golden ASSYSA/ASSYSB streams and score vs the 1978 oracle
 	$(MAKE) -C mac-c tss
-	cd mac-c && ./compare_asymb.sh ../Build/ASYMB.SYMB ../reference/ASYMB.SYMB
-	cd mac-c && ./compare_asymb.sh ../Build/BSYMB.SYMB ../reference/BSYMB.SYMB
+	cd mac-c && ./scripts/verify/compare_asymb.sh ../Build/ASYMB.SYMB ../reference/ASYMB.SYMB
+	cd mac-c && ./scripts/verify/compare_asymb.sh ../Build/BSYMB.SYMB ../reference/BSYMB.SYMB
 
 verify-repo: ## the whole verification gate: layout, build, tests, coverage, oracle, links
-	cd mac-c && ./verify_repo.sh
+	cd mac-c && ./scripts/verify/verify_repo.sh
 
 # ---------------------------------------------------------------------------
 ##@ Bring-up: bare disc -> interactive login   (docs/TSS-BRINGUP.md)

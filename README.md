@@ -63,8 +63,8 @@ Each has its own README with the detail.
 ```bash
 cd mac-c
 make test                 # 695 unit tests
-./build_tss_assysa.sh     # run the real ASSYSA and ASSYSB scripts
-./compare_asymb.sh ../Build/ASYMB.SYMB ../reference/ASYMB.SYMB
+./mac-c/scripts/build/build_tss_assysa.sh     # run the real ASSYSA and ASSYSB scripts
+./mac-c/scripts/verify/compare_asymb.sh Build/ASYMB.SYMB ../reference/ASYMB.SYMB
 ```
 
 Needs a POSIX toolchain; on Windows use WSL.

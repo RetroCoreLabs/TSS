@@ -64,8 +64,8 @@ In the 1973 originals all of them are consistently defined and used
 undefined after a full rebuild are artifacts of this incomplete patch, not
 of the original program or of the modern assembler.
 
-Regenerate this analysis with `mac-c/diff_cvs_vs_original.sh` and
-`mac-c/check_rename_gaps.sh`.
+Regenerate this analysis with `mac-c/scripts/attic/diff_cvs_vs_original.sh` and
+`mac-c/scripts/attic/check_rename_gaps.sh`.
 
 ## Contents
 

@@ -427,11 +427,40 @@ DBLOP, LDX DBCOR; LDT DBDKA; JPL RDKOP
 So `LOAD-SYSTEM` loads zeros into core 0 and executes them with interrupts
 already disabled — hence the silent wedge.
 
-**Classification: a bring-up provisioning gap.** Nothing in `bringup/` or the
-Makefile writes a disc bootstrap, which is consistent with `)SOVER` /
-`)8DUMP` — the commands that dump the system to disc — being intentional
-no-ops in mac-c because they need real ND-100 execution. The command itself
-is correct and would work on a disc that had been made self-bootable.
+**Why page 0 is empty — the bootstrap is compiled out, twice.** Mark regions
+in `src/TSS3.SYMB`:
+
+```
+239: "CDC NMACF     <- contains DKRST, RDKOP, DBOOT (the disc bootstrap)
+275: "
+277: "TSBIN         <- defines CDBIN
+280: "NCR           <- )KILL CDBIN
+284: "CDBIN         <- the two )8DUMP writes, to disc pages 0 and 2
+297: "
+```
+
+Our builds set `CDC MACF DIAB K14 TEL4` (+ `DRUM N10` for the drum variant):
+
+1. `"CDC NMACF` is **FALSE**, because `MACF` *is* set — so `DKRST`, `RDKOP`
+   and `DBOOT` are **never assembled**. The bootstrap code is not in the
+   image. (Their absence from the symbol dump is explained by this, not by
+   the `)PCL DBOOT` purge.)
+2. `CDBIN` is defined only inside `"TSBIN`, which we do not set — so the two
+   `)8DUMP` writes to disc pages 0 and 2 are compiled out as well.
+
+**The archived 1978 golden builds also set `MACF`.** The system this project
+reproduces is therefore the **tape-loaded** variant, not the
+self-booting-disc variant. `LOAD-SYSTEM` is the only command that assumes the
+other build.
+
+**Classification: not a defect at all — a build-variant mismatch.** Nothing in `bringup/` or the
+Makefile writes a disc bootstrap, which is and `)8DUMP` is in any case an intentional no-op in mac-c because it needs
+real ND-100 execution. The command itself is correct and would work on a disc
+built from the `NMACF` + `TSBIN`/`CDBIN` variant.
+
+**To make `LOAD-SYSTEM` work** you would either build that variant and
+implement `)8DUMP` in mac-c, or synthesise pages 0 and 2 host-side from a
+build that does assemble `DKRST`/`DBOOT`.
 
 `LOADV` (`src/TSS5.SYMB:609`) deliberately stops the machine and restarts it
 from location 0:

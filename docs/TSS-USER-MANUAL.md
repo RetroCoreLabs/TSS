@@ -47,7 +47,11 @@ PROJECT NUMBER P-<n>
 - **Abbreviation:** commands are matched against the command table by a block
   search, so a **unique prefix** is enough. If a prefix matches more than one
   command the match is ambiguous and rejected.
-- **Unknown command:** the processor prints **`?`**.
+- **Unknown command:** the processor prints **`?`**. **[VERIFIED 2026-07-25]**
+  `?` is the general **failure-return** indicator, not only "unknown command":
+  it also follows defined errors such as `ILLEGAL ADDRESS` (`GOTO-USER`) and
+  `PROGRAM OUT OF BOUNDS` (`RBLOAD`), and appears alone from `CONTINUE` and
+  a refused `LINK-TO`.
 - **Line editing / recall:** the previous command line is retained and can be
   recalled/edited (the `EDIT` routine, `src/TSS5.SYMB` command loop `CLOOP`).
 - Commands marked **SYSTEM only** below check the caller's user number and refuse
@@ -59,8 +63,15 @@ PROJECT NUMBER P-<n>
 
 **How arguments work.** Most commands take their arguments on the same line,
 separated by spaces or commas (e.g. `OPEN-FILE MYFILE,RW`). If you leave a
-required argument out, TSS **prompts** you for it using a fixed prompt string
-(`FILE NAME:`, `START ADDRESS:`, …). Numeric addresses/values are **octal**;
+required argument out, TSS **prompts** you for it from the fixed table
+`PARPT` / `SC1`–`SC36` (`src/TSS4.SYMB:1690-1731`). The type prefix in that
+table governs the radix: **`S[]` = string, `IB[]` = octal, `ID[]` = decimal**
+— which is why addresses are octal but dates are decimal.
+
+> **[VERIFIED 2026-07-25]** some commands **ignore a command-line argument
+> and prompt anyway** — `DELETE-MEMORY 40000` and `PLACE-BINARY TAPE-READER`
+> both re-prompted. When in doubt, issue the bare command and answer the
+> prompts. Numeric addresses/values are **octal**;
 dates are **decimal**. Where noted, a parenthesised `(USER)` before a file or
 friend name targets another user's object. **SYSTEM only** means the command
 checks the caller's user number and refuses anyone but user 1 (`SYSTEM`) with
@@ -84,8 +95,9 @@ until you re-enter your password correctly (wrong entry silently re-prompts).
 No arguments. `src/TSS4.SYMB:782`
 
 #### CONTINUE
-Resumes the currently suspended program at its saved restart address. If there is
-nothing to continue it returns silently. No arguments. `src/TSS2.SYMB:1668`
+Resumes the currently suspended program at its saved restart address.
+**[VERIFIED 2026-07-25]** with nothing to continue it prints **`?`** (the
+failure-return indicator), not silence. No arguments. `src/TSS2.SYMB:1668`
 
 #### MODE
 Redirects where the command processor reads commands and writes results — opens
@@ -173,10 +185,17 @@ Marks one or more code blocks in a dump file as reentrant. Syntax:
 dump. `src/TSS4.SYMB:992`
 
 #### MEMORY
-With a page number and address, assigns/sizes a page of your address space; with
-no size it **lists the page map**, showing each page as `READ ONLY`,
-`READ/WRITE`, or `EMPTY`. Bad address → `ILLEGAL ADDRESS SPACE`.
-`src/TSS3.SYMB:1590`
+Sets the size of your address space. Takes a **lower bound** and an **upper
+bound**; if either is omitted it prompts (`LOWER BOUND:`, `UPPER BOUND:`).
+**A lower bound of `0` lists the page map instead** (`STA M0,B; JAZ M2`),
+showing each page as `READ ONLY`, `READ/WRITE`, or `EMPTY`. Bad address →
+`ILLEGAL ADDRESS SPACE`. `src/TSS3.SYMB:1590`
+
+> **[VERIFIED 2026-07-25 — DEFECT] The assigning form hangs.**
+> `MEMORY 40000 44000` produces no output and never returns; the terminal is
+> lost. Only the `MEMORY 0` listing form is safe. Path: `MEM` → `CKMEM`
+> (`src/TSS2.SYMB:458`) → `CRMEM` (`src/TSS2.SYMB:489`), which posts
+> `SAA 40; MST PID` to interrupt level 5. See `TSS-COMMAND-VALIDATION.md`.
 
 #### DELETE-MEMORY
 Releases (frees) one or more pages of your address space. Syntax:
@@ -187,13 +206,19 @@ Releases your entire address space (frees all your pages). No arguments.
 `src/TSS2.SYMB:427`
 
 #### STATUS
-Lists your program's saved register block: `P, X, T, A, D, L, STS, B` (and `MPR`
-on NORD-1). No arguments. `src/TSS3.SYMB:305`
+Lists your program's saved register block. **[VERIFIED 2026-07-25]** the
+printed order is `STS, D, P, B, L, A, T, X` — one per line, not the
+declaration order. (`MPR` also on NORD-1.) No arguments. `src/TSS3.SYMB:305`
 
 #### SET-REGISTER
 Sets a saved register (`P X T A D L B`) or a memory location to a value. The
 target is the first field, the value the second; a memory address is range-checked
 before writing. `src/TSS3.SYMB:351`
+
+> **[VERIFIED 2026-07-25 — DEFECT] It sets the wrong register.**
+> `SET-REGISTER A 1234` left `A = 0` and set `STS = 234`;
+> `SET-REGISTER X 777` left `X = 0`. No error is reported. Do not rely on
+> this command.
 
 #### EXAMINE
 Examines core: with one address, prints that location's contents (octal); with a
@@ -204,6 +229,19 @@ second address, prints the whole range. `src/TSS4.SYMB:1218`
 Device names: `TELETYPE`, `TAPE-READER`, `FAST-PUNCH`, `CARD-READER`,
 `LINE-PRINTER`, `DIABLO`, `NULL`.
 
+> **A device name is a valid FILE name.** `OPEN` matches its operand against
+> the peripheral table `PDEVS` **before** parsing it as a file
+> (`src/TSS3.SYMB:1345-1348`, label `O4`): on a match it indexes `DDEVS` for
+> the device number and returns open-success; only on no-match does it fall
+> through to the file path. So a device can be given wherever a file name is
+> expected. Table (`src/TSS2.SYMB:1837-1856`): `TELETYPE`=1, `TAPE-READER`=2,
+> `FAST-PUNCH`=3, `CARD-READER`=4, `LINE-PRINTER`=5, `DIABLO`=14, `NULL`=0.
+>
+> **[VERIFIED 2026-07-25]** `RBLOAD` accepted `TAPE-READER` and read the tape;
+> `MODE` accepted `TELETYPE` as both input and output file. **But
+> `PLACE-BINARY` and `LOAD-BINARY` reject `TAPE-READER`** (`BAD FILENAME`) —
+> unexplained, since they call the same `OPEN`.
+
 #### RESERVE
 Reserves a named peripheral for your exclusive use. If already taken, prints
 `ALREADY RESERVED BY USER <name>`. Arg: device name. `src/TSS4.SYMB:362`
@@ -213,8 +251,10 @@ Releases a device you reserved (silently does nothing if it isn't yours). Arg:
 device name. `src/TSS4.SYMB:401`
 
 #### WHERE-IS
-Reports a device's status: `RESERVED BY USER <name>` or `FREE TO USE`. Arg: device
-name. `src/TSS4.SYMB:430`
+Reports a device's status: `RESERVED BY USER <name>`. **[VERIFIED 2026-07-25]**
+a **free device produces no output at all** — the documented `FREE TO USE`
+message was not observed, for either a free or a just-reserved `TELETYPE`.
+Arg: device name. `src/TSS4.SYMB:430`
 
 #### PIN-DEVICE
 Pins/activates a device by issuing an I/O start (`IOT PIN`) to it. Arg: device
@@ -231,8 +271,12 @@ Lists all authorised user numbers and their names. No arguments.
 `src/TSS4.SYMB:967`
 
 #### LIST-TRACKS
-Prints `<n> TRACKS LEFT` for a user (defaults to you). Arg: optional user name.
-`src/TSS5.SYMB:1606`
+Prints `<n> TRACKS LEFT` for a user. **[VERIFIED 2026-07-25]** the user name is
+**not** optional in practice: with no argument it prompts `USER NAME:`, and an
+empty answer does **not** mean "you" — it yields `0 TRACKS LEFT`. Give the name
+explicitly (`LIST-TRACKS SYSTEM`). Note `SYSTEM` holds no track *quota* on a
+fresh disc (`0 TRACKS LEFT`) even though `DISK-SPACE` shows 15 free — which is
+also why `TRANSFER` answers `NO MORE TRACKS AVAILABLE`. `src/TSS5.SYMB:1606`
 
 #### TIME-USED
 Prints `TIME USED IS <t> OUT OF <limit>` — your compute time against your
@@ -244,8 +288,9 @@ arguments. `src/TSS4.SYMB:1300`
 
 #### LINK-TO
 Couples your terminal to another user/terminal (terminal-to-terminal link). Arg:
-user name or TTY number. Fails silently if not possible (target invalid, inactive,
-or already linked). `src/TSS4.SYMB:459`
+user name or TTY number. **[VERIFIED 2026-07-25]** on failure it prints **`?`**,
+not silence (`LINK-TO SYSTEM`, i.e. linking to self, is refused this way).
+`src/TSS4.SYMB:459`
 
 #### BREAK-LINKS
 Breaks your terminal link, clearing both ends of the coupling. No arguments.
@@ -285,8 +330,14 @@ FILENAME ACCESS-WORD` (9 bits, octal). `src/TSS4.SYMB:1602`
 ### 4.7 System administration *(SYSTEM only)*
 
 #### CREATE-USER
-Creates a new user account and prints `USER NUMBER = <n>`. Arg: new user name.
+Creates a new user account. Arg: new user name.
 Errors include `ALREADY EXISTS`, `TOO LONG`, `NO MORE ROOM`. `src/TSS4.SYMB:920`
+
+> **[VERIFIED 2026-07-25 — DEFECT] False error.** On a disc holding only
+> `SYSTEM`, `CREATE-USER TESTU` printed **`ALREADY EXISTS`** and no
+> `USER NUMBER = <n>` — yet the user **was** created (`LIST-USERS` then showed
+> `1 SYSTEM`, `2 TESTU`, and `DELETE-USER TESTU` removed it cleanly). Treat
+> `ALREADY EXISTS` from this command as unreliable; check `LIST-USERS`.
 
 #### DELETE-USER
 Deletes a user account. Arg: user name. `src/TSS4.SYMB:1899`
@@ -377,10 +428,19 @@ carries that `"` (`src/TSS3.SYMB`, label `O4A`); without it, `OPEN` looks up an
 
 - **On demand (inferred):** a program that needs scratch opens `"SCRATCH:DATA`
   itself — the normal way a program obtains work space.
-- **Manually (inferred):** e.g. `OPEN-FILE "SCRATCH:DATA,WX` then
-  `CLOSE-FILE` (`"` = create, `W` = write, `X` = random/indexed). *This exact
-  incantation is inferred from the create-marker and R/W/X conventions and has
-  not yet been confirmed on a running system.*
+- **Manually — DISPROVEN.** `OPEN-FILE "SCRATCH:DATA,WX` was previously
+  inferred here. **[VERIFIED 2026-07-25]** it returns **`BAD FILENAME`**, on
+  the command line *and* through the `FILE NAME:` prompt. Without the quote,
+  `OPEN-FILE SCRATCH:DATA,W` correctly returns `NO SUCH FILE`. So the command
+  processor rejects the create marker.
+
+> **[VERIFIED 2026-07-25 — OPEN QUESTION] No way to create a file was found.**
+> Beyond `OPEN-FILE`, `ALLOCATE` returns `NO SUCH FILE`, and `DUMP`,
+> `SAVE-CORE`, `MAKE-REENTRANT` and `GET-CORE` all fail the same way —
+> `DUMP` is supposed to *create* its output file. Either file creation is
+> reached only from a running program via the `OPEN` monitor call rather than
+> from the command processor, or something in the create path is broken.
+> Full evidence in `TSS-COMMAND-VALIDATION.md`.
 
 > **Bring-up implication.** Because nothing in the login / user-creation /
 > cold-start path creates it, a freshly-MINIT'd disc has no `SCRATCH:DATA`, so the
@@ -399,11 +459,12 @@ carries that `"` (`src/TSS3.SYMB`, label `O4A`); without it, `OPEN` looks up an
 - **`LOGOUT`** closes files and frees the user's temporary tracks
   (`src/TSS4.SYMB`, `LOGOUT`), reclaiming transient scratch space at sign-off.
 
-*Not yet verified live:* the exact create command, whether `SCRATCH:DATA` is meant
-to persist across sessions or be re-created per session, and precisely why the
-missing file reports as `AMBIGUOUS FILENAME` (error 31) rather than `NO SUCH FILE`
-(error 8). These would be confirmed by booting TSS, creating the file, and
-re-logging in.
+*Verified live 2026-07-25:* the inferred create command **does not work** (see
+above). `NO SUCH FILE` (error 8) demonstrably exists and is what `RENAME`,
+`DELETE-FILE` and `DEFINE-FILE-ACCESS` return for a missing file — while
+`LIST-FILE` returns **nothing at all** for the same missing file. Why `LOGON`'s
+failed open reports `AMBIGUOUS FILENAME` (error 31) instead is therefore still
+open, as is whether `SCRATCH:DATA` is meant to persist across sessions.
 
 ---
 

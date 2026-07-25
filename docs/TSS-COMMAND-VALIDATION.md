@@ -480,7 +480,53 @@ Also recovered: `OPEN`'s error codes — `OF8` = `57`, `OFX` = `10` (NO SUCH
 FILE) or `37` = **31 decimal = AMBIGUOUS FILENAME**, which is exactly the
 error `LOGON` reports on a fresh disc.
 
-## 1. The `MEMORY` hang — spinning in the swapper  **[PARTLY PROVEN]**
+## 1. The MEMORY hang — CLOSED: a fatal-error trap in the swapper  **[PROVEN]**
+
+The chain, every step evidenced:
+
+1. `MEMORY <lo> <hi>` -> `MEM` -> `CKMEM` (`src/TSS2.SYMB:458`), which calls
+   `CRMEM` for each absent page.
+2. `CRMEM` (`src/TSS2.SYMB:489`) writes the page-table entry
+   **`VCTBL[i] = 160000`** — X bit set, and the INDX field
+   (`160000 AND 1777`) = **0** — then posts `SAA 40; MST PID`, an interrupt
+   request to **level 5**.
+3. Level 5 runs the swapper `SWAPR` (`src/TSS1.SYMB:2794`). Its `SW1` page
+   loop reaches this guard:
+
+   ```
+   %  FTLER() IF PDTBL[VCTBL[I]$INDX]$COUNT<=0;
+      AND K1777; SHA 1; ADD 9PDTB; COPY DX SA
+      LDA 0,X; AND K77; JAF *+2; JPL I 9FTLE
+   ```
+
+4. It reads `PDTBL[0]` — the entry the INDX field points at — whose usage
+   count is **0**, because `CRMEM` never allocated a physical page to back
+   the entry it just created. The guard fires.
+5. `FTLER` is at **address 000013** and its entire body is
+   **`FTLER, JMP *`** (`src/TSS1.SYMB:165`) — jump-to-self. An infinite loop
+   with no diagnostic.
+
+**Every observation is accounted for:**
+
+| observation | explained by |
+|---|---|
+| no console output whatsoever | `FTLER` prints nothing |
+| PC frozen at `000013` across 30 single-steps | `JMP *` never advances |
+| caller frame `006762` = `SWAPR`+207 | the swapper's `SW1` loop |
+| `drum.img` / `cdc.img` unmodified | it traps *before* any `TRSFR` I/O |
+| terminal dead permanently | nothing ever clears the loop |
+
+**This is a real TSS bug, and it is NOT the track-quota condition** — the
+earlier inference is retracted. `CRMEM` marks a `VCTBL` entry as present
+(X bit) with `INDX = 0` while leaving `PDTBL[0]` unbacked, which the swapper
+treats as a fatal inconsistency.
+
+**Why login still works:** the overlay path (`GOVER`/level 5) uses `VCTBL`
+entries that *do* have `PDTBL` backing. Only `CRMEM` — reached solely by the
+assigning form of `MEMORY` — creates the malformed entry. That is why the
+system boots, logs in and runs 59 of 60 commands, and dies only here.
+
+## 1b. Earlier partial analysis (superseded)
 
 **Proven by measurement.** Pausing the CPU over DAP four times, seconds
 apart, gives an identical stack every time:

@@ -76,8 +76,8 @@ dumps were built from.
 **[VERIFIED]** The rename is also **incomplete**: `STR`, `STR0`, `STR1`,
 `STR2`, `STR1X` and `STR2X` are referenced but never defined in the patched
 sources, which accounts for **six of the twenty symbols left undefined by a
-full rebuild**. Reproduce with `mac-c/diff_cvs_vs_original.sh` and
-`mac-c/check_rename_gaps.sh`; full detail in `archive/README.md`.
+full rebuild**. Reproduce with `mac-c/scripts/attic/diff_cvs_vs_original.sh` and
+`mac-c/scripts/attic/check_rename_gaps.sh`; full detail in `archive/README.md`.
 
 ### Parity-clearing caveat
 
@@ -284,7 +284,7 @@ subsystem build, loading at octal `145000–177777`. **[VERIFIED]**:
   correctly, then loops forever retrying its first character. This is why
   a host reimplementation (mac-c) was written instead of running MAC.
 - Its permanent symbol table at `0xE9B3` (3-word entries, names packed
-  5 chars × 6 bits) is where every opcode value in `mac-c/mac_permsym.c`
+  5 chars × 6 bits) is where every opcode value in `mac-c/src/mac_permsym.c`
   came from — byte-verified ground truth for the instruction set.
 
 ---
@@ -380,7 +380,7 @@ list output does not carry generated words.
 archive.** `ASYMB`/`BSYMB` prove symbol *addresses* (i.e. word counts)
 only; the LIST files add nothing on encoding. This is why encoding bugs
 could — and did — survive a long time while the symbol scorecard stayed
-perfect, and why `mac-c/test_mac.c` asserts every instruction's
+perfect, and why `mac-c/tests/test_mac.c` asserts every instruction's
 **encoding** directly, and why the ultimate test is running the built
 system (§8).
 

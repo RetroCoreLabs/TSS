@@ -54,7 +54,7 @@ original is `../archive/TSS*.ORG`; every difference is catalogued in
 
 ```bash
 cd ../mac-c
-./build_tss_assysa.sh     # runs ASSYSA and ASSYSB; output -> ../Build/
+./scripts/build/build_tss_assysa.sh     # runs ASSYSA and ASSYSB; output -> ../Build/
 ```
 
 The build scripts are MAC command streams, not shell scripts. `ASSYSA`

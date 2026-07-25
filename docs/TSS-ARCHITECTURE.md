@@ -1011,14 +1011,14 @@ The `VOR` windows hold **fully fixed-up** overlay bodies: an instrumented
 build showed zero forward-reference or literal fixups unresolved inside any
 overlay window at the `)9MOVE` snapshot point (every overlay's internal
 labels and `)FILL`'d literals are defined before its `OVERX`); pinned by
-`mac-c test_mac.c [12]`. **[VERIFIED]**
+`mac-c tests/test_mac.c [12]`. **[VERIFIED]**
 
 Per-overlay used size = `*-ROVER` at the `OVERX`, stored in the `QOVn`
 symbol (`$A1 =*-ROVER`, `TSS3.SYMB:82`); e.g. `QOV19=000725` (469 dec of
 512) **[VERIFIED]** `ASYMB:692`. All ≤ 1000. The reference SOVER guard
 halts `WAIT 47` if an overlay reaches 512 words (`TSS3.SYMB:37`).
 
-For the reproduction, `mac_write_cdc_disc` (`mac-c/mac.c`) copies each
+For the reproduction, `mac_write_cdc_disc` (`mac-c/src/mac_bpun.c`) copies each
 512-word `VOR` window to CDC-disc physical sectors
 `cdc_dkadr(OVDK+2n)`/`cdc_dkadr(OVDK+2n+1)` — DKADR applied once, at write
 time, so the nd100x CDC device stays a dumb linear-by-physical-sector store
@@ -1027,7 +1027,7 @@ time, so the nd100x CDC device stays a dumb linear-by-physical-sector store
 ### 5.6 The 31-overlay layout table
 
 Overlay numbers and OVDK are build-independent (numbers verified from
-`reference/ASYMB.SYMB` via `mac-c/overlay_layout.py`). Sectors are octal
+`reference/ASYMB.SYMB` via `tools/analysis/overlay_layout.py`). Sectors are octal
 256-word logical sector numbers on the CDC disc; each overlay occupies the
 two consecutive sectors `sec0, sec1` and loads at `ROVER`.
 
@@ -1082,7 +1082,7 @@ Total 31 overlays (0..36 octal = 0..30 dec), logical sectors 160..255.
 5. Copy verbatim — no relocation (matches `)9MOVE` and the reader loading
    straight into `ROVER`).
 6. Overlays go on the CDC disc (channel 500 / 100), never the drum (540).
-7. `mac-c/overlay_layout.py` regenerates the overlay→sector table from a
+7. `tools/analysis/overlay_layout.py` regenerates the overlay→sector table from a
    `)LIST` dump for diffing.
 
 Not determined from source: the runtime value of `DKBAS` (`DKBAS,0`,
@@ -2962,8 +2962,8 @@ comment. **[INFERRED]**
 
 **Validation.**
 
-- Golden reconciliation **unchanged**: `./build_tss_assysa.sh` +
-  `./compare_asymb.sh` → `exact matches : 679` (A), 675 (B); the only
+- Golden reconciliation **unchanged**: `./scripts/build/build_tss_assysa.sh` +
+  `./scripts/verify/compare_asymb.sh` → `exact matches : 679` (A), 675 (B); the only
   unmatched entries remain the pre-existing 13 macro names.
   **[VERIFIED]**
 - `EXRGP` now defined: drum `DSYMB.SYMB` shows `EXRGP=015246`; the S10
@@ -3002,9 +3002,9 @@ store-through in the N10 build*.
 
 | step | command (from `mac-c/`) | expected |
 |---|---|---|
-| golden A/B unchanged | `./build_tss_assysa.sh` then `./compare_asymb.sh ../Build/ASYMB.SYMB ../reference/ASYMB.SYMB` | `exact matches : 679` |
+| golden A/B unchanged | `./scripts/build/build_tss_assysa.sh` then `./scripts/verify/compare_asymb.sh ../Build/ASYMB.SYMB ../reference/ASYMB.SYMB` | `exact matches : 679` |
 | `EXRGP` defined | `grep -i '^EXRGP=' ../Build/drum/DSYMB.SYMB` | `EXRGP=015246` |
-| GOVER dispatches | `./logon_trace_probe.sh` | `GOVX>0` and the login-path counters advance |
+| GOVER dispatches | `bringup/logon_trace_probe.sh` | `GOVX>0` and the login-path counters advance |
 
 Supporting tooling note: restoring `EXRGP` shifted every TSS2+ symbol by
 +1 word, which silently invalidated hard-coded addresses in

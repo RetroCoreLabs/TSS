@@ -143,10 +143,10 @@ inline one-liners — always write a script file and run it.**
 cd /mnt/e/Dev/Ronny/TSS/mac-c && make test
 
 # The runnable NORD-10/DRUM TSS: bootable BPUN + drum image + CDC overlay disc
-./build_tss_drum.sh    # -> Build/drum/{tss-drum.bpun, tss-drum.img, tss-cdc.img, DSYMB.SYMB}
+./scripts/build/build_tss_drum.sh    # -> Build/drum/{tss-drum.bpun, tss-drum.img, tss-cdc.img, DSYMB.SYMB}
 
 # The standalone disc formatter
-./build_minit.sh       # -> Build/minit/minit.bpun   (entry MINIT = 000206)
+./scripts/build/build_minit.sh       # -> Build/minit/minit.bpun   (entry MINIT = 000206)
 ```
 
 Both TSS and MINIT build with **0 assembly errors**.
@@ -168,7 +168,7 @@ Both TSS and MINIT build with **0 assembly errors**.
 ### 2.2 CRITICAL build gotcha — `make test` does not relink `mac-as`
 
 `make test` rebuilds `test_mac` but does **not** relink `mac-as`. After any
-edit to `mac.c`/`mac.h`, run plain **`make`** in `mac-c/` *before* any
+edit under `mac-c/src/`, run plain **`make`** in `mac-c/` *before* any
 `build_tss_*.sh`, or the images are built with the **stale assembler** — a
 failure mode that cost a full debug cycle (the fixed code tested green while
 the emulator ran an image built by the old binary). Verify an artifact with:
@@ -187,8 +187,8 @@ of the original 1978 builds — the oracle. Any change is judged by re-running
 the build and re-scoring:
 
 ```bash
-cd mac-c && ./build_tss_assysa.sh \
-  && ./compare_asymb.sh ../Build/ASYMB.SYMB ../reference/ASYMB.SYMB | grep 'exact matches'
+cd mac-c && ./scripts/build/build_tss_assysa.sh \
+  && ./scripts/verify/compare_asymb.sh ../Build/ASYMB.SYMB ../reference/ASYMB.SYMB | grep 'exact matches'
 # Baseline: 679/693 (A), 675/689 (B). Must not regress.
 ```
 
@@ -202,7 +202,7 @@ word **count** is right. Three real bugs survived it — `COPY SA DT` emitting
 (§7.4) — because none changed a word count. There is also **no
 instruction-bit oracle in the archive**: the `reference/LIST*.SYMB` listings
 are verbatim source echoes with no generated-code column **[VERIFIED]**.
-Encodings are therefore pinned by `mac-c/test_mac.c`, which asserts every
+Encodings are therefore pinned by `mac-c/tests/test_mac.c`, which asserts every
 instruction's **encoding**, not just corpus totals. See
 [`MAC-ASSEMBLER.md`](MAC-ASSEMBLER.md).
 
@@ -432,7 +432,7 @@ allocator `GTRK` later consumes, so that the first cold boot's `SINIT` can
 create user SYSTEM. It is self-contained: its own TTY I/O, octal I/O, message
 printer, and a full copy of the CDC disc driver (`DKTR`/`DKOP`/`DKADR`/
 `DWAIT`); NORD-1 vs NORD-10 code selected by library marks. It builds via
-`mac-c/build_minit.sh` to `Build/minit/minit.bpun`, image base `000000`,
+`mac-c/scripts/build/build_minit.sh` to `Build/minit/minit.bpun`, image base `000000`,
 entry `MINIT = 000206`, 0 errors. **[VERIFIED]**
 
 Source structure map **[VERIFIED]** (`src/MINIT.SYMB`, 810 lines):
@@ -542,7 +542,7 @@ driver the OS uses; MINIT carries its own copy so it can run bare.
 - Logical sector `= OVDK + 2·OVLAY` (`OVDK = 0160` non-DEBUG); each overlay
   is two 256-word sectors, read into `ROVER` (`031400`) and
   `ROV4 = ROVER+400`.
-- The mac-c overlay writer (`mac_write_cdc_disc`, `mac.c:2965`) writes
+- The mac-c overlay writer (`mac_write_cdc_disc`, `src/mac_bpun.c`) writes
   **overlays only**, each at its `DKADR` physical sector. Everything else on
   the disc — MIB, user tables, per-user tracks, the saved system image — is
   written by MINIT and by TSS itself at runtime (§6.3).

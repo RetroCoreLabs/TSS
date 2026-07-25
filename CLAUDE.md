@@ -33,16 +33,23 @@ wsl -d Ubuntu -- bash -lc "cd /mnt/e/Dev/Ronny/TSS/mac-c && make test"
 
 | command (from `mac-c/`) | purpose |
 |---|---|
-| `make` | build `mac-as` + `test_mac` (must stay warning-free under `-Wall -Wextra`) |
-| `make test` | run the whole suite (695 assertions, must be 0 failures) — builds `test_mac` but does NOT relink `mac-as`; run plain `make` before any `build_tss_*.sh` |
-| `./check_coverage.sh` | assert every public function and every implemented `)` command is referenced by a test |
-| `./run_tss.sh` | assemble the five TSS parts directly |
-| `./build_tss_assysa.sh` | **the real end-to-end test** — runs the original `ASSYSA`/`ASSYSB` command streams; writes to `../Build/` |
-| `./compare_asymb.sh <produced> <golden>` | score a symbol dump against the archived one |
-| `./first_divergence.sh <produced> <golden>` | first symbol whose value differs, in definition order |
-| `./verify_repo.sh` | everything at once: layout, no duplicates, build, tests, coverage, both TSS builds, oracle scores, markdown links |
+| `make` | build `build/mac-as` + `build/test_mac` (must stay warning-free under `-Wall -Wextra`) |
+| `make test` | run the whole suite (695 assertions, must be 0 failures) — builds `build/test_mac` but does NOT relink `build/mac-as`; run plain `make` before any `build_tss_*.sh` |
+| `./scripts/verify/check_coverage.sh` | assert every public function and every implemented `)` command is referenced by a test |
+| `./scripts/build/run_tss.sh` | assemble the five TSS parts directly |
+| `./scripts/build/build_tss_assysa.sh` | **the real end-to-end test** — runs the original `ASSYSA`/`ASSYSB` command streams; writes to `../Build/` |
+| `./scripts/verify/compare_asymb.sh <produced> <golden>` | score a symbol dump against the archived one |
+| `./scripts/verify/first_divergence.sh <produced> <golden>` | first symbol whose value differs, in definition order |
+| `./scripts/verify/verify_repo.sh` | everything at once: layout, no duplicates, build, tests, coverage, both TSS builds, oracle scores, markdown links |
 
-There is no single-test runner; `test_mac.c` is one binary with numbered
+Layout inside `mac-c/`: `src/` the assembler (split by section, see
+`src/mac_internal.h`), `tests/` the test source, `build/` **all** generated
+output, `scripts/{build,verify,extract,attic}/`. Every script restores
+`mac-c/` as its working directory, so they run from anywhere. Note `mac-c/src/`
+(the assembler's C source) and `../src/` (the TSS MAC corpus) are different
+directories.
+
+There is no single-test runner; `tests/test_mac.c` is one binary with numbered
 sections (`[1]`, `[1b]`, … `[15]`). To run one section, comment out the
 others in `main()` or add a temporary early `return`.
 
@@ -67,7 +74,7 @@ primary source and record the evidence in a comment plus a test:
 
 1. `E:\Dev\Ronny\NDInsight\Reference-Manuals\ND-60.096.01 MAC Interactive Assembly and Debugging System User's Guide.md` — the language spec.
 2. `D:\ND\BPUN\MAC.BPUN` — the real 1978 MAC binary. Its permanent symbol
-   table at `0xE9B3` is where every opcode value in `mac_permsym.c` came
+   table at `0xE9B3` is where every opcode value in `src/mac_permsym.c` came
    from (3-word entries, names packed 5 chars × 6 bits). Ghidra MCP tools
    work on it; see `docs/MAC-ASSEMBLER.md`.
 3. The golden dumps — arithmetic on symbol addresses localises a missing or
@@ -77,7 +84,7 @@ primary source and record the evidence in a comment plus a test:
 
 Beware: matching symbol *addresses* only proves the word **count** is right.
 A bug that emitted `000000` for every `COPY SA DT` survived a long time
-because the count was correct. That is why `test_mac.c` asserts every
+because the count was correct. That is why `tests/test_mac.c` asserts every
 instruction's **encoding**, not just the corpus totals.
 
 ## mac-c architecture
@@ -112,7 +119,7 @@ produces the archived dump); reports go to the list stream; `0` selects the
 dummy device (NULL). `main()` must call `mac_close_streams()` or buffered
 object output is lost.
 
-**`mac_permsym.c` is generated** from the MAC binary. Do not hand-edit it;
+**`src/mac_permsym.c` is generated** from the MAC binary. Do not hand-edit it;
 regenerate if the extraction changes.
 
 ## MAC semantics that are counter-intuitive
@@ -161,8 +168,8 @@ any of them will break the corpus reconciliation.
 - `Build/` is committed so the output is browsable, but everything in it
   except `README.md` is regenerated; the build scripts delete and rewrite
   it, preserving only that README.
-- The `mac-c/probe_*.sh`, `bisect_hash.sh` and `find_hash.sh` scripts are
-  the divergence-localising tools; `diff_cvs_vs_original.sh` and
-  `check_rename_gaps.sh` reproduce the `.ORG`-vs-`.SYMB` analysis. Prefer
+- `mac-c/scripts/attic/` holds the divergence-localising probes
+  (`probe_*.sh`, `bisect_hash.sh`, `find_hash.sh`); `diff_cvs_vs_original.sh`
+  and `check_rename_gaps.sh` there reproduce the `.ORG`-vs-`.SYMB` analysis. Prefer
   writing a script file over long inline shell, since PowerShell→WSL quoting
   mangles complex one-liners.

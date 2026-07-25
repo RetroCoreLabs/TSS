@@ -19,7 +19,7 @@ for the tool itself; this one is the analysis and defect-history companion.
 
 | source | what it is |
 |---|---|
-| `D:\ND\BPUN\MAC.BPUN` (28389 bytes) | the real 1978 MAC binary (48-bit-float build), loaded in Ghidra as an ND-100 BPUN; origin of every permanent-symbol value in `mac-c/mac_permsym.c` |
+| `D:\ND\BPUN\MAC.BPUN` (28389 bytes) | the real 1978 MAC binary (48-bit-float build), loaded in Ghidra as an ND-100 BPUN; origin of every permanent-symbol value in `mac-c/src/mac_permsym.c` |
 | `fmac-1920c.prog` | FMAC, 32-bit-float build — **the assembler that built TSS** (§2) |
 | `f48mac-1408d.prog` | the same FMAC built for 48-bit floats |
 | `MACM-1718L.BPUN` | MACM, the mass-storage assembler (§4) |
@@ -397,7 +397,7 @@ the one-page architecture summary the defect record (§6) builds on.
   are recorded in `g_pending` (per-symbol chains) and patched when the
   symbol is defined; literal references go in `g_litrefs` and are patched at
   `)FILL`. **Each fixup carries the expression's constant part in
-  `mac_fixup.addend`** (`mac-c/mac.h:126`) — PREL8 patches
+  `mac_fixup.addend`** (`mac-c/src/mac.h:126`) — PREL8 patches
   `((sym+addend)-pc) & 0377`, ARG8 `(sym+addend) & 0377`, FULL pre-stores
   the constant in the word and the patch adds. This rule exists because of
   defect §6.6.
@@ -420,7 +420,7 @@ the one-page architecture summary the defect record (§6) builds on.
   extracted from `MAC.BPUN`'s table at 0xE9B3 — the **48-bit-float** build.
   FMAC-1920C (which built TSS) differs on three entries: `STR`
   (030000 vs 020000), `LDR` (034000 vs 024000), `2OR3` (3 vs 2).
-  **[VERIFIED 2026-07-23]** `mac-c/mac_permsym.c:22-23` still carries
+  **[VERIFIED 2026-07-23]** `mac-c/src/mac_permsym.c:22-23` still carries
   `LDR=034000`, `STR=030000` — the FMAC re-audit remains **open** (§8).
   Current corpus impact is nil: after the `STR→XTR` rename completion
   (§6.5), `STR` appears in `src/*.SYMB` only inside `%` comments
@@ -441,7 +441,7 @@ why a verbatim copy is correct (internal references stay `ROVER`-relative).
 or literal fixups inside any overlay window at the `)9MOVE` snapshot point;
 pinned by `test_mac.c [12]`.
 
-`mac_write_cdc_disc` (`mac-c/mac.c`, `mac-as -c FILE`) then writes each
+`mac_write_cdc_disc` (`mac-c/src/mac_bpun.c`, `mac-as -c FILE`) then writes each
 overlay *n* to CDC-disc sectors `OVDK+2n` / `OVDK+2n+1`, applying the
 linear→physical map **at write time**:
 
@@ -483,7 +483,7 @@ entire class of code-generation bugs is invisible to it.
 - **Symptom:** typing at the TSS login prompt produced total silence — no
   echo, `LOGON` never saw a character. `RBUF` returned 0 forever, `TCI`
   spun.
-- **Mechanism:** in mac-c's tokenizer (`mac.c:289-306` at the time),
+- **Mechanism:** in mac-c's tokenizer (`mac.c:289-306` at the time; now `src/mac_expr.c`),
   all-digit tokens were classified as numbers with `isdigit()` (0–9) but
   parsed as **octal** with `strtol(…, 8)`. The TSS *symbol* `9377` (the
   `377` byte-mask literal used by the teletype ring routines `WBUF`/`RBUF`,
@@ -525,7 +525,7 @@ entire class of code-generation bugs is invisible to it.
 
 - **Why the golden dumps were blind:** encoding-only; every symbol address
   and word count unchanged.
-- **Fix:** `eval_expr` (`mac-c/mac.c`) tracks a pending-`SHR` state
+- **Fix:** `eval_expr` (`mac-c/src/mac_expr.c`) tracks a pending-`SHR` state
   (`shr_pending`): `SHR` still contributes its `0200`, then the
   **following** shift-count term is SUBTRACTED, forming the 7-bit
   two's-complement negative counter. `ROT`/`ZIN`/`LIN` (shift-type bits
@@ -594,7 +594,7 @@ silent-zero-operand class a hard error:
 - **Fix (corpus):** all 48 dangling `STR*` references in `src/TSS2–TSS5`
   completed to their `XTR*` definitions (`SAT STR1` → `SAT XTR1`); verified
   in the built overlay.
-- **Fix (guard):** `used_as_operand` flag (`mac-c/mac.h:92` + `mac.c`) — a
+- **Fix (guard):** `used_as_operand` flag (`mac-c/src/mac.h:92` + `src/mac_stmt.c`) — a
   still-undefined symbol consumed as the VALUE OPERAND of a defined
   MRI/JUMP8/ARG8 instruction is now a **hard build error**
   ("undefined operand:"). Library marks are exempt (no false positives on
@@ -627,7 +627,7 @@ project number.
   unchanged — the same family as §6.3. `MAC_FIX_FULL` fixups were already
   correct (the constant is pre-stored in the word and the patch adds), which
   is why data-word forward references never showed the bug.
-- **Fix:** `mac_fixup.addend` (`mac-c/mac.h:126`) carries the expression's
+- **Fix:** `mac_fixup.addend` (`mac-c/src/mac.h:126`) carries the expression's
   constant part; PREL8 patches `(sym+addend)-pc`, ARG8 `(sym+addend)&0377`.
 - **Pinning test:** `test_mac.c` [15], which reproduces the exact ROBJ
   shape. `bringup/check-robj-encoding.py` additionally byte-checks a built
@@ -653,8 +653,8 @@ login respectively.
 
 ## 7. Validation methodology
 
-1. **Golden symbol-dump reconciliation** — `./build_tss_assysa.sh` runs the
-   original `ASSYSA`/`ASSYSB` command streams; `./compare_asymb.sh` scores
+1. **Golden symbol-dump reconciliation** — `./scripts/build/build_tss_assysa.sh` runs the
+   original `ASSYSA`/`ASSYSB` command streams; `./scripts/verify/compare_asymb.sh` scores
    against `reference/ASYMB.SYMB` / `BSYMB.SYMB`. Current state:
    **679/693 exact (A), 675/689 (B), zero assembly errors**; 13 of the 14
    unmatched entries per dump are macro names, which real MAC lists with
@@ -665,20 +665,20 @@ login respectively.
    **[VERIFIED by running it, 2026-07-23]**. Sections [1]–[15]; [1]–[1d]
    are the exhaustive encoding tests, [12] the overlay-snapshot guard,
    [14] undefined-operand + CLD, [15] the addend rule.
-   `./check_coverage.sh` asserts every public function and implemented `)`
+   `./scripts/verify/check_coverage.sh` asserts every public function and implemented `)`
    command is referenced by a test.
 3. **Live run as the ultimate oracle** — the full bring-up
    (MINIT format → cold-start at address 7 with `--opr=131313` → normal
    boot → login to the `@` prompt) exercises encodings no static oracle
    covers. See [`TSS-BRINGUP.md`](TSS-BRINGUP.md).
-4. **Divergence localisation** — `./first_divergence.sh` (first symbol whose
+4. **Divergence localisation** — `./scripts/verify/first_divergence.sh` (first symbol whose
    value differs, in definition order), `probe_*.sh`, `bisect_hash.sh`,
    `find_hash.sh`; `MACTRACE=1` prints which line ended each source stream
    and the conditional state on exit (the tool for "the build silently
-   stopped early"). `./verify_repo.sh` runs everything at once.
+   stopped early"). `./scripts/verify/verify_repo.sh` runs everything at once.
 
 **Build gotcha that cost a debugging cycle:** `make test` rebuilds
-`test_mac` but does **NOT relink `mac-as`** — after editing `mac.c`, run
+`test_mac` but does **NOT relink `mac-as`** — after editing anything in `src/`, run
 plain `make` before any `build_tss_*.sh`, or the build silently uses the
 stale assembler.
 

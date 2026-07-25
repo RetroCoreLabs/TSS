@@ -32,9 +32,9 @@ Any assembler that reproduces them has reproduced the build.
 
 ```bash
 cd ../mac-c
-./build_tss_assysa.sh
-./compare_asymb.sh ../Build/ASYMB.SYMB ../reference/ASYMB.SYMB
-./first_divergence.sh ../Build/ASYMB.SYMB ../reference/ASYMB.SYMB
+./scripts/build/build_tss_assysa.sh
+./scripts/verify/compare_asymb.sh ../Build/ASYMB.SYMB ../reference/ASYMB.SYMB
+./scripts/verify/first_divergence.sh ../Build/ASYMB.SYMB ../reference/ASYMB.SYMB
 ```
 
 `compare_asymb.sh` scores exact matches; `first_divergence.sh` walks the

@@ -640,8 +640,45 @@ command processor — hence the permanently dead console. (`JMP *` is a
 preemptible idle spin, the ND idiom for "stop this program level"; higher
 levels still run.)
 
-**Open:** why no free physical page is available on a system whose page map
-reports all eight pages `EMPTY`.
+**Open — and now BLOCKED on tooling.** Why the scan finds no free page is
+**not** explained. Investigated 2026-07-26:
+
+*Measured at the hang (all read through the MMU):*
+
+| fact | value |
+|---|---|
+| `IDXA` (`006721`), `IDXB` (`006722`) | both `177777` (-1) — hence the trap |
+| `J` (`006723`) | `000044` = 36 = `NDPGS` — **the scan ran to completion** |
+| `J2` (`006724`) | `000106` = 2x35 — indices were computed correctly |
+| `PDTBL` frames | **35 of 36 have `W0 = 0`** — abundant `IDXA` candidates |
+| `X` at trap | `014607` = `PDTBL` — correct table base |
+| pointers | `9VCTB`@`006704`=`015063`, `9PCTB`@`006705`=`014577`, `9PDTB`@`006706`=`014607` |
+
+Those facts are **mutually contradictory** under `SW5` as written: with 35
+free frames the very first iteration should have latched `IDXA`.
+
+*Hypotheses tested and eliminated:*
+
+1. `PDTBL[..]$COUNT<=0` guard — wrong call site; the trap is `SW6`.
+2. Physical page pool exhausted — refuted, 35 of 36 frames free.
+3. Track/quota exhaustion — refuted, unrelated to `PDTBL`.
+4. nd100x computing pre-indexed instead of post-indexed indirect — refuted:
+   `cpu.c:316` is `eff_addr = gX + ReadIndirectVirtualMemory(...)`, correct.
+5. mac-c mis-encoding the addressing mode — refuted: the instruction decodes
+   to mode 6 = `((P)+disp)+(X)`, exactly right.
+
+*Why it is blocked:* locating `SW4`/`SW5`/`SW6` in memory requires mapping
+source lines to addresses, and **`mac-as` cannot emit an address listing** —
+`-l` writes the *symbol* list only. Every hand-mapping attempt (P-relative
+displacement arithmetic) produced a wrong address; a breakpoint placed at the
+computed "SW5" landed in an unrelated loop whose indirect word held `172776`,
+an instruction word rather than an index.
+
+**Unblocking step:** add a listing mode to `mac-as` emitting
+`address | emitted words | source line`. With that, `SW4`/`SW5`/`SW6` can be
+located exactly, a breakpoint set on the real scan, and the loaded value
+observed per iteration. Without it this question should not be answered by
+further inference.
 
 ## 1b. (superseded analysis)
 

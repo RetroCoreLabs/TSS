@@ -394,7 +394,44 @@ nd100x, or rebuild TSS with `mac_state.float48` so the constants match the
 emulated FP (this shifts addresses and breaks the golden-dump match, so it is
 a runtime-only variant).
 
-## 2. `LOAD-SYSTEM` — works as designed  **[PROVEN]**
+## 2. `LOAD-SYSTEM` — works as designed; the DISC has no bootstrap  **[PROVEN]**
+
+> **[CORRECTION 2026-07-26]** This section previously said the command
+> "needs front-panel LOAD hardware nd100x does not provide". **That was
+> invented and is retracted.** No front-panel hardware is involved.
+
+`SDISK`'s contract (`src/TSS1.SYMB:3955`) is
+`%A = OPERATION (1=READ, 3=WRITE)  %X = CORE ADDRESS  %T = DISK ADDRESS`, and
+`LOAD-SYSTEM` calls it as:
+
+```
+L2,	SAX 0; SAT 0; SAA 1; JPL I (SDISK   % X=0, T=0, A=1 -> READ disc page 0 into core 0
+	IOF; RCLR DP                        % I/O off; RCLR DP clears P -> execute from address 0
+```
+
+`RCLR DP` is simply "clear the P register", so the next instruction is
+fetched from location 0. It is a **self-contained software reboot**: load the
+boot page from disc, jump to it.
+
+Disc page 0 is supposed to hold **`DBOOT`** (`src/TSS3.SYMB:265`), which
+reloads the coreloads and enters `INIT`:
+
+```
+DBOOT, STZ DBCOR; LDA (CORLD; STA DBDKA
+DBLOP, LDX DBCOR; LDT DBDKA; JPL RDKOP
+   MIN DBDKA; LDA (400; ADD DBCOR; STA DBCOR
+   SUB (MSTRT; JAN DBLOP; JMP I (301
+```
+
+**Measured:** sector 0 of `Build/bringup/cdc.img` is **512 bytes of zeros**.
+So `LOAD-SYSTEM` loads zeros into core 0 and executes them with interrupts
+already disabled — hence the silent wedge.
+
+**Classification: a bring-up provisioning gap.** Nothing in `bringup/` or the
+Makefile writes a disc bootstrap, which is consistent with `)SOVER` /
+`)8DUMP` — the commands that dump the system to disc — being intentional
+no-ops in mac-c because they need real ND-100 execution. The command itself
+is correct and would work on a disc that had been made self-bootable.
 
 `LOADV` (`src/TSS5.SYMB:609`) deliberately stops the machine and restarts it
 from location 0:

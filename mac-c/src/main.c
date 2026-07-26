@@ -19,6 +19,9 @@ static void usage(const char *argv0)
         "  -m MARK      set a library mark (repeatable), e.g. -m CDC -m N10\n"
         "  -d NAME=VAL  define a symbol, VAL is octal, e.g. -d 9TTI=40\n"
         "  -l FILE      write the symbol list ()LIST format) to FILE\n"
+        "  -L FILE      write an ADDRESS LISTING to FILE: one row per source\n"
+        "               line, 'file:line  address  words  statement'. Not a\n"
+        "               MAC feature - a mac-c aid for mapping source to core.\n"
         "  -o FILE      write the assembled image (MACIMG format)\n"
         "  -c FILE      write a CDC-disc overlay image (see\n"
         "               docs/TSS-ARCHITECTURE.md (overlay chapter)). Requires an overlay/OVERX\n"
@@ -36,6 +39,7 @@ int main(int argc, char **argv)
     mac_init(&st);
 
     const char *listfile = NULL;
+    const char *asmlistfile = NULL;   /* -L: source-to-address listing */
     const char *imgfile = NULL;
     const char *cdcfile = NULL;   /* -c: CDC-disc overlay image */
     const char *bpunfile = NULL;
@@ -63,6 +67,10 @@ int main(int argc, char **argv)
             }
             *eq = '\0';
             mac_define(&st, buf, (uint16_t)strtol(eq + 1, NULL, 8));
+        }
+        else if (strcmp(argv[i], "-L") == 0 && i + 1 < argc)
+        {
+            asmlistfile = argv[++i];
         }
         else if (strcmp(argv[i], "-l") == 0 && i + 1 < argc)
         {
@@ -96,11 +104,20 @@ int main(int argc, char **argv)
         }
     }
 
+    /* -L must be open before any line is processed, since the listing is
+     * produced as a side effect of assembly, not afterwards.              */
+    if (asmlistfile != NULL && !mac_open_asm_listing(&st, asmlistfile))
+    {
+        fprintf(stderr, "cannot create %s\n", asmlistfile);
+        return 1;
+    }
+
     /* second pass: assemble every non-option argument in order */
     for (int i = 1; i < argc; i++)
     {
         if (strcmp(argv[i], "-m") == 0 || strcmp(argv[i], "-d") == 0 ||
-            strcmp(argv[i], "-l") == 0 || strcmp(argv[i], "-o") == 0 ||
+            strcmp(argv[i], "-l") == 0 || strcmp(argv[i], "-L") == 0 ||
+            strcmp(argv[i], "-o") == 0 ||
             strcmp(argv[i], "-b") == 0 || strcmp(argv[i], "-e") == 0 ||
             strcmp(argv[i], "-c") == 0 || strcmp(argv[i], "--cdc") == 0)
         {

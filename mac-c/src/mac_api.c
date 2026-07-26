@@ -223,8 +223,36 @@ int mac_check_undefined_opcodes(mac_state *st)
     return n;
 }
 
+bool mac_open_asm_listing(mac_state *st, const char *path)
+{
+    FILE *f = fopen(path, "w");
+    if (f == NULL)
+    {
+        return false;
+    }
+    st->asm_list = f;
+    st->own_asm_list = true;
+    st->al_n = 0;
+    st->al_depth = 0;
+    fprintf(f, "%-26s %-7s %-*s %s\n", "source", "addr",
+            6 * 7 - 1, "emitted words (octal)", "statement");
+    fprintf(f, "%-26s %-7s %-*s %s\n", "--------------------------",
+            "------", 6 * 7 - 1,
+            "-----------------------------------------",
+            "---------");
+    return true;
+}
+
 void mac_close_streams(mac_state *st)
 {
+    /* write the buffered -L rows now that every fixup has been applied */
+    asm_list_flush(st);
+    if (st->own_asm_list && st->asm_list != NULL)
+    {
+        fclose(st->asm_list);
+    }
+    st->asm_list = NULL;
+    st->own_asm_list = false;
     if (st->own_listing && st->listing != NULL)
     {
         fclose(st->listing);

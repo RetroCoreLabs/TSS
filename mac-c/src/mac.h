@@ -160,6 +160,11 @@ typedef struct
 #define MAC_MAX_MACROS      64
 #define MAC_MACRO_BODY_MAX  8192
 #define MAC_MACRO_ARGS_MAX  8
+
+/* Most words any one source line can contribute to the -L address listing.
+ * A packed text line ('...') is the worst case in this corpus; 64 covers
+ * every line in TSS1-5, MINIT and TDUMP. Beyond it the row is marked "...". */
+#define MAC_ASM_LIST_MAX    64
 typedef struct
 {
     char name[MAC_SYM_LEN + 1];
@@ -254,6 +259,19 @@ typedef struct
     bool        own_listing;          /**< close on mac_close_streams         */
     bool        own_object;
     bool        end_of_file_seen;     /**< set by )LINE                       */
+
+    /* -------- address listing (-L) ------------------------------------
+     * NOT a MAC feature: real MAC has no such mode. This is a mac-c
+     * debugging aid that answers "what address is this source line at",
+     * which no other artifact in the project can. emit() records every
+     * (address, word) pair it writes for the line currently being
+     * processed, and mac_line() flushes one row per source line.        */
+    FILE       *asm_list;             /**< address listing (NULL = off)       */
+    bool        own_asm_list;         /**< close on mac_close_streams         */
+    uint16_t    al_addr[MAC_ASM_LIST_MAX]; /**< addresses written this line   */
+    uint16_t    al_word[MAC_ASM_LIST_MAX]; /**< words written this line       */
+    int         al_n;                 /**< how many, -1 once overflowed       */
+    int         al_depth;             /**< mac_line recursion (macro/)9ASSM)  */
 } mac_state;
 
 /* -------- public API --------------------------------------------------- */
@@ -270,6 +288,11 @@ bool mac_assemble_file(mac_state *st, const char *path);
 /** Feed a single source line (the console-input equivalent). Exposed so a
  *  driver can replay ASSYSA-style preamble lines verbatim. */
 void mac_line(mac_state *st, const char *line);
+
+/** Open the -L address listing. Writes one row per source line:
+ *  `file:line  address  words...  source`. Returns false if the file cannot
+ *  be created. Closed by mac_close_streams(). */
+bool mac_open_asm_listing(mac_state *st, const char *path);
 
 /** Define a symbol programmatically (driver preamble, -D options). */
 void mac_define(mac_state *st, const char *name, uint16_t value);

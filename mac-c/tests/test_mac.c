@@ -1918,6 +1918,70 @@ static void test_forward_ref_addend(void)
     check_word("JMP FW0 fwd: disp = 2        ", st.mem[at], 0124002);
 }
 
+
+/* ---------------------------------------------------------------------- */
+/* 16. -L address listing (mac_open_asm_listing)                           */
+/*                                                                         */
+/* The listing exists to map a source line to the address it assembled to. */
+/* The two properties that matter are (a) the address column is the        */
+/* address of the FIRST word the line emitted, and (b) a FORWARD reference */
+/* is recorded like any other word - six sites in mac_stmt.c used to       */
+/* duplicate emit()'s body inline and were invisible to the hook, which    */
+/* made every forward reference show a blank row while '*' silently        */
+/* advanced.                                                               */
+/* ---------------------------------------------------------------------- */
+static void test_asm_listing(void)
+{
+    printf("[16] -L address listing\n");
+    const char *lst = "mac_test_asm.lst";
+    mac_state st;
+    fresh(&st);
+
+    check_true("mac_open_asm_listing opens    ",
+               mac_open_asm_listing(&st, lst));
+
+    mac_line(&st, "2000/");
+    mac_line(&st, "L1,    SAA 20; IOX 505");   /* two words at 2000        */
+    mac_line(&st, "L2,    UNDEF9-1");          /* forward ref: one word    */
+    mac_line(&st, "L3,    5");
+    mac_close_streams(&st);
+
+    FILE *f = fopen(lst, "rb");
+    if (f == NULL)
+    {
+        check_true("listing file was created  ", false);
+        return;
+    }
+    char buf[8192];
+    size_t n = fread(buf, 1, sizeof(buf) - 1, f);
+    buf[n] = '\0';
+    fclose(f);
+    remove(lst);
+
+    /* the two-word line is anchored at 002000 and shows BOTH words        */
+    check_true("row: addr + both words       ",
+               strstr(buf, "002000  170420 164505") != NULL);
+    /* the forward reference is recorded, not blank: UNDEF9 evaluates 0,
+       so the emitted word is the constant part -1 = 177777               */
+    check_true("row: forward ref recorded    ",
+               strstr(buf, "002002  177777") != NULL);
+    /* and the line after it is at 002003, proving '*' advanced by one     */
+    check_true("row: next line follows at +1 ",
+               strstr(buf, "002003  000005") != NULL);
+    /* source text is carried through                                      */
+    check_true("row: statement text present  ",
+               strstr(buf, "UNDEF9-1") != NULL);
+    /* the header is written once                                          */
+    check_true("listing carries a header     ",
+               strstr(buf, "emitted words (octal)") != NULL);
+
+    /* with -L off, nothing is recorded and nothing crashes                */
+    fresh(&st);
+    st.asm_list = NULL;
+    mac_line(&st, "SAA 20");
+    check_word("listing off: still assembles ", st.mem[st.loc - 1], 0170420);
+}
+
 /* ---------------------------------------------------------------------- */
 int main(void)
 {
@@ -1946,6 +2010,7 @@ int main(void)
     test_undefined_opcode_guard();
     test_undefined_operand_guard();
     test_forward_ref_addend();
+    test_asm_listing();
 
     printf("\n=== %d passed, %d failed ===\n", g_pass, g_fail);
     return g_fail == 0 ? 0 : 1;

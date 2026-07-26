@@ -140,4 +140,9 @@ void          cmd_interval(mac_state *st, char *stmt, char *lt);
 void          assemble_stmt(mac_state *st, char *stmt);
 bool          eval_mark(mac_state *st, const char *expr);
 
+/* -L address listing: rows are buffered during assembly and written by
+ * asm_list_flush() at mac_close_streams() time, so the words column
+ * shows the FINAL contents of memory (forward references patched).   */
+void          asm_list_flush(mac_state *st);
+
 #endif /* MAC_INTERNAL_H */

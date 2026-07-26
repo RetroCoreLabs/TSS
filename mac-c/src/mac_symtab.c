@@ -162,6 +162,25 @@ void mac_err(mac_state *st, const char *msg, const char *detail)
 
 void emit(mac_state *st, uint16_t word)
 {
+    /* -L address listing: record what this word was and where it went, so
+     * mac_line() can print the row. Recording here rather than diffing the
+     * location counter is exact - it survives a line that both moves '*'
+     * and emits (e.g. ')FILL' after a location set), which a before/after
+     * comparison of st->loc would misreport.                              */
+    if (st->asm_list != NULL)
+    {
+        if (st->al_n >= 0 && st->al_n < MAC_ASM_LIST_MAX)
+        {
+            st->al_addr[st->al_n] = st->loc;
+            st->al_word[st->al_n] = word;
+            st->al_n++;
+        }
+        else if (st->al_n >= 0)
+        {
+            st->al_n = -1; /* overflowed: the row is marked "..." */
+        }
+    }
+
     st->mem[st->loc] = word;
     st->used[st->loc] = 1;
     if (st->loc < st->lo_used)

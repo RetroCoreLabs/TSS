@@ -1,0 +1,9 @@
+% TDUMP CDC / NORD-10 build - project-made command stream, not an original.
+% CDC selects the cartridge-disc controller and enables the DKRST/DBOOT block;
+% N10 selects the IOX I/O path (and makes DCHN=500).
+% The symbol table is dumped to TSYMB:SYMB so TDUMP's entry address is recorded.
+CDC
+N10
+)9ASSM TDUMP,"LISTT:SYMB","TSYMB:SYMB"
+)LIST
+)9EXIT

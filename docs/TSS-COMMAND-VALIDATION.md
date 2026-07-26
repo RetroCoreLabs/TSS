@@ -1775,3 +1775,279 @@ LOAD-SYSTEM
 ```
 
 
+
+
+---
+
+# PART IV — defects found on 2026-07-26
+
+Two defects observed while empirically validating the `LOGON` master-password
+finding (`docs/PROJECT-DESCRIPTION.md` §9). Both were reproduced on a **fresh
+disc copied from `Build/bringup`**, under nd100x, and both have a source-level
+explanation.
+
+## D1. `CREATE-USER` succeeds but reports `ALREADY EXISTS`
+
+**Observed.** On a disc containing only user `SYSTEM`:
+
+```
+@LIST-USERS
+  1   SYSTEM
+@CREATE-USER SECURE
+ALREADY EXISTS
+@LIST-USERS
+  1   SYSTEM
+  2   SECURE
+```
+
+`LIST-USERS` before the call shows the name does **not** exist. The command
+prints `ALREADY EXISTS`. `LIST-USERS` after the call shows the user **was
+created** — and it is fully usable: `SECURE` subsequently logged in and set a
+password successfully.
+
+So the message is wrong, and an operator following it would conclude the
+account was not created when it was.
+
+**Cause, read from source.** `CRUSR` (`src/TSS4.SYMB:940-957`) reaches its
+`ALREADY EXISTS` message from **two** places:
+
+```
+        LDA (USRTB; JPL I (ABLKP; JMP *+2; JMP CF3   /* name found -> correct  */
+        AAA 2; JAZ CF2
+        RCLR DD; SAX XTR; RADD DX SB; JPL I (CRUSE; JMP CF3
+                                                    /*  ^^^ ANY CRUSE failure */
+CF3,    LDX (MS3; JMP CFF                           /* MS3 = 'ALREADY EXISTS' */
+```
+
+Remember the inverted skip return: the word immediately after `JPL I (CRUSE`
+is the **failure** path. So `CRUSE`'s three distinct failure codes —
+`A=1` no more tracks, `A=2` too many users, `A=3` user already exists
+(`src/TSS5.SYMB:68-70`) — are **all** collapsed onto the single message
+`ALREADY EXISTS`. The specific code in `A` is discarded.
+
+**Why the user still exists.** `CRUSE` writes the user-table entry, allocates
+the UIB track and calls `IUSER` *before* it charges one track to user 1
+(`src/TSS5.SYMB:97-106`). A failure in that final `UTRK` therefore returns the
+failure path with the account already fully created and committed to disc.
+
+**Which failure fires — ANSWERED 2026-07-26.** The experiment was run:
+
+```
+@DISK-SPACE
+15 TRACKS (30K WORDS) LEFT OUT OF 4096 TRACKS (8192K WORDS)
+@LIST-TRACKS
+USER NAME: SYSTEM
+0 TRACKS LEFT                      <-- SYSTEM's quota is ZERO
+@CREATE-USER SECURE
+ALREADY EXISTS
+@LIST-USERS
+  1   SYSTEM
+  2   SECURE                       <-- created anyway
+@LIST-TRACKS
+USER NAME: SYSTEM
+0 TRACKS LEFT
+@LIST-TRACKS
+USER NAME: SECURE
+0 TRACKS LEFT                      <-- new user also gets zero
+@DISK-SPACE
+14 TRACKS (28K WORDS) LEFT ...     <-- one track spent on the UIB, correctly
+```
+
+**`SYSTEM`'s track quota is `0` after bring-up.** So the final step of `CRUSE`,
+`UTRK(+1, user 1)` (`src/TSS5.SYMB:106`), computes `0 - 1 = -1`, is refused by
+`UTRK` (`src/TSS2.SYMB:3118`), and returns `A = 1` "NO MORE TRACKS". `CRUSR`
+then prints `ALREADY EXISTS` for it. The trigger is now **CONFIRMED**: it is
+the track-quota charge, not a name clash.
+
+Note the global free-track count behaved correctly throughout — `15 -> 14`, one
+track for the new user's index block. Only the *quota* accounting failed.
+
+**Severity note.** This also invalidated two earlier runs of this experiment,
+where `CREATE-USER TEST` and `CREATE-USER TESTA` were abandoned on seeing
+`ALREADY EXISTS`. Those users had almost certainly been created. Any future
+test of `CREATE-USER` must confirm with `LIST-USERS` on both sides rather than
+trusting the return message.
+
+## D2. `LOGOUT` leaves the terminal dead — it never returns to `@ENTER`
+
+**Observed.** From a logged-in `@` prompt:
+
+```
+@LOGOUT
+126 JULY 2026   154126:124
+TIME USED IS 1013 HOURS 40 MINS -5204 SECS
+OUT OF 716 HOURS 32 MINS -19004 SECS
+<nothing further>
+```
+
+The accounting summary prints, then the terminal produces no further output.
+Six carriage returns sent at 6-second intervals produced nothing; the terminal
+never reprinted `@ENTER`, so no new session can be started. Reproduced twice,
+on separate boots, at ports 1871 and 1873.
+
+Entry 78 of Phase 5a already recorded `LOGOUT` as "returns"; that is correct as
+far as it goes — the command itself completes and prints its summary. What was
+not tested then was **whether the terminal is usable afterwards**. It is not.
+
+**Consequence for test methodology.** Any multi-session test must use a fresh
+boot per session rather than `LOGOUT` between them. The disc persists across a
+clean debugger-terminate, so this is a workable substitute; it is how the
+master-password validation was run.
+
+**Secondary observation in the same output:** the accounting figures are
+visibly wrong — `-5204 SECS` and `-19004 SECS` are negative, and
+`1013 HOURS` of time used against a `716 HOURS` allowance is inconsistent. The
+date line `126 JULY 2026   154126:124` is also malformed. This suggests the
+accounting fields are being formatted from uninitialised or wrongly-scaled
+values. `UACCT` (`src/TSS4.SYMB:724`) and `TUSED` (`:1121`) are where to look.
+**Not investigated.**
+
+**Cause: UNKNOWN.** Not investigated at source level. `QUIT`
+(`src/TSS4.SYMB:1065-1120`) is the handler; `LOGF1` (`src/TSS2.SYMB:1698`)
+clears `TTYTB[terminal]` on the login-timeout path and is the closest analogue
+of what a clean return-to-`LOGON` should do.
+
+
+## D3. `SYSTEM` has no track quota after bring-up, and `TRANSFER` to yourself mints more
+
+**Observed.** On a freshly bootstrapped disc, **every** user's quota is zero —
+including `SYSTEM`. Consequences, all reproduced:
+
+- `CREATE-USER` always reports the spurious `ALREADY EXISTS` of D1.
+- `TRANSFER` **from** `SYSTEM` to anyone fails with `NO MORE TRACKS AVAILABLE`,
+  because the debit leg is refused.
+- No user can ever be given quota by the normal route.
+
+The cause is structural: `SINIT` creates `SYSTEM` through `CRUSE`, and `CRUSE`
+passes literal `0` as the track count to `IUSER` (`src/TSS5.SYMB:103`,
+`SAX 0`). User 1 skips the `UTRK` charge that would otherwise fail, so the
+account is created — with a zero quota and nothing to draw on.
+
+**The escape hatch, verified.** `TRTRK` (`src/TSS5.SYMB:1589`) reads:
+
+```
+T2,	LDA US1,B; SUB US2,B; JAZ T4
+T3,	LDT US2,B; LDA CNT,B; JPL I (UTRK; JMP TFX     /* debit  the donor     */
+T4,	LDT US1,B; LDA CNT,B; COPY CM2 DA SA; JPL I (UTRK; JMP TFX  /* credit */
+```
+
+When the caller is `SYSTEM` **and `TO USER` equals `FROM USER`**, `JAZ T4`
+jumps straight to the credit and **skips the debit entirely**. Confirmed:
+
+```
+@LIST-TRACKS
+USER NAME: SYSTEM
+0 TRACKS LEFT
+@TRANSFER
+TO USER: SYSTEM
+FROM USER: SYSTEM
+NUMBER OF TRACKS: 20
+@LIST-TRACKS
+USER NAME: SYSTEM
+20 TRACKS LEFT                     <-- created from nothing
+@DISK-SPACE
+14 TRACKS (28K WORDS) LEFT ...     <-- global count UNCHANGED
+```
+
+Ordinary transfers then behave conservatively — `TO=SECURE FROM=SYSTEM 5` gave
+`SECURE` 5 and left `SYSTEM` 15.
+
+**Two observations, offered without a verdict on intent:**
+
+1. This is almost certainly the intended administrative bootstrap — there is no
+   other command that can increase a quota, so without it the quota system is
+   inert on a fresh system.
+2. **Quota is completely decoupled from physical free space.** After the
+   transfer `SYSTEM` held a 20-track quota on a disc with 14 tracks actually
+   free. `UTRK` only checks the quota word; `GTRK` only checks the bitmap. A
+   quota can therefore be issued that the disc cannot honour.
+
+**Practical note for bring-up:** after a fresh `SINIT`, an operator must run
+`TRANSFER` with `TO USER` = `FROM USER` = `SYSTEM` before the file system is
+usable by anyone.
+
+## D4. RESOLVED — files CAN be created; the name needs quotes on BOTH sides
+
+`docs/TSS-USER-MANUAL.md` has recorded since 2026-07-25 that **no way to create
+a file was found** from the `@` prompt, after `OPEN-FILE "SCRATCH:DATA,WX`
+returned `BAD FILENAME`. **That conclusion is wrong, and the syntax is the
+reason.**
+
+The correct form quotes the name on **both** sides:
+
+```
+@OPEN-FILE "MYFILE",W
+FILE NUMBER = 100
+```
+
+**Verified 2026-07-26** on the `Build/cmdtest/quotachain` disc, user `SECURE`
+holding a 5-track quota:
+
+```
+@LIST-TRACKS
+USER NAME: SECURE
+5 TRACKS LEFT
+@DISK-SPACE
+14 TRACKS (28K WORDS) LEFT OUT OF 4096 TRACKS ...
+@OPEN-FILE "MYFILE",W
+FILE NUMBER = 100                  <-- created and opened
+@LIST-TRACKS
+USER NAME: SECURE
+4 TRACKS LEFT                      <-- quota charged
+@DISK-SPACE
+13 TRACKS (26K WORDS) LEFT ...     <-- track physically allocated
+@LIST-FILE
+FILE NAME: MYFILE
+  1   MYFILE:SYMB                  <-- it is there
+```
+
+### Why the unterminated form fails
+
+`FFOPE`, the `OPEN` monitor call, uses `"` as a **delimiter pair**, not a
+prefix flag:
+
+| line | code | meaning |
+|---|---|---|
+| `src/TSS3.SYMB:1350` | `SAT ##"; SKP IF DA EQL ST; JMP O5` / `SAT -1; STT NEWF,B` | a **leading** `"` sets `NEWF = -1` |
+| `src/TSS3.SYMB:1365`, `:1373` | `SAT ##"; SKP IF DA UEQ ST; JMP O15` | a **later** `"` jumps to `O15` |
+| `src/TSS3.SYMB:1375` | `O15, LDA NEWF,B; JAZ *+2; JMP O17; JMP I (OF8` | a closing `"` is accepted **only if** `NEWF` is set |
+| `src/TSS3.SYMB:1376` | `O16, LDA NEWF,B; JAP *+2; JMP I (OF8` | reached when the name **runs out**; if `NEWF < 0` -> `BAD FILENAME` |
+
+So `"MYFILE` with no closing quote reaches `O16` with `NEWF = -1` and is
+rejected. `OF8` is `SAA 57` (`src/TSS3.SYMB:1420`) — error `0o57` = 47 =
+`MS47`, `'BAD FILENAME'` (`src/TSS5.SYMB:1090`).
+
+The command processor was never at fault. The 2026-07-25 test used
+`"SCRATCH:DATA,WX` — an opening quote with no closing one — which is exactly
+the rejected case.
+
+## D5. Confirmed: a user with zero quota cannot create a file
+
+The prediction chained from `CRUSE` -> `IUSER` -> `UTRK` -> `CRFIL` is
+**confirmed**, and the control is the same command on the same disc:
+
+```
+--- user SECURE, quota 5 ---
+@OPEN-FILE "MYFILE",W
+FILE NUMBER = 100
+
+--- user POOR, quota 0 (freshly created) ---
+@OPEN-FILE "HISFILE",W
+NO MORE TRACKS AVAILABLE
+```
+
+`CRFIL` charges one track to the file's owner before doing anything else
+(`src/TSS5.SYMB:259`), and `UTRK` refuses a charge that would take the quota
+below zero (`src/TSS2.SYMB:3118`).
+
+**This also proves D1's cause from the opposite direction.** By this point
+`SYSTEM` held a 15-track quota, and:
+
+```
+@CREATE-USER POOR
+USER NUMBER = 3                    <-- no spurious ALREADY EXISTS
+```
+
+Same command, same code, same disc — only the quota differs. With quota,
+`CREATE-USER` reports success correctly; without it, the `UTRK` charge fails
+and `CRUSR` mislabels the failure as `ALREADY EXISTS`.

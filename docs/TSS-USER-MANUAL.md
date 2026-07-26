@@ -434,13 +434,18 @@ carries that `"` (`src/TSS3.SYMB`, label `O4A`); without it, `OPEN` looks up an
   `OPEN-FILE SCRATCH:DATA,W` correctly returns `NO SUCH FILE`. So the command
   processor rejects the create marker.
 
-> **[VERIFIED 2026-07-25 — OPEN QUESTION] No way to create a file was found.**
-> Beyond `OPEN-FILE`, `ALLOCATE` returns `NO SUCH FILE`, and `DUMP`,
-> `SAVE-CORE`, `MAKE-REENTRANT` and `GET-CORE` all fail the same way —
-> `DUMP` is supposed to *create* its output file. Either file creation is
-> reached only from a running program via the `OPEN` monitor call rather than
-> from the command processor, or something in the create path is broken.
-> Full evidence in `TSS-COMMAND-VALIDATION.md`.
+> **[RESOLVED 2026-07-26 — supersedes the note below.] Files CAN be created.**
+> The name must be quoted on **both** sides: `OPEN-FILE "MYFILE",W` returns
+> `FILE NUMBER = 100`, charges one track to the user's quota and one to the
+> disc, and `LIST-FILE` then shows `MYFILE:SYMB`. The 2026-07-25 test used
+> `"SCRATCH:DATA,WX` — an opening quote with **no closing quote** — which
+> `FFOPE` rejects at `src/TSS3.SYMB:1376` (`O16`, name exhausted while
+> `NEWF < 0`) with error `0o57` = `BAD FILENAME`. The `"` is a delimiter pair,
+> not a prefix flag. Full derivation and transcript:
+> `docs/TSS-COMMAND-VALIDATION.md` D4.
+>
+> Note the file cannot be created by a user with **zero track quota** — a
+> freshly created user gets `NO MORE TRACKS AVAILABLE`. See D5.
 
 > **Bring-up implication.** Because nothing in the login / user-creation /
 > cold-start path creates it, a freshly-MINIT'd disc has no `SCRATCH:DATA`, so the

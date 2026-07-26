@@ -55,6 +55,29 @@ make build                                (mac-as + tests + all artifacts)
   →  @                                    (the command prompt)
 ```
 
+> **[VERIFIED 2026-07-26] One more step is required before the file system is
+> usable.** After `SINIT`, **every user's track quota is zero — including
+> `SYSTEM`** (`SINIT` creates it through `CRUSE`, which passes literal `0`,
+> `src/TSS5.SYMB:103`). Until quota exists, `CREATE-USER` reports a spurious
+> `ALREADY EXISTS`, `TRANSFER` from `SYSTEM` fails, and no user can create a
+> file. As `SYSTEM`, at the `@` prompt:
+>
+> ```
+> @TRANSFER
+> TO USER: SYSTEM
+> FROM USER: SYSTEM          <-- same user: mints quota, skips the debit
+> NUMBER OF TRACKS: 20
+> @LIST-TRACKS
+> USER NAME: SYSTEM
+> 20 TRACKS LEFT
+> ```
+>
+> `TRTRK` jumps straight to the credit when `TO` equals `FROM`
+> (`src/TSS5.SYMB:1589`, `JAZ T4`), so this is the only way to create quota
+> from nothing. `DISK-SPACE` is unaffected — quota and physical free space are
+> separate accounts, and a quota larger than the disc can be issued. Details:
+> `docs/TSS-COMMAND-VALIDATION.md` D3.
+
 At the `@` prompt, `HELP` lists the full ~60-command catalogue and
 `WHO-IS-ON` prints `1 SYSTEM`. **[VERIFIED]** live.
 

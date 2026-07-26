@@ -24,10 +24,12 @@ The NORD-10 device drivers — including the swapping drum — were written by
 > then [`docs/PROJECT-DESCRIPTION.md`](docs/PROJECT-DESCRIPTION.md) for the
 > provenance, authorship and rebuild status.
 
-The documentation is four documents:
+The documentation:
 
 | document | contents |
 |---|---|
+| [`docs/TSS-SOURCE-FILES.md`](docs/TSS-SOURCE-FILES.md) | **per-file reference** — every `.SYMB` file: what it is, what is in it, whether it is built, and where it is documented in depth |
+| [`docs/TSS-PSEUDOCODE.md`](docs/TSS-PSEUDOCODE.md) | **the source in pseudo-C** — every routine, what it does, with the line range to check it against |
 | [`docs/TSS-ARCHITECTURE.md`](docs/TSS-ARCHITECTURE.md) | **the OS, top to bottom** — memory/paging, scheduler, interrupt levels, cold start, the overlay subsystem, terminal I/O and login, file system, users/accounting, the command processor, every device driver, and the emulated CDC/drum devices |
 | [`docs/TSS-BRINGUP.md`](docs/TSS-BRINGUP.md) | **from clean checkout to a logged-in `@` prompt** — build, emulator, MINIT disc format, cold-start, login, validation and debugging (scripts in [`bringup/`](bringup/README.md)) |
 | [`docs/PROJECT-DESCRIPTION.md`](docs/PROJECT-DESCRIPTION.md) | **history and provenance** — what this is, who wrote it, the `.ORG`-vs-`.SYMB` restoration, how it was originally built and booted |
@@ -55,7 +57,7 @@ Each has its own README with the detail.
 | [`mac-c/`](mac-c/README.md) | a MAC assembler in C — 695 unit tests, runs the 1973 build scripts |
 | [`Build/`](Build/README.md) | **output only**, disposable — everything the assembler produces |
 | [`bringup/`](bringup/README.md) | bring-up validation tools (the bring-up itself is `make help` at the root) |
-| [`docs/`](docs/TSS-ARCHITECTURE.md) | the four documents above |
+| [`docs/`](docs/README.md) | the documents above |
 | [`ppt/`](ppt/README.md) | *Intro to TSS* — the guided tour |
 
 ## Rebuilding it
@@ -84,6 +86,11 @@ Needs a POSIX toolchain; on Windows use WSL.
 - **Can it be assembled today?** Yes, with `mac-c/`. The real MAC binary
   cannot run without SINTRAN — see
   [`docs/MAC-ASSEMBLER.md`](docs/MAC-ASSEMBLER.md).
+- **Is there really a backdoor?** Yes. `LOGON` bypasses the password check
+  when what you type hashes to `0636` — which is `..`, two periods. It is in
+  Lewendal's 1973 original *and* in the 1978 assembly listing, and it has been
+  verified by logging in with it. See
+  [`docs/PROJECT-DESCRIPTION.md` §9](docs/PROJECT-DESCRIPTION.md).
 - **How was TSS started?** Assemble into core, start at address 7 — that
   saves the image to disk and boots it.
 - **How do you get to a login prompt from a bare disc?** Format the disc with

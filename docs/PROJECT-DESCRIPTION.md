@@ -426,6 +426,90 @@ The exact build/boot/login procedure is in
 | 2026-07-20 | mac-c reproduces the 1973 build; golden reconciliation 679/693 with 0 errors |
 | 2026-07-21 | TSS executes its own cold-start on nd100x for the first time |
 | 2026-07-23 | full bring-up: MINIT-formatted disc, cold start at 7, user SYSTEM created, interactive `@` login with working commands |
+| 2026-07-26 | every `.SYMB` file documented in pseudo-C; `TDUMP` assembled for the first time; the `..` master password found and verified |
+
+---
+
+## 9. Curiosities found in the source
+
+Things discovered while reading the corpus that are not architecture, not
+provenance, and too good to leave in a footnote.
+
+### `..` logs you in as anybody
+
+`LOGON` contains a hard-coded master password. `src/TSS4.SYMB:568`:
+
+```
+L6,	LDA PASSW,B; SUB (636; JAZ L6A
+	SAX 7; LDA I OBJ,B,X; SUB PASSW,B; JAF L7
+L6A,	LDX (MS3; JPL I (MSG; SAT 1; JPL I (SXBRK
+```
+
+In C:
+
+```c
+if (typed == 0636)      goto ok;      /* bypass -- the stored password is
+                                         never even loaded              */
+if (stored[7] != typed) goto retry;
+ok:  print("OK");
+```
+
+TSS does not store passwords as text. `src/TSS4.SYMB:566` folds the typed
+characters into one 16-bit word, `passw = (passw << 3) + c`, each character
+masked to 7 bits. `0636` octal is 414 decimal, and ASCII `.` is 46:
+
+```
+h("..") = (46 << 3) + 46 = 368 + 46 = 414 = 0636
+```
+
+So **typing `..` at the password prompt logs you in as any user that has a
+password set.** Eleven other two-character strings collide (`$~`, `%v`, `&n`,
+`'f`, `(^`, `)V`, `*N`, `+F`, `,>`, `-6`, `/&`); no single character can reach
+414, and no three-character printable string can either, since the minimum for
+three printable characters is `32*64 = 2048`. `..` is the only candidate a
+person would type, and the only one where both characters are the same.
+
+**It is in the 1973 original**, not a later addition. Present in
+`archive/original-text/TSS4.ORG`, `archive/TSS4.ORG`, `archive/TSS4.SYMB`, and
+-- decisively -- in `reference/LIST4.SYMB:1153`, the 1978 assembly listing, so
+it was compiled into the system that actually shipped. The literal `0636`
+occurs exactly once in all 15,244 lines of the corpus.
+
+**Verified by running it** on 2026-07-26 under nd100x:
+
+| password | result |
+|---|---|
+| `999` (wrong) | **REJECTED** -- returns to `@ENTER` |
+| `123` (the real one) | ACCEPTED -- prints `OK` |
+| `..` | **ACCEPTED** -- prints `OK` |
+
+The rejected control matters: it proves the comparison is live, not disabled.
+And `h("123") = 0o7003` differs from `h("..") = 0o636`, so the success is the
+bypass and not a collision with the stored value.
+
+Scope: it works at `@ENTER` only. You still need a valid user name and a
+non-zero project number. **`PASSWORD` does not accept it** --
+`src/TSS4.SYMB:627` compares against the stored word with no escape, so the
+master password can be used to log in as someone, but not to change their
+password. It is irrelevant for users with no password at all, since
+`src/TSS4.SYMB:562` skips the prompt entirely when the stored word is zero --
+which is the state `SYSTEM` is in after bring-up.
+
+Why it exists is **unknown**. A field-service login for a site that had lost
+its SYSTEM password is the obvious guess for 1973, but there is no comment on
+the line and nothing nearby explains it. That `..` was the intended string is
+**inferred**: what the source records is the constant and the hash function,
+not the password.
+
+There is no way to disable it short of editing the source and reassembling --
+it is a compiled-in literal.
+
+### Login failures are silent
+
+Related, and visible from the same routine: an unknown user name
+(`src/TSS4.SYMB:559`) and a wrong password (`src/TSS4.SYMB:601`) both jump back
+to the same place and reprint `@ENTER `. No message, no attempt counter, no
+lockout, nothing logged. From the terminal the two are indistinguishable.
 
 ---
 

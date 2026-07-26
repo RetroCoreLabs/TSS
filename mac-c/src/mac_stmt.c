@@ -468,11 +468,9 @@ void assemble_stmt(mac_state *st, char *stmt)
         if (oper.literal >= 0)
         {
             /* address a literal cell P-relative; patched at )FILL time.     */
-            st->mem[here] = (uint16_t)(opc + oper.mode);
-            st->used[here] = 1;
-            if (here < st->lo_used) st->lo_used = here;
-            if (here > st->hi_used) st->hi_used = here;
-            st->loc++;
+            /* emit() so the -L listing records this word too; identical
+             * semantics to the former inline store (here == st->loc). */
+            emit(st, (uint16_t)(opc + oper.mode));
             litref *r = (litref *)calloc(1, sizeof(litref));
             r->addr = here;
             r->pc = here;
@@ -490,11 +488,9 @@ void assemble_stmt(mac_state *st, char *stmt)
              * oper.disp carries the expression's constant part (undefined
              * symbols evaluate as 0), e.g. the +1 of "LDA FWD+1" - it rides
              * in the fixup so the patch targets FWD+1, not FWD.             */
-            st->mem[here] = (uint16_t)(opc + oper.mode);
-            st->used[here] = 1;
-            if (here < st->lo_used) st->lo_used = here;
-            if (here > st->hi_used) st->hi_used = here;
-            st->loc++;
+            /* emit() so the -L listing records this word too; identical
+             * semantics to the former inline store (here == st->loc). */
+            emit(st, (uint16_t)(opc + oper.mode));
             pending_add(oper.undef, here, here, MAC_FIX_PREL8, oper.disp);
             /* Flag: undefined VALUE OPERAND of a defined MRI (e.g. "STT STRX,B").
              * A real forward ref clears this by being defined; if still
@@ -546,11 +542,9 @@ void assemble_stmt(mac_state *st, char *stmt)
         uint16_t here = st->loc;
         if (oper.undef != NULL)
         {
-            st->mem[here] = opc;
-            st->used[here] = 1;
-            if (here < st->lo_used) st->lo_used = here;
-            if (here > st->hi_used) st->hi_used = here;
-            st->loc++;
+            /* emit() so the -L listing records this word too; identical
+             * semantics to the former inline store (here == st->loc). */
+            emit(st, opc);
             /* oper.disp = constant part of "JMP RFN+2" (2); without it all
              * three ROBJ error exits landed on RFN itself - see mac.h note */
             pending_add(oper.undef, here, here, MAC_FIX_PREL8, oper.disp);
@@ -574,11 +568,9 @@ void assemble_stmt(mac_state *st, char *stmt)
         uint16_t here = st->loc;
         if (uo != NULL)
         {
-            st->mem[here] = opc;
-            st->used[here] = 1;
-            if (here < st->lo_used) st->lo_used = here;
-            if (here > st->hi_used) st->hi_used = here;
-            st->loc++;
+            /* emit() so the -L listing records this word too; identical
+             * semantics to the former inline store (here == st->loc). */
+            emit(st, opc);
             /* arg = constant part of the expression (undef sym counted 0)  */
             pending_add(uo, here, here, MAC_FIX_ARG8, arg);
             /* Flag: undefined VALUE OPERAND of a defined ARG8 instr, e.g.
@@ -684,11 +676,9 @@ void assemble_stmt(mac_state *st, char *stmt)
     {
         int li = literal_intern(st, stmt + 1);
         uint16_t here = st->loc;
-        st->mem[here] = 0;
-        st->used[here] = 1;
-        if (here < st->lo_used) st->lo_used = here;
-        if (here > st->hi_used) st->hi_used = here;
-        st->loc++;
+        /* emit() so the -L listing records this word too; identical
+         * semantics to the former inline store (here == st->loc). */
+        emit(st, 0);
         litref *r = (litref *)calloc(1, sizeof(litref));
         r->addr = here;
         r->pc = here;
@@ -708,11 +698,9 @@ void assemble_stmt(mac_state *st, char *stmt)
         uint16_t here = st->loc;
         if (u != NULL)
         {
-            st->mem[here] = v;   /* constant part pre-stored; FULL patch ADDS */
-            st->used[here] = 1;
-            if (here < st->lo_used) st->lo_used = here;
-            if (here > st->hi_used) st->hi_used = here;
-            st->loc++;
+            /* emit() so the -L listing records this word too; identical
+             * semantics to the former inline store (here == st->loc). */
+            emit(st, v);   /* constant part pre-stored; FULL patch ADDS */
             pending_add(u, here, here, MAC_FIX_FULL, 0);
             return;
         }
@@ -783,7 +771,10 @@ bool eval_mark(mac_state *st, const char *expr)
 /* line processing                                                         */
 /* ---------------------------------------------------------------------- */
 
-void mac_line(mac_state *st, const char *line)
+/* The real per-line worker. mac_line() below wraps it so the -L address
+ * listing can bracket every return path without disturbing this control
+ * flow (which has many early returns).                                    */
+static void mac_line_inner(mac_state *st, const char *line)
 {
     st->cur_line++;
 
@@ -1282,3 +1273,198 @@ void mac_line(mac_state *st, const char *line)
     }
 }
 
+
+/* ---------------------------------------------------------------------- */
+/* -L address listing                                                      */
+/*                                                                         */
+/* One row per source line:                                                */
+/*                                                                         */
+/*     file:line   address  words...   source                              */
+/*                                                                         */
+/* Real MAC has no such mode - this is a mac-c debugging aid. It exists    */
+/* because nothing else in the project maps a source line to the address   */
+/* it assembled to: the archived LIST*.SYMB streams carry diagnostics      */
+/* only, and hand-derived addresses have been wrong every time they were   */
+/* attempted (see docs/HANDOFF-2026-07-26.md).                             */
+/* ---------------------------------------------------------------------- */
+
+/* Trim CR/LF and trailing blanks so the source column stays aligned.      */
+static void al_trim(const char *in, char *out, size_t cap)
+{
+    size_t n = 0;
+    for (const char *p = in; *p != '\0' && n + 1 < cap; p++)
+    {
+        if (*p == '\r' || *p == '\n')
+        {
+            break;
+        }
+        out[n++] = *p;
+    }
+    while (n > 0 && (out[n - 1] == ' ' || out[n - 1] == '\t'))
+    {
+        n--;
+    }
+    out[n] = '\0';
+}
+
+/* Basename of the current source file, so rows stay narrow.               */
+static const char *al_basename(const char *path)
+{
+    if (path == NULL)
+    {
+        return "<console>";
+    }
+    const char *b = path;
+    for (const char *p = path; *p != '\0'; p++)
+    {
+        if (*p == '/' || *p == '\\')
+        {
+            b = p + 1;
+        }
+    }
+    return b;
+}
+
+#define AL_WORDS_PER_ROW 6
+
+/* A buffered listing row. Rows are accumulated during assembly and written
+ * by asm_list_flush() once every fixup has been applied, so the words
+ * column shows what the image ACTUALLY contains. Printing during assembly
+ * would show forward references unpatched - "STA IDXA" would read 004000
+ * with a zero displacement - which is precisely the class of misreading
+ * this listing exists to prevent.                                         */
+typedef struct al_row
+{
+    char            pos[64];
+    char            src[256];
+    uint16_t        addr[MAC_ASM_LIST_MAX];
+    int             n;      /**< word count, or -1 if the line overflowed  */
+    uint16_t        loc;    /**< location counter when the line started    */
+    int             depth;  /**< mac_line recursion depth                  */
+    struct al_row  *next;
+} al_row;
+
+static al_row *g_al_head = NULL;
+static al_row *g_al_tail = NULL;
+
+void asm_list_flush(mac_state *st)
+{
+    for (al_row *r = g_al_head; r != NULL; )
+    {
+        al_row *next = r->next;
+        if (st->asm_list != NULL)
+        {
+            const char *ind = (r->depth > 0) ? "+ " : "";
+            if (r->n < 0)
+            {
+                fprintf(st->asm_list, "%-26s %06o  %-*s %s%s\n", r->pos,
+                        r->loc, AL_WORDS_PER_ROW * 7 - 1, "... (>64 words)",
+                        ind, r->src);
+            }
+            else if (r->n == 0)
+            {
+                fprintf(st->asm_list, "%-26s %06o  %-*s %s%s\n", r->pos,
+                        r->loc, AL_WORDS_PER_ROW * 7 - 1, "", ind, r->src);
+            }
+            else
+            {
+                for (int i = 0; i < r->n; i += AL_WORDS_PER_ROW)
+                {
+                    char words[AL_WORDS_PER_ROW * 7 + 1];
+                    size_t w = 0;
+                    for (int j = i; j < r->n && j < i + AL_WORDS_PER_ROW; j++)
+                    {
+                        w += (size_t)snprintf(words + w, sizeof(words) - w,
+                                              "%06o ", st->mem[r->addr[j]]);
+                    }
+                    if (w > 0) { words[w - 1] = '\0'; } else { words[0] = '\0'; }
+
+                    if (i == 0)
+                    {
+                        fprintf(st->asm_list, "%-26s %06o  %-*s %s%s\n",
+                                r->pos, r->addr[0], AL_WORDS_PER_ROW * 7 - 1,
+                                words, ind, r->src);
+                    }
+                    else
+                    {
+                        fprintf(st->asm_list, "%-26s %06o  %s\n", "",
+                                r->addr[i], words);
+                    }
+                }
+            }
+        }
+        free(r);
+        r = next;
+    }
+    g_al_head = NULL;
+    g_al_tail = NULL;
+}
+
+void mac_line(mac_state *st, const char *line)
+{
+    if (st->asm_list == NULL)
+    {
+        mac_line_inner(st, line);
+        return;
+    }
+
+    /* A nested mac_line (macro expansion, or a line read by )9ASSM from
+     * inside another line) must not clobber the outer line's word list.
+     * Save and restore it around the recursion; the inner line prints its
+     * own row, indented by depth.                                         */
+    uint16_t save_addr[MAC_ASM_LIST_MAX];
+    uint16_t save_word[MAC_ASM_LIST_MAX];
+    int      save_n     = st->al_n;
+    int      save_count = (save_n > 0) ? save_n : 0;
+    if (save_count > 0)
+    {
+        memcpy(save_addr, st->al_addr, (size_t)save_count * sizeof(uint16_t));
+        memcpy(save_word, st->al_word, (size_t)save_count * sizeof(uint16_t));
+    }
+
+    const char *file = al_basename(st->cur_file);
+    int         lno  = st->cur_line + 1; /* mac_line_inner bumps it first  */
+    int         depth = st->al_depth;
+    char        src[256];
+    al_trim(line, src, sizeof(src));
+
+    uint16_t loc_before = st->loc;
+    st->al_n = 0;
+    st->al_depth = depth + 1;
+
+    mac_line_inner(st, line);
+
+    st->al_depth = depth;
+    int n = st->al_n;
+
+    /* Buffer the row; asm_list_flush() prints it after fixups are applied. */
+    if (!(n == 0 && src[0] == '\0'))
+    {
+        al_row *r = (al_row *)malloc(sizeof(al_row));
+        if (r != NULL)
+        {
+            snprintf(r->pos, sizeof(r->pos), "%s:%d", file, lno);
+            snprintf(r->src, sizeof(r->src), "%s", src);
+            r->n = n;
+            r->loc = loc_before;
+            r->depth = depth;
+            r->next = NULL;
+            int keep = (n > 0) ? n : 0;
+            for (int i = 0; i < keep; i++)
+            {
+                r->addr[i] = st->al_addr[i];
+            }
+            if (g_al_tail == NULL) { g_al_head = r; }
+            else                   { g_al_tail->next = r; }
+            g_al_tail = r;
+        }
+    }
+
+    /* restore the enclosing line's accumulation */
+    if (save_count > 0)
+    {
+        memcpy(st->al_addr, save_addr, (size_t)save_count * sizeof(uint16_t));
+        memcpy(st->al_word, save_word, (size_t)save_count * sizeof(uint16_t));
+    }
+    st->al_n = save_n;
+}

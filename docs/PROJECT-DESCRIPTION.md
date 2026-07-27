@@ -405,8 +405,10 @@ bugs invisible to the symbol-address oracle (§7) that only surfaced as
 wrong runtime behaviour: the all-digit-symbol octal misparse (`AND 9377`
 assembled as `AND 0`, zeroing console characters), a SHR shift-count
 negation, the missing `CLD` permanent symbol (verified against real MAC),
-completion of CVS's `STR`→`XTR` rename, and a forward-reference addend
-error. The full defect record, with tests, is in
+completion of CVS's `STR`→`XTR` rename, a forward-reference addend
+error, and addressing mode 6 `,I ,X` encoded X-relative instead of
+P-relative (which corrupted nine backward references in the swapper and
+hung the `MEMORY` command). The full defect record, with tests, is in
 [`MAC-ASSEMBLER.md`](MAC-ASSEMBLER.md). The few deliberate source
 modifications made relative to the archive (e.g. restoring the `EXRGP`
 definition) are documented in

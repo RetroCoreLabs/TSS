@@ -132,6 +132,16 @@ any of them will break the corpus reconciliation.
 - **Word = opcode + mode + (disp & 0377).** Mode bits and displacement must
   be kept separate; masking after adding lets a negative displacement eat
   the `,B` bit.
+- **Only mode 4 `,X` is X-relative.** The displacement's base is decided by
+  what the displacement *addresses*, not by which mode bits are set:
+  `,B` forms (1,3,5,7) are B-relative, mode 4 `(X)+D` is X-relative, and
+  everything else — including **mode 6 `,I ,X` = `((P)+D)+(X)`** — is
+  P-relative, because `D` locates the indirect pointer word relative to `P`
+  and `X` is added after the fetch. Testing the X bit alone caught mode 6
+  too and silently miscompiled nine backward references in TSS1's swapper,
+  hanging `MEMORY`. Forward references hide this class (they go through
+  `MAC_FIX_PREL8`, which is correct), so **test backward references**.
+  See `docs/MAC-ASSEMBLER.md` §6.7; pinned by test [17].
 - **Symbol significance is the LAST 5 characters** (MAC shifts into a 30-bit
   field). `RBLOAD` → `BLOAD`, `TIMOUT` → `IMOUT`.
 - **A label redefinition keeps the FIRST value** ("ALREADY DEFINED");

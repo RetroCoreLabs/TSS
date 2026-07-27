@@ -1983,6 +1983,80 @@ static void test_asm_listing(void)
 }
 
 /* ---------------------------------------------------------------------- */
+/* 17. mode 6 ",I ,X" is INDIRECT P-RELATIVE indexed, not X-relative       */
+/*                                                                         */
+/* ND-60.096.01's addressing-mode table gives mode 6 as ((P)+D)+(X) with   */
+/* bits X I B = 1 1 0: D locates the indirect POINTER WORD relative to P,  */
+/* and X is added after that word is fetched. Only mode 4 "(X)+D" is       */
+/* X-relative. mac_stmt.c used to select the X location counter on the X   */
+/* bit alone, which caught mode 6 as well; with xcounter 0 the symbol's    */
+/* absolute low byte survived into the displacement field.                 */
+/*                                                                         */
+/* The bug was invisible from a forward reference, which is why it lived   */
+/* so long: a forward ref emits a bare opcode and is patched by            */
+/* MAC_FIX_PREL8, which is P-relative and right. Only BACKWARD references  */
+/* reach the arithmetic below. The golden dumps cannot see this class at   */
+/* all - the word count never changes, only the displacement byte.         */
+/*                                                                         */
+/* Live consequence: seven sites in TSS1's swapper, whose locals block     */
+/* sits between SW4 (forward, correct) and SW5 (backward, broken). At      */
+/* 006732 "LDA I J2,X" addressed a fixed word of code instead of           */
+/* PDTBL[J], so the page scan never saw a free frame, IDXA and IDXB both   */
+/* stayed -1, and SW6 fell straight into FTLER.                            */
+/* ---------------------------------------------------------------------- */
+static void test_mode6_is_p_relative(void)
+{
+    printf("[17] mode 6 (,I ,X) is P-relative, backward and forward\n");
+    mac_state st;
+
+    /* ---- the exact SW5 shape: pointer cell BEFORE the reference ------- */
+    fresh(&st);
+    mac_line(&st, "PTR, 0");                       /* the indirect pointer  */
+    uint16_t at = st.loc;
+    mac_line(&st, "LDA I PTR,X");                  /* disp = PTR - here     */
+    /* PTR = at-1, so disp = -1 = 0377; LDA 044000 + mode 6 03000          */
+    check_word("LDA I PTR,X back: disp = -1  ", st.mem[at], 0047377);
+
+    /* a second reference one word further on MUST encode a different      */
+    /* displacement - identical words from different P was the signature   */
+    at = st.loc;
+    mac_line(&st, "STA I PTR,X");                  /* PTR = at-2 -> -2      */
+    check_word("STA I PTR,X back: disp = -2  ", st.mem[at], 0007376);
+
+    /* ---- forward reference: was already correct, must stay correct ---- */
+    fresh(&st);
+    at = st.loc;
+    mac_line(&st, "LDA I FPTR,X");
+    mac_line(&st, "0");
+    mac_line(&st, "FPTR, 0");                      /* FPTR = at+2 -> +2     */
+    check_word("LDA I FPTR,X fwd: disp = +2  ", st.mem[at], 0047002);
+
+    /* ---- mode 4 ",X" alone stays X-relative (xcounter is 0) ----------- */
+    fresh(&st);
+    mac_line(&st, "XC, 0");
+    at = st.loc;
+    mac_line(&st, "LDA XC,X");                     /* absolute, not P-rel   */
+    check_word("LDA XC,X mode 4: absolute    ",
+               st.mem[at], (uint16_t)(0046000 + ((at - 1) & 0377)));
+
+    /* ---- ",B" forms are unaffected: still base-relative --------------- */
+    fresh(&st);
+    mac_line(&st, "BC, 0");
+    at = st.loc;
+    mac_line(&st, "LDA BC,B");
+    check_word("LDA BC,B mode 1: absolute    ",
+               st.mem[at], (uint16_t)(0044400 + ((at - 1) & 0377)));
+
+    /* ---- mode 7 ",I ,X ,B" stays B-relative (B wins over X) ----------- */
+    fresh(&st);
+    mac_line(&st, "BX, 0");
+    at = st.loc;
+    mac_line(&st, "LDA I BX,B,X");
+    check_word("LDA I BX,B,X mode 7: B-rel   ",
+               st.mem[at], (uint16_t)(0047400 + ((at - 1) & 0377)));
+}
+
+/* ---------------------------------------------------------------------- */
 int main(void)
 {
     printf("=== MAC-C assembler unit tests ===\n\n");
@@ -2011,6 +2085,7 @@ int main(void)
     test_undefined_operand_guard();
     test_forward_ref_addend();
     test_asm_listing();
+    test_mode6_is_p_relative();
 
     printf("\n=== %d passed, %d failed ===\n", g_pass, g_fail);
     return g_fail == 0 ? 0 : 1;

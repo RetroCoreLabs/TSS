@@ -475,7 +475,7 @@ run-time reader (`S5`, `GOVX`, `OVDK`, `ROVER`/`ROV4`) are documented in
 
 Each entry: symptom → mechanism → why the golden dumps could not see it →
 fix → pinning test. Dates are the fix dates. The unifying theme is stated
-at the end (§6.7); the golden symbol dumps are an **address** oracle, and an
+at the end (§6.8); the golden symbol dumps are an **address** oracle, and an
 entire class of code-generation bugs is invisible to it.
 
 ### 6.1 The `9377` octal-parse bug — the login char-killer (2026-07-22)
@@ -637,7 +637,84 @@ project number.
   prompt**; `HELP` lists the ~60-command catalogue, `WHO-IS-ON` prints
   `1 SYSTEM`.
 
-### 6.7 The moral
+### 6.7 Addressing mode 6 encoded X-relative — the swapper hang (2026-07-27)
+
+- **Symptom:** the `MEMORY` command never returned. The swapper's page scan
+  ran all `NDPGS = 36` iterations, set neither index, and fell into `FTLER`,
+  killing the process; the CPU then idled in `LEV0`. Measurement at the hang
+  gave `IDXA = IDXB = -1`, `J = 36`, and 35 of 36 `PDTBL` frames free —
+  values that contradict the algorithm in `TSS1.SYMB:2995-3022`, which sets
+  `IDXA := J` on the first frame with `W0 = 0`.
+
+- **Mechanism:** `assemble_stmt()` chose the displacement base from the mode
+  bits, testing the X bit alone:
+
+  ```c
+  else if (oper.mode & 02000)          /* caught modes 4 AND 6 */
+      disp = oper.disp - st->xcounter;
+  ```
+
+  Only **mode 4** `,X` is X-relative (`(X) + D`). **Mode 6** `,I ,X` is
+  `((P) + D) + (X)`, which ND-60.096.01's addressing-mode table names
+  *indirect P-relative indexed*: `D` locates the indirect **pointer word**
+  relative to `P`, and `X` is added only after that word is fetched. With
+  the X location counter at 0 the subtraction was a no-op, leaving the
+  symbol's **absolute low byte** in the displacement field.
+
+  Only **backward** references were affected. A forward reference emits a
+  bare opcode and is patched by `MAC_FIX_PREL8`, which is P-relative and
+  correct. That asymmetry is why the bug survived: it is invisible from a
+  forward-reference test case.
+
+  Nine sites were miscompiled, every one of them in TSS1's swapper, because
+  its locals block sits between `SW4` (forward references, correct) and
+  `SW5` onward (backward references, broken):
+
+  | source (`TSS1.SYMB`) | PC | wrong | correct |
+  |---|---|---|---|
+  | `LDA I J2,X` (3109)    | 006732 | `047324` (→`006656`) | `047372` (→`006724`) |
+  | `LDA I II2,X` (3113)   | 006737 | `047276` (→`006635`) | `047337` (→`006676`) |
+  | `LDA I J2,X` (3118)    | 006746 | `047324` (→`006672`) | `047356` (→`006724`) |
+  | `STA I IDXX,X` (3149)  | 007003 | `007317`             | `007314` |
+  | `LDA I IDXX2,X` (3171) | 007032 | `047320` (→`006752`) | `047266` (→`006720`) |
+
+  At `006732` the instruction addressed `006656` — a word of the `AAA -2`
+  instruction — instead of `PDTBL[J]`. Every iteration read the same fixed
+  word, so the scan never observed a free frame regardless of `J`. That
+  explains all four measured values, `J = 36` included.
+
+- **Why the golden dumps were blind:** encoding-only. Only the displacement
+  byte changes; every symbol address and word count is bit-identical, and
+  the reconciliation held at 679/693 (A) and 675/689 (B) across the fix.
+
+- **How it was actually found:** not by debugging, but by an invariant sweep
+  over the `mac-as -L` listing that assumes nothing about MAC semantics —
+  **a P-relative instruction assembled at two different addresses must
+  encode two different displacements.** `LDA I J2,X` emitted the identical
+  word `047324` at both `006732` and `006746`, which is arithmetically
+  impossible; at most one could be right, and in fact neither was. The same
+  sweep independently confirmed the `,B` path is sound: `TREG` encodes `-4`
+  at all 728 of its sites, which is only possible if that path is
+  base-relative as intended.
+
+- **Fix:** require the I bit to be clear before selecting the X location
+  counter, so mode 6 falls through to the P-relative branch:
+
+  ```c
+  else if ((oper.mode & 02000) && !(oper.mode & 01000))
+  ```
+
+- **Pinning test:** `[17]` in `mac-c/tests/test_mac.c` — asserts the
+  backward mode-6 encoding at two different addresses (they must differ),
+  that the forward case still works, and that modes 4, 1 and 7 are
+  unchanged.
+
+- **Verified by running the OS:** `MEMORY 40000 44000` now returns to the
+  `@` prompt, with `IDXA = 2` and `J = 2` (the loop exits early via
+  `GOTO SW6` the moment a frame is found) instead of `IDXA = IDXB = -1`,
+  `J = 36`.
+
+### 6.8 The moral
 
 **Symbol-address oracles validate word COUNTS, not encodings.** Every defect
 above except §6.5's dangling names left every symbol address in the golden
@@ -648,6 +725,17 @@ caught these bugs were (a) exhaustive per-instruction encoding tests,
 (b) hand-verification on the real MAC, and (c) **running the OS** — the
 ultimate oracle, which found §6.1 and §6.6 as a dead console and a hung
 login respectively.
+
+§6.7 adds a fourth, and it is the cheapest of the four: **invariant sweeps
+over the `-L` listing.** Some properties of correct code generation can be
+checked without knowing any MAC semantics at all — a P-relative instruction
+assembled at two addresses must encode two displacements; a base-relative
+one must encode the same displacement everywhere the symbol means the same
+thing. Violations are proofs, not suspicions, and the sweep covers all
+16,680 listing rows at once instead of the single point a debugger session
+can reach. When a runtime measurement contradicts the source, check that
+the emitted code matches the source **before** concluding the measurement
+was wrong — in §6.7 the measurement was right and the binary was not.
 
 ---
 

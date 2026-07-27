@@ -4,6 +4,12 @@
 bring-up, after the mode-6 assembler fix. Results in PART II; the re-run
 delta is in PART V.**
 
+> **CURRENCY WARNING — read this before trusting a transcript.** The PART II
+> and PART V transcripts were captured **before** the NLZ/DNZ assembler fix
+> (commit `01dce34`). They describe a binary that no longer exists. Only the
+> four clock-derived commands have been re-run since; see PART VI for what
+> was re-verified and what was not.
+
 ## Headline (2026-07-27 re-run — clean bring-up, 89 invocations)
 
 | | |
@@ -46,12 +52,21 @@ The 2026-07-25 figures were: 57 of 60 returning, **2** hangs
 2. **`LOAD-SYSTEM` never returns.** Console shows the echo and nothing more —
    no reboot, no sign-on banner. Documented as "reloads (reboots) the TSS
    system from disk".
-3. **The time/date arithmetic is broken.** Reproducible across four commands
-   and unaffected by input: after `DEFINE-DATE 26,7,2026,8,30,0` the date
-   still reads `10 JULY 2026 23495:232`, and the **day field changes on every
-   read** (63 → 71 → 60 → 10 → 128 → 230 → 227). `TIME-USED`,
-   `RESPONSE-TIME` and `LOGOUT` all print **negative seconds**
-   (`-26204 SECS`). One defect in the formatting/arithmetic, not four.
+3. ~~**The time/date arithmetic is broken.**~~ **RESOLVED 2026-07-27 — this
+   was never a TSS defect either, and the cause first recorded here was
+   wrong.** The observed symptoms were real: after
+   `DEFINE-DATE 26,7,2026,8,30,0` the date read `10 JULY 2026 23495:232`, the
+   **day field changed on every read** (63 → 71 → 60 → 10 → 128 → 230 → 227),
+   and `TIME-USED`, `RESPONSE-TIME` and `LOGOUT` printed **negative seconds**
+   (`-26204 SECS`). The cause was one instruction word: `mac-c` classed
+   `NLZ`/`DNZ` as plain 16-bit sums, so the negative scaling in `DNZ -20`
+   borrowed out of the 8-bit scaling field and into the opcode —
+   `0152000 - 0000020 = 0151760`, which **is `NLZ`**. The machine normalised
+   where the program asked it to denormalise, at all twelve sites, every one
+   of them `TBANG`'s float-to-integer step. Full account in
+   `/mnt/e/Dev/Ronny/TSS/docs/MAC-ASSEMBLER.md` §6.8; verified end to end in
+   PART VI. **The 32-bit/48-bit floating-point theory in PART III §3 is
+   retracted** — it was labelled PROVEN and was not.
 4. **`SET-REGISTER` sets the wrong register.** `SET-REGISTER A 1234` left
    `A = 0` and set `STS = 234`; `SET-REGISTER X 777` left `X = 0`. No error
    reported.
@@ -113,7 +128,6 @@ Also established: the trailing **`?` is a failure-return indicator**, not
 
 ### Still open
 
-- Root cause of the `MEMORY`/level-5 hang (needs a CPU trace).
 - Why `LOAD-SYSTEM` does not come back.
 - How a file is created on this system at all.
 - Why `PLACE-BINARY`/`LOAD-BINARY` reject a device name that `RBLOAD` accepts.
@@ -374,14 +388,46 @@ Investigated 2026-07-25 after the sweep. Each entry separates what is
 
 | # | defect | root cause | is it a TSS bug? |
 |---|---|---|---|
-| 1 | `MEMORY <lo> <hi>` hangs | CPU spins in the **swapper**, before any I/O | open — see below |
-| 2 | `LOAD-SYSTEM` never returns | works as designed; needs front-panel LOAD hardware | **no** — emulator gap |
-| 3 | date/time garbage | TSS is a **32-bit-float** program; nd100x has 48-bit FP only | **no** — CPU-model mismatch |
+| 1 | `MEMORY <lo> <hi>` hangs | **CLOSED** — `mac-c` emitted mode 6 (`,I ,X`) as X-relative; nine backward refs in the swapper addressed code, not `PDTBL[J]` | **no** — assembler bug |
+| 2 | `LOAD-SYSTEM` never returns | works as designed; the working disc carries no bootstrap | **no** — build-variant gap |
+| 3 | date/time garbage | **CLOSED** — `mac-c` classed `NLZ`/`DNZ` as plain sums, so `DNZ -20` borrowed into the opcode and assembled as `NLZ` | **no** — assembler bug |
 | 4 | `SET-REGISTER` no effect | `"N10` variant drives **live** CPU registers, not the saved block | **yes** (plus an off-by-one) |
 | 5 | `CREATE-USER` false error | all `CRUSE` failures wired to the `ALREADY EXISTS` label | **yes** |
 | 6 | no file can be created | create marker is a **quoted pair**; then blocked on track quota | **no** — doc error + provisioning |
 
-## 3. Date/time — a 32-bit vs 48-bit floating-point mismatch  **[PROVEN]**
+## 3. Date/time — RETRACTED. The cause was an assembler bug, not FP width
+
+> **[RETRACTION 2026-07-27]** This section was headed **[PROVEN]** and was
+> **wrong**. The real cause is in `mac-c`: `NLZ`/`DNZ` were classed as plain
+> 16-bit sums, so the negative scaling in `DNZ -20` borrowed out of the 8-bit
+> scaling field into the opcode and assembled as `NLZ` (`0152000 - 020 =
+> 0151760`). ND-60.096.01 §3.2.2.4 states the correction explicitly ("Bit 7
+> is now examined and it is 1, so 400 is added"). All twelve affected sites
+> are `TBANG`'s float-to-integer step. See
+> `/mnt/e/Dev/Ronny/TSS/docs/MAC-ASSEMBLER.md` §6.8 and PART VI below.
+>
+> **FP width was ruled out by experiment**, not by argument. nd100x gained
+> `--fpp=32|48`; both widths produced the same garbage over six paired runs.
+> TSS in fact *requires* 48-bit: `NORM` builds an `040000`-biased exponent in
+> T, and `FPDAT` unpacks year and month out of that T word.
+>
+> **Why the old reasoning looked airtight and still failed.** Every bullet
+> below is individually true. The partition argument — "integer fields print
+> correctly, floating-point fields are garbage, so the fault is in the FP" —
+> is the one that misled: `DNZ` sits exactly on that boundary, so a bug in
+> the *instruction* mimics a bug in the *format*. A correct correlation is
+> not a cause. What settled it was patching a single constant in memory and
+> watching one variable, after a full `-F48` rebuild had produced a **false
+> negative** by shifting every address past the first `[`.
+>
+> One thing in the old text survives and is still true: TSS's `[` constants
+> are 2-word (32-bit) while every consumer is 48-bit. That is **historical,
+> not ours** — the golden dump gives `RDATE=022700`, and 3-word constants
+> would put it at `022704`. It cannot be corrected without diverging from the
+> archive. It is invisible at small elapsed times, but it means the day and
+> hour counters can never advance. Untested; recorded in the handoff.
+
+### (superseded analysis follows)
 
 `TBANG` (`src/TSS2.SYMB:1123`) is the **only floating-point code in TSS**. It
 converts the tick counter using four `[` constants:
@@ -2184,11 +2230,12 @@ constant misbehaviour.
 - **`LOAD-SYSTEM` does not return.** Unchanged. The command itself is
   correct; the working disc carries no bootstrap for it to reload. This
   needs a different build variant rather than a code fix.
-- **Accounting arithmetic is still wrong.** `LOGOUT` printed `TIME USED IS
-  600 HOURS 2 MINS -24896 SECS` and the date line `126 JULY 2026
-  154126:124`. Per the owner's direction this is to be re-tested only after
-  32-bit floating point lands in nd100x, since the emulator implements the
-  48-bit format only.
+- ~~**Accounting arithmetic is still wrong.**~~ **CLOSED the same day — see
+  PART VI.** `LOGOUT` printed `TIME USED IS 600 HOURS 2 MINS -24896 SECS` and
+  the date line `126 JULY 2026 154126:124`. The deferral recorded here ("re-test
+  only after 32-bit floating point lands in nd100x") was based on the retracted
+  PART III §3 theory. 32-bit FP did land, made no difference, and the actual
+  cause was the `NLZ`/`DNZ` classification in `mac-c`.
 - **`SET-REGISTER` targets the wrong register** (D-part of the 07-25 list) —
   not re-investigated in this run.
 
@@ -2201,3 +2248,72 @@ passed on the first retry once a `sync` and a five-second settle gap were
 inserted between phases. Any future sweep should keep that gap. An empty
 console is the signature to look for; a genuine hang always shows the
 command echo first.
+
+---
+
+# PART VI. THE NLZ/DNZ ROUND, 2026-07-27 — what was re-verified, and what was not
+
+## VI.1 The fix
+
+`mac-c` classed `NLZ` (`0151400`) and `DNZ` (`0152000`) as `MAC_CLS_PLAIN`,
+which sums every term into the full 16-bit word. Their scaling factor is an
+**8-bit field**, so a negative scaling borrowed out of that field and into the
+opcode:
+
+```
+DNZ -20   assembled   0152000 - 0000020 = 0151760      <- this is NLZ + 0360
+correct               0152000 + (-020 & 0377) = 0152360
+```
+
+Reclassifying both as `MAC_CLS_ARG8` applies the correction ND-60.096.01
+§3.2.2.4 spells out. Positive operands were never affected, which is why only
+the twelve `DNZ -20` sites broke — and every one of them is the
+float-to-integer step in `TBANG`, the routine that decomposes elapsed clock
+ticks into days, hours, minutes and seconds. One wrong word corrupted every
+clock-derived value in the system.
+
+Commit `01dce34`. Pinned by test `[18]` in
+`/mnt/e/Dev/Ronny/TSS/mac-c/tests/test_mac.c`.
+
+## VI.2 Verified live, on a clean rebuild and bring-up
+
+| command | before | after |
+|---|---|---|
+| `DATE` x6 | `126 JULY 2026   154126:124`, a different day every read | `26 JULY 2026   0830:00`, identical across all six reads |
+| `TIME-USED` | `1013 HOURS 40 MINS -5204 SECS` | `0 SECS / OUT OF 2 SECS` |
+| `RESPONSE-TIME` | garbage | `AVERAGE RESPONSE TIME IS 0.02 SECONDS / OVER A PERIOD OF 4 SECS` |
+| `LOGOUT` | negative seconds, impossible totals | `26 JULY 2026 0830:00 / TIME USED IS 2 SECS / OUT OF 11 SECS` |
+
+Gates at that state: mac-c **718 assertions, 0 failures**, coverage clean,
+golden oracle **679/693 (A)** and **675/689 (B)** with **0** assembly errors,
+`verify_repo.sh` fully green.
+
+## VI.3 What was NOT re-run
+
+**Only the four commands above.** The 89-invocation sweep in PART V ran
+against the pre-fix binary. Nothing suggests the fix disturbed anything else —
+the oracle scores and the assertion count are unchanged, and no non-clock
+command reaches `TBANG` — but *no evidence of harm is not re-verification*,
+and the two should not be blurred. Treat every PART II and PART V transcript
+as describing a superseded binary until a full sweep is re-run.
+
+## VI.4 A test was asserting the bug
+
+`tests/test_mac.c` contained:
+
+```c
+check_word("DNZ -20 (masked)            ",
+           asm1_at(&st, 01000, "DNZ -20"),
+           (uint16_t)(0152000 - 020));          /* = 0151760 -- the defect */
+```
+
+It was labelled *(masked)* though nothing was masked, and it held the wrong
+expected value. It did not merely fail to catch the defect; it **locked it
+in** — any correct fix would have turned the suite red. Corrected in the same
+commit.
+
+Worth carrying forward, given how heavily this project leans on its suite and
+on the golden dumps: a green suite can be green *because* it agrees with the
+fault, and the golden dumps validate **word counts only**, never encodings.
+Both oracles were fully satisfied by a binary whose clock arithmetic was
+inverted.

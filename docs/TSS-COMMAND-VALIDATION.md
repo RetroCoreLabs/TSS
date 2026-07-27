@@ -6,9 +6,9 @@ delta is in PART V.**
 
 > **CURRENCY WARNING — read this before trusting a transcript.** The PART II
 > and PART V transcripts were captured **before** the NLZ/DNZ assembler fix
-> (commit `01dce34`). They describe a binary that no longer exists. Only the
-> four clock-derived commands have been re-run since; see PART VI for what
-> was re-verified and what was not.
+> (commit `01dce34`) and describe a binary that no longer exists. The sweep
+> was re-run in full against the fixed binary — **PART VII holds the current
+> results**. PART VI records the fix itself.
 
 ## Headline (2026-07-27 re-run — clean bring-up, 89 invocations)
 
@@ -2288,14 +2288,13 @@ Gates at that state: mac-c **718 assertions, 0 failures**, coverage clean,
 golden oracle **679/693 (A)** and **675/689 (B)** with **0** assembly errors,
 `verify_repo.sh` fully green.
 
-## VI.3 What was NOT re-run
+## VI.3 What was NOT re-run at this point
 
 **Only the four commands above.** The 89-invocation sweep in PART V ran
-against the pre-fix binary. Nothing suggests the fix disturbed anything else —
-the oracle scores and the assertion count are unchanged, and no non-clock
-command reaches `TBANG` — but *no evidence of harm is not re-verification*,
-and the two should not be blurred. Treat every PART II and PART V transcript
-as describing a superseded binary until a full sweep is re-run.
+against the pre-fix binary. Nothing suggested the fix disturbed anything else —
+the oracle scores and the assertion count were unchanged, and no non-clock
+command reaches `TBANG` — but *no evidence of harm is not re-verification*.
+**That gap has since been closed: see PART VII.**
 
 ## VI.4 A test was asserting the bug
 
@@ -2317,3 +2316,102 @@ on the golden dumps: a green suite can be green *because* it agrees with the
 fault, and the golden dumps validate **word counts only**, never encodings.
 Both oracles were fully satisfied by a binary whose clock arithmetic was
 inverted.
+
+---
+
+# PART VII. FULL RE-RUN, 2026-07-27 (second) — clean bring-up after the NLZ/DNZ fix
+
+This closes the gap flagged in PART VI.3. The entire sweep was executed again
+from a completely fresh bring-up, against the post-`01dce34` binary. **These
+are the current results.** PART II and PART V are historical.
+
+## VII.1 Bring-up chain
+
+All from `/mnt/e/Dev/Ronny/TSS`:
+
+| step | command | verified end state |
+|---|---|---|
+| build | `make build` | mac-as + **718 assertions, 0 failures**; TSS, DRUM, MINIT artifacts; **0** assembly errors |
+| encoding guard | `make check-encoding` | `Build/drum/tss-drum.bpun: FIXED`, `Build/bringup/tss.bpun: FIXED` |
+| wipe | `make clean-bringup` | `Build/bringup/` removed |
+| bring-up | `make auto` | MINIT format + cold-start, unattended over DAP |
+| verify | `make verify` | **15 free tracks**, `SYSTEM` present in `USTBL` |
+| quota | `TRANSFER SYSTEM<-SYSTEM 20` | `20 TRACKS LEFT`, `DISK-SPACE` 15 of 4096 |
+
+Sweep driver: `sweep_postdnz.sh`, one disposable disc copy per phase, with the
+PART V.5 settle gap and up to three attempts per phase.
+
+## VII.2 Results — unchanged from PART V, which is the point
+
+**89 invocations covering all 60 commands. 87 return to `@`.**
+
+| phase | invocations | result |
+|---|---|---|
+| 1 — read-only / informational | 19 | all return |
+| 2b — files, users, friends, registers | 23 | all return |
+| 3 — clock, accounting, system state | 14 | all return |
+| 4 — binaries, core images, devices | 12 | all return |
+| 4b — `PLACE-BINARY` via prompt | 4 | all return |
+| 5a — version, recover, pause, mode, logout | 7 | 6 return; `LOGOUT` ends the session **by design** |
+| 5b — `LOAD-BINARY` from tape | 1 | returns |
+| 5c — `LOAD-SYSTEM` | 1 | **does not return** |
+| 6 — `MEMORY` assign/list/delete | 8 | all return |
+
+Identical to the pre-fix figures. **No regression**: the NLZ/DNZ change
+touched twelve instruction words, all of them inside `TBANG`, and nothing
+outside the clock path moved.
+
+The three known-bad behaviours are also unchanged, as expected — none of them
+reaches `TBANG`:
+
+- `SET-REGISTER X 777` -> `STATUS` still reports `X = 0`.
+- `OPEN-FILE` still gives `BAD FILENAME` (quoted) / `NO SUCH FILE` (unquoted);
+  `ALLOCATE` and `DUMP` still give `NO SUCH FILE`.
+- `LOAD-SYSTEM` still does not return.
+
+## VII.3 The clock output is now sane in every phase
+
+Verified in the transcripts, not merely by the returns-to-`@` scorer:
+
+```
+DATE            DATE IS 25 JULY 2026   1200:00     (the value set at login)
+DEFINE-DATE     26,7,2026,8,30,0
+DATE            DATE IS 26 JULY 2026   0830:00     (accepts the new base)
+TIME-USED       TIME USED IS 2 SECS / OUT OF 13 SECS
+RESPONSE-TIME   AVERAGE RESPONSE TIME IS 0.00 SECONDS / OVER A PERIOD OF 18 SECS
+LOGOUT          25 JULY 2026   1200:00 / TIME USED IS 2 SECS / OUT OF 14 MINS 44 SECS
+```
+
+No negative seconds, no impossible day numbers, no value changing between two
+consecutive reads. `CLOCK-OFF` / `CLOCK-ON` no longer perturb the reading.
+
+## VII.4 NEW, and visible only now: the time of day does not advance
+
+With the garbage gone, a second defect is legible underneath it.
+
+**Observed.** `DATE` returns *exactly* the value last set — by the login date
+prompt or by `DEFINE-DATE` — and never anything else. In phase 5a, `DATE` read
+`1200:00` before `PAUSE` and `1200:00` again after `PAUSE` and `MODE`, while
+the `LOGOUT` line from that same session reported **`OUT OF 14 MINS 44 SECS`**.
+TSS therefore believes ~15 minutes of its own time elapsed while its
+time-of-day display did not move a second.
+
+**What this rules in and out.** The elapsed-time counters (`TIME USED`,
+`OUT OF`, `RESPONSE-TIME`'s period) *do* advance and *do* cross into minutes,
+so `TBANG`'s decomposition is working. What is lost is the elapsed
+contribution to the *absolute* clock.
+
+**Inferred, NOT established:** this is consistent with the latent constant
+issue recorded in PART III §3 and in the handoff — TSS's `[` constants are
+2-word (32-bit) while every consumer is 48-bit, so `K1`'s word0 `042701` reads
+as exponent 1473 rather than 23, and a divisor of that size drives the day and
+hour terms to zero. That would freeze the high-order fields exactly as seen.
+**It has not been tested**, the minute field would need explaining separately,
+and it must not be written up as the cause until it is. The discriminating
+experiment is to patch `K1`-`K4` in memory to their 48-bit equivalents and
+re-read `DATE` after a known interval.
+
+**Note that this defect was invisible before.** While the day field was
+randomly garbage on every read it *looked* like it was changing. Fixing the
+loud bug is what made the quiet one observable — and the same is likely true
+of whatever sits under this one.

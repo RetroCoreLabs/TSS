@@ -300,8 +300,13 @@ static void test_register_class_forms(void)
                asm1_at(&st, 01000, "IOF"), 0150401);
     check_word("NLZ 20                      ",
                asm1_at(&st, 01000, "NLZ 20"), 0151400 + 020);
+    /* DNZ's scaling is an 8-bit FIELD, so a negative one is masked into
+     * it - it does not subtract from the whole word. This assertion used
+     * to read (0152000 - 020) = 0151760, which is NLZ+0360, not DNZ at
+     * all; it locked the bug in rather than catching it. See test [18].  */
     check_word("DNZ -20 (masked)            ",
-               asm1_at(&st, 01000, "DNZ -20"), (uint16_t)(0152000 - 020));
+               asm1_at(&st, 01000, "DNZ -20"),
+               (uint16_t)(0152000 + ((-020) & 0377)));
 }
 
 /* ---------------------------------------------------------------------- */
@@ -2057,6 +2062,66 @@ static void test_mode6_is_p_relative(void)
 }
 
 /* ---------------------------------------------------------------------- */
+/* 18. NLZ/DNZ scaling is an 8-bit field - a negative one must not borrow  */
+/*     out of it and corrupt the opcode                                    */
+/*                                                                         */
+/* MAC statements are sums, so a PLAIN classification computes "DNZ -20"   */
+/* as 0152000 - 0000020 = 0151760. That is not DNZ: the scaling field is   */
+/* bits 0-7 (NLZ 0151400-0151777, DNZ 0152000-0152377), so the borrow ran  */
+/* into the opcode and turned DNZ into NLZ+0360 - the machine normalises   */
+/* where the program asked it to denormalise. ND-60.096.01 sec 3.2.2.4     */
+/* documents the borrow and the correction: examine bit 7 of the result    */
+/* and add 0400 when it is set. ARG8's "opc + (arg & 0377)" does exactly   */
+/* that, giving 0152360.                                                   */
+/*                                                                         */
+/* Live consequence: all twelve "DNZ -20" in TSS are the float-to-integer  */
+/* step of TBANG (src/TSS2.SYMB:1371), which decomposes elapsed clock      */
+/* ticks into days/hours/minutes/seconds. Measured on a running machine    */
+/* with a correct float input of 43 ticks, the miscompiled instruction     */
+/* returned -30396 days. Invisible to the golden dumps - one word either   */
+/* way, so every symbol address is unchanged.                              */
+/* ---------------------------------------------------------------------- */
+static void test_nlz_dnz_scaling_field(void)
+{
+    printf("[18] NLZ/DNZ 8-bit scaling field, negative operands\n");
+    mac_state st;
+
+    /* ---- the exact TBANG shape -------------------------------------- */
+    fresh(&st);
+    uint16_t at = st.loc;
+    mac_line(&st, "DNZ -20");
+    check_word("DNZ -20: stays in DNZ range ", st.mem[at], 0152360);
+
+    /* the bug produced NLZ's opcode; assert we are not back there       */
+    check_true("DNZ -20: not in NLZ range   ",
+               st.mem[at] >= 0152000 && st.mem[at] <= 0152377);
+
+    /* ---- positive operands must be untouched ------------------------ */
+    fresh(&st);
+    at = st.loc;
+    mac_line(&st, "DNZ 20");
+    check_word("DNZ 20: unchanged           ", st.mem[at], 0152020);
+
+    fresh(&st);
+    at = st.loc;
+    mac_line(&st, "NLZ 20");
+    check_word("NLZ 20: unchanged           ", st.mem[at], 0151420);
+
+    /* ---- NLZ with a negative scaling has the same hazard ------------ */
+    fresh(&st);
+    at = st.loc;
+    mac_line(&st, "NLZ -20");
+    check_word("NLZ -20: stays in NLZ range ", st.mem[at], 0151760);
+
+    /* ---- the full TBANG line still assembles as five words ---------- */
+    fresh(&st);
+    at = st.loc;
+    mac_line(&st, "K1, 0; 0");
+    mac_line(&st, "FDV K1; DNZ -20; SAA 0; NLZ 20; FMU K1");
+    check_word("TBANG line: DNZ word correct", st.mem[at + 3], 0152360);
+}
+
+/* ---------------------------------------------------------------------- */
 int main(void)
 {
     printf("=== MAC-C assembler unit tests ===\n\n");
@@ -2086,6 +2151,7 @@ int main(void)
     test_forward_ref_addend();
     test_asm_listing();
     test_mode6_is_p_relative();
+    test_nlz_dnz_scaling_field();
 
     printf("\n=== %d passed, %d failed ===\n", g_pass, g_fail);
     return g_fail == 0 ? 0 : 1;

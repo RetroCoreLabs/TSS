@@ -13,6 +13,20 @@
 ** Duplicate values are intentional and match the binary (STF==STR,      **
 ** LDF==LDR==LDD-adjacent, IIC==IIE, etc.).                              **
 **                                                                       **
+** NLZ/DNZ are ARG8, NOT PLAIN. Their scaling factor is an 8-bit field   **
+** (NLZ 0151400-0151777, DNZ 0152000-0152377), so a PLAIN 16-bit sum     **
+** lets a negative scaling borrow out of it and change the OPCODE:       **
+** "DNZ -20" became 0152000-0000020 = 0151760, which is not DNZ at all   **
+** but NLZ+0360 - the machine normalised where the program asked it to   **
+** denormalise. ND-60.096.01 sec 3.2.2.4 describes exactly this borrow   **
+** and its fix ("Bit 7 is now examined and it is 1, so 400 is added"),   **
+** which is what ARG8's "opc + (arg & 0377)" performs: 0152360. Twelve   **
+** sites in TSS use "DNZ -20", all of them the float-to-integer step of  **
+** the date/time arithmetic. Positive operands are unaffected. Do NOT    **
+** apply ARG8 to SHA/SHT/SHD: their shift count is a 6-bit field with    **
+** modifier bits above it, so an 8-bit mask would be a different bug.    **
+** Pinned by test [18].                                                  **
+**                                                                       **
 ** Ronny Hansen                                                          **
 ***************************************************************************/
 #include "mac.h"
@@ -60,8 +74,8 @@ const mac_permsym_entry MAC_PERMSYM[] =
     { "SAX", 0171400, MAC_CLS_ARG8 },
     { "AAA", 0172400, MAC_CLS_ARG8 },
     { "SAA", 0170400, MAC_CLS_ARG8 },
-    { "DNZ", 0152000, MAC_CLS_PLAIN },
-    { "NLZ", 0151400, MAC_CLS_PLAIN },
+    { "DNZ", 0152000, MAC_CLS_ARG8  },
+    { "NLZ", 0151400, MAC_CLS_ARG8  },
     { ",X", 02000, MAC_CLS_PLAIN },
     { ",B", 0400, MAC_CLS_PLAIN },
     { "I", 01000, MAC_CLS_PLAIN },

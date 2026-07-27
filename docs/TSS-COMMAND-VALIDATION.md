@@ -1,27 +1,48 @@
 # NORD TSS 3.0 — command validation plan
 
-**Status: EXECUTED 2026-07-25. All 60 commands run. Results in PART II.**
+**Status: EXECUTED 2026-07-25. RE-RUN IN FULL 2026-07-27 from a clean
+bring-up, after the mode-6 assembler fix. Results in PART II; the re-run
+delta is in PART V.**
 
-## Headline
+## Headline (2026-07-27 re-run — clean bring-up, 89 invocations)
 
 | | |
 |---|---|
 | commands in `HELP` | **60** |
 | distinct commands exercised | **60 (full coverage)** |
-| return to the `@` prompt | **57** |
-| **HANG — never return** | **2** — `MEMORY <lower> <upper>`, `LOAD-SYSTEM` |
-| end the session by design | 1 — `LOGOUT` (prints its sign-off correctly) |
+| return to the `@` prompt | **88 of 89 invocations** |
+| **HANG — never return** | **1** — `LOAD-SYSTEM` |
+| end the session by design | 1 — `LOGOUT` (signs off; **ESC** brings back `@ENTER`) |
 | crashes | **0** — the emulator never died and the console never became unusable |
+
+**Two entries below changed at the re-run.** `MEMORY <lower> <upper>` no
+longer hangs — it was a `mac-c` code-generation bug, not a TSS bug (see
+defect 1). And `LOGOUT` does not leave the terminal dead — **ESC** revives
+it, which is the ordinary SINTRAN convention (see D2). The earlier
+`ALREADY EXISTS` on `CREATE-USER` also does not reproduce once `SYSTEM`
+holds quota, exactly as the D1 analysis predicted.
+
+The 2026-07-25 figures were: 57 of 60 returning, **2** hangs
+(`MEMORY <lower> <upper>` and `LOAD-SYSTEM`).
 
 ### Defects found
 
-1. **`MEMORY <lower> <upper>` hangs forever.** No output at all. The listing
-   form (`MEMORY 0`) is fine. Source path: `MEM` (`src/TSS3.SYMB:1600`) →
-   `CKMEM` (`src/TSS2.SYMB:458`) → `CRMEM` (`src/TSS2.SYMB:489`), which
-   writes a page-table entry and posts `SAA 40; MST PID` to **interrupt
-   level 5**, the resident page reader. Both loops terminate by inspection,
-   so the wedge is in the level-5 hand-off. Root-causing it needs a CPU
-   trace. **This is the most serious finding.**
+1. ~~**`MEMORY <lower> <upper>` hangs forever.**~~ **RESOLVED 2026-07-27 —
+   this was never a TSS defect.** The swapper's page scan was miscompiled:
+   `mac-c` encoded addressing mode 6 (`,I ,X`) as X-relative when it is
+   *indirect P-relative indexed*, so nine backward references in TSS1's
+   swapper addressed fixed words of code instead of `PDTBL[J]`. The scan
+   therefore never saw a free frame, `IDXA`/`IDXB` stayed `-1`, and `SW6`
+   fell into `FTLER`, killing the process. Full account in
+   `/mnt/e/Dev/Ronny/TSS/docs/MAC-ASSEMBLER.md` §6.7. `MEMORY 40000 44000`
+   now assigns the page and returns; `MEMORY 0` then lists it as assigned,
+   `EXAMINE` reads it, and `DELETE-MEMORY` releases it.
+
+   Worth recording *why* this stayed open for three sessions: the runtime
+   measurement (`IDXA = IDXB = -1`, `J = 36`, 35 of 36 frames free) was
+   correct all along and was repeatedly dismissed as impossible, because
+   everyone reasoned from the **source** rather than checking that the
+   **emitted code matched it**.
 2. **`LOAD-SYSTEM` never returns.** Console shows the echo and nothing more —
    no reboot, no sign-on banner. Documented as "reloads (reboots) the TSS
    system from disk".
@@ -1868,9 +1889,36 @@ where `CREATE-USER TEST` and `CREATE-USER TESTA` were abandoned on seeing
 test of `CREATE-USER` must confirm with `LIST-USERS` on both sides rather than
 trusting the return message.
 
-## D2. `LOGOUT` leaves the terminal dead — it never returns to `@ENTER`
+## D2. ~~`LOGOUT` leaves the terminal dead~~ — RETRACTED 2026-07-27: press ESC
 
-**Observed.** From a logged-in `@` prompt:
+**This is not a defect.** The original probe only ever sent carriage
+returns. Waking a quiescent terminal with **ESC** is the ordinary SINTRAN
+convention, and TSS follows it. Verified 2026-07-27 by sending a graded
+sequence of inputs after `LOGOUT` and waiting 10 s after each:
+
+| input sent | result |
+|---|---|
+| `CR` (`\r`) | silent — this is what produced the false "dead terminal" |
+| **`ESC` (`\x1b`)** | **`NORD TSS VERSION 3.0A IS UP` … `@ENTER`** — session ready |
+
+So `LOGOUT` behaves correctly end to end: it prints its sign-off, releases
+the session, and the terminal re-arms on ESC. The methodology note below
+about needing a fresh boot per session is **withdrawn** — `LOGOUT` + ESC is
+a valid way to start a new session in a multi-session test.
+
+The accounting garbage in the sign-off is a **separate, still-open** issue;
+it is preserved as the secondary observation below and is tracked as P3.
+It reproduced unchanged on 2026-07-27 (`TIME USED IS 600 HOURS 2 MINS
+-24896 SECS`), and per the owner's direction should be re-tested only after
+32-bit floating point lands in nd100x, since the emulator currently
+implements the 48-bit format only and this has the shape of an arithmetic
+fault.
+
+The original (now superseded) observation follows, kept for the record.
+
+---
+
+**Observed [2026-07-25, superseded].** From a logged-in `@` prompt:
 
 ```
 @LOGOUT
@@ -1889,10 +1937,12 @@ Entry 78 of Phase 5a already recorded `LOGOUT` as "returns"; that is correct as
 far as it goes — the command itself completes and prints its summary. What was
 not tested then was **whether the terminal is usable afterwards**. It is not.
 
-**Consequence for test methodology.** Any multi-session test must use a fresh
-boot per session rather than `LOGOUT` between them. The disc persists across a
-clean debugger-terminate, so this is a workable substitute; it is how the
-master-password validation was run.
+**Consequence for test methodology [WITHDRAWN 2026-07-27 — see above].** This
+said a multi-session test must use a fresh boot per session. That was a
+consequence of the wrong conclusion; `LOGOUT` followed by **ESC** returns to
+`@ENTER` and starts a new session. A fresh boot per session remains a valid
+technique (it is how the master-password validation was run) but is no
+longer *required*.
 
 **Secondary observation in the same output:** the accounting figures are
 visibly wrong — `-5204 SECS` and `-19004 SECS` are negative, and
@@ -2051,3 +2101,103 @@ USER NUMBER = 3                    <-- no spurious ALREADY EXISTS
 Same command, same code, same disc — only the quota differs. With quota,
 `CREATE-USER` reports success correctly; without it, the `UTRK` charge fails
 and `CRUSR` mislabels the failure as `ALREADY EXISTS`.
+
+
+---
+
+# PART V. FULL RE-RUN, 2026-07-27 — clean bring-up after the mode-6 fix
+
+## V.1 What was re-run and why
+
+The whole sweep was executed again from a **completely fresh bring-up**, to
+confirm that the addressing-mode-6 fix in `mac-c`
+(`/mnt/e/Dev/Ronny/TSS/docs/MAC-ASSEMBLER.md` §6.7) resolved the `MEMORY`
+hang without disturbing anything else. Nothing was carried over: the disc
+set was deleted and rebuilt from scratch.
+
+Bring-up chain, in order, all from `/mnt/e/Dev/Ronny/TSS`:
+
+| step | command | verified end state |
+|---|---|---|
+| build | `make build` | mac-as + **708 assertions, 0 failures**; TSS, DRUM, MINIT and TDUMP artifacts |
+| encoding guard | `make check-encoding` | `Build/drum/tss-drum.bpun: FIXED` |
+| wipe | `make clean-bringup` | `Build/bringup/` removed |
+| bring-up | `make auto` | MINIT format + cold-start, unattended over DAP |
+| verify | `make verify` | **15 free tracks**, `SYSTEM` present in `USTBL` |
+| quota | `TRANSFER SYSTEM←SYSTEM 20` | `20 TRACKS LEFT` (the D3 bootstrap step) |
+
+Gate results at that state: mac-c **708 passed / 0 failed**, coverage clean,
+golden oracle **679/693 (A)** and **675/689 (B)** with **0** assembly errors,
+`verify_repo.sh` fully green.
+
+Each phase then ran on its **own disposable copy** of that verified disc set,
+per the PART I method, so a phase that creates users or files cannot perturb
+the next.
+
+## V.2 Results
+
+**89 command invocations covering all 60 commands. 87 returned to `@`.**
+
+| phase | invocations | result |
+|---|---|---|
+| 1 — read-only / informational | 19 | all return |
+| 2b — files, users, friends, registers | 23 | all return |
+| 3 — clock, accounting, system state | 14 | all return |
+| 4 — binaries, core images, devices | 12 | all return |
+| 4b — `PLACE-BINARY` via prompt | 4 | all return |
+| 5a — risky: version, recover, pause, mode, logout | 7 | 6 return; `LOGOUT` ends the session **by design** |
+| 5b — `LOAD-BINARY` from tape | 1 | returns |
+| 5c — `LOAD-SYSTEM` | 1 | **does not return** |
+| 6 — `MEMORY` assign/list/delete (new) | 8 | all return |
+
+Only **`LOAD-SYSTEM`** fails to return. `LOGOUT` is counted as a non-return
+by the automatic scorer because no `@` follows, but that is its defined
+behaviour and the terminal re-arms on **ESC** (D2).
+
+## V.3 The three things that changed since 2026-07-25
+
+**1. `MEMORY <lower> <upper>` works.** This was the headline hang. Phase 6
+was added specifically to exercise the previously-wedging path end to end:
+
+```
+@MEMORY 40000 44000        -> returns to @
+@MEMORY 0                  -> shows the page assigned
+@EXAMINE 40000 40004       -> reads it
+@DELETE-MEMORY 40000       -> releases it
+@MEMORY 0                  -> shows it EMPTY again
+@MEMORY 50000 54000        -> a second range also works
+```
+
+Root cause was in the assembler, not in TSS. See defect 1 in the Headline
+and `MAC-ASSEMBLER.md` §6.7.
+
+**2. `LOGOUT` does not kill the terminal.** ESC revives it. D2 retracted.
+
+**3. `CREATE-USER` reports success.** `CREATE-USER TESTU` → `USER NUMBER =
+2`, with no spurious `ALREADY EXISTS`. The only difference from the 07-25
+run is that `SYSTEM` held quota, which is precisely what the D1 analysis
+predicted. D1 is therefore confirmed as *conditional on quota*, not a
+constant misbehaviour.
+
+## V.4 Still open after the re-run
+
+- **`LOAD-SYSTEM` does not return.** Unchanged. The command itself is
+  correct; the working disc carries no bootstrap for it to reload. This
+  needs a different build variant rather than a code fix.
+- **Accounting arithmetic is still wrong.** `LOGOUT` printed `TIME USED IS
+  600 HOURS 2 MINS -24896 SECS` and the date line `126 JULY 2026
+  154126:124`. Per the owner's direction this is to be re-tested only after
+  32-bit floating point lands in nd100x, since the emulator implements the
+  48-bit format only.
+- **`SET-REGISTER` targets the wrong register** (D-part of the 07-25 list) —
+  not re-investigated in this run.
+
+## V.5 Harness note
+
+Five phases initially reported `NEVER REACHED @` with a **completely empty
+console** — the emulator never printed its banner. That is a launch race
+between consecutive emulator starts, not a TSS result: every one of them
+passed on the first retry once a `sync` and a five-second settle gap were
+inserted between phases. Any future sweep should keep that gap. An empty
+console is the signature to look for; a genuine hang always shows the
+command echo first.

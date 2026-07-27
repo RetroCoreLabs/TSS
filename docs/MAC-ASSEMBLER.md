@@ -475,7 +475,7 @@ run-time reader (`S5`, `GOVX`, `OVDK`, `ROVER`/`ROV4`) are documented in
 
 Each entry: symptom → mechanism → why the golden dumps could not see it →
 fix → pinning test. Dates are the fix dates. The unifying theme is stated
-at the end (§6.8); the golden symbol dumps are an **address** oracle, and an
+at the end (§6.9); the golden symbol dumps are an **address** oracle, and an
 entire class of code-generation bugs is invisible to it.
 
 ### 6.1 The `9377` octal-parse bug — the login char-killer (2026-07-22)
@@ -714,7 +714,83 @@ project number.
   `GOTO SW6` the moment a frame is found) instead of `IDXA = IDXB = -1`,
   `J = 36`.
 
-### 6.8 The moral
+### 6.8 `DNZ -20` borrowed out of its scaling field (2026-07-27)
+
+- **Symptom:** every date, time and accounting figure TSS printed was
+  garbage, and unstable — `DATE` gave a different day on every read
+  (166, 209, 169, 10, 60, 40), `TIME-USED` and `LOGOUT` printed negative
+  seconds (`-24896 SECS`) and hour totals exceeding the allowance.
+
+- **Mechanism:** `NLZ`/`DNZ` were classed `MAC_CLS_PLAIN`, a pure 16-bit
+  sum of all terms. Their scaling factor is an 8-bit **field**
+  (NLZ `0151400`-`0151777`, DNZ `0152000`-`0152377`), so a negative
+  scaling borrowed straight out of it and into the opcode:
+
+  ```
+  DNZ -20  ->  0152000 - 0000020 = 0151760
+  ```
+
+  `0151760` is not DNZ at all — it is **NLZ**+`0360`. The machine
+  normalised where the program asked it to denormalise. ND-60.096.01
+  §3.2.2.4 describes this exact borrow and its correction ("Bit 7 is now
+  examined and it is 1, so 400 is added"), which is what `MAC_CLS_ARG8`'s
+  `opc + (arg & 0377)` performs, giving the correct `0152360`.
+
+  All twelve `DNZ -20` in the corpus are the float-to-integer step of
+  `TBANG` (`src/TSS2.SYMB:1371`), which decomposes elapsed clock ticks into
+  days, hours, minutes and seconds. One miscompiled instruction therefore
+  corrupted every clock-derived value in the system.
+
+- **Why the golden dumps were blind:** encoding-only. One word either way,
+  every symbol address unchanged.
+
+- **Worse: a test asserted the bug.** `tests/test_mac.c` carried
+  `check_word("DNZ -20 (masked)", ..., 0152000 - 020)` — the wrong value,
+  labelled "(masked)" although nothing was masked. It locked the defect in
+  instead of catching it. Corrected here.
+
+- **How it was found:** by bisecting `TBANG` on a running machine with
+  instruction breakpoints. Reading its inputs and intermediates proved the
+  elapsed tick count and `DADD`/`NORM` were exactly right (`T=040006
+  A=126000 D=000000` decodes to precisely 43 ticks) while the outputs were
+  `days=-30396`. That localised the fault to the four-instruction
+  `FDV`/`DNZ` chain, and from there to one instruction word.
+
+- **Fix:** `NLZ`/`DNZ` reclassified `MAC_CLS_ARG8` in `src/mac_permsym.c`,
+  with the reasoning recorded in that file's header so a regeneration
+  cannot silently undo it. **Do not extend this to `SHA`/`SHT`/`SHD`** —
+  their shift count is a 6-bit field with modifier bits above it, so an
+  8-bit mask would be a different bug.
+
+- **Pinning test:** `[18]`, plus the corrected assertion in `[1]`.
+
+- **Verified by running the OS.** After a clean rebuild and bring-up:
+
+  ```
+  @DEFINE-DATE 26,7,2026,8,30,0
+  @DATE
+  DATE IS 26 JULY 2026   0830:00     (stable across six reads)
+  @TIME-USED
+  TIME USED IS 0 SECS
+  OUT OF 2 SECS
+  @LOGOUT
+  26 JULY 2026   0830:00
+  TIME USED IS 2 SECS
+  ```
+
+- **Still latent, and not fixed by this.** TSS's `[` float constants
+  assembled in the **32-bit** format (2 words) while every consumer is
+  48-bit — `K1`'s word 0 `042701` means exponent 23 read as 32-bit, but
+  1473 read as 48-bit. The archived 1978 build has the same 2-word
+  constants (`RDATE=022700` in golden and produced alike; 3-word constants
+  would put it at `022704`), so this is **historical, not a mac-c defect**,
+  and cannot be corrected without diverging from the archive. It does not
+  show at small elapsed times because dividing by a 2^1473-sized number
+  underflows to zero and `DNZ` now correctly returns zero — but it means
+  the **day and hour counters can never advance**, which no short test can
+  observe. See `docs/HANDOFF-2026-07-26.md`.
+
+### 6.9 The moral
 
 **Symbol-address oracles validate word COUNTS, not encodings.** Every defect
 above except §6.5's dangling names left every symbol address in the golden

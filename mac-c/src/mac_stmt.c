@@ -514,8 +514,24 @@ void assemble_stmt(mac_state *st, char *stmt)
             {
                 disp = (uint16_t)((int)oper.disp - (int)st->bcounter);
             }
-            else if (oper.mode & 02000)
+            else if ((oper.mode & 02000) && !(oper.mode & 01000))
             {
+                /* mode 4 only: "(X) + D" is the sole X-relative form. Mode 6
+                 * ",I ,X" is "((P) + D) + (X)" - the manual names it INDIRECT
+                 * P-RELATIVE indexed (ND-60.096.01, addressing-mode table:
+                 * ((P)+D)+(X), bits X I B = 1 1 0). D locates the indirect
+                 * pointer word relative to P; X is added after the fetch, so
+                 * D must be P-relative. Testing the X bit alone caught mode 6
+                 * too and, with xcounter 0, left the symbol's absolute low
+                 * byte in the displacement field. Forward references hid it:
+                 * they emit a bare opcode and are patched by MAC_FIX_PREL8,
+                 * which is P-relative and correct - only backward references
+                 * reached this code. That miscompiled seven sites in TSS1's
+                 * swapper, where the locals block sits between SW4 (forward,
+                 * fine) and SW5 (backward, broken): "LDA I J2,X" at 006732
+                 * read a fixed word of code instead of PDTBL[J], so the page
+                 * scan never saw a free frame, IDXA/IDXB stayed -1 and SW6
+                 * fell into FTLER. Pinned by test [17].                     */
                 disp = (uint16_t)((int)oper.disp - (int)st->xcounter);
             }
             else

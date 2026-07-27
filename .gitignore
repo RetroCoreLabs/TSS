@@ -34,3 +34,5 @@ Build/write_*.txt
 
 # Python bytecode caches (bringup/, tools/).
 __pycache__/
+Build/f48/
+Build/bringup_f48/

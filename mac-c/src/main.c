@@ -72,6 +72,20 @@ int main(int argc, char **argv)
         {
             asmlistfile = argv[++i];
         }
+        else if (strcmp(argv[i], "-F48") == 0)
+        {
+            /* Assemble "[" constants in the 48-bit format (3 words, pure
+             * 040000-biased exponent) instead of the default 32-bit one
+             * (2 words, 0400-biased exponent packed with 6 mantissa bits;
+             * ND-60.096.01 Appendix E). DIAGNOSTIC ONLY - the archived
+             * golden dumps were produced by a 32-bit-float MAC, so this
+             * shifts every symbol after the first "[" and will not
+             * reconcile. It exists to test whether TSS's float code, which
+             * is written for the 48-bit machine (STF/LDF, DATA TEMP,3 and
+             * NORM building a 040000-biased exponent in T), actually needs
+             * 48-bit constants.                                            */
+            st.float48 = true;
+        }
         else if (strcmp(argv[i], "-l") == 0 && i + 1 < argc)
         {
             listfile = argv[++i];

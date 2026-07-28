@@ -10,7 +10,7 @@ ls -1 ../Build | grep -iE '\.(bpun|bin|img|core)$' || \
 echo
 echo "=== 2. do the build scripts ever ask for an image or tape? ==="
 grep -nE '\-o |\-b ' scripts/build/build_tss_assysa.sh scripts/build/run_tss.sh || \
-    echo "  no: neither script passes -o (image) or -b (BPUN) to mac-as"
+    echo "  no: neither script passes -o (image) or -b (BPUN) to mac-c"
 
 echo
 echo "=== 3. produce one now and see what comes out ==="
@@ -19,7 +19,7 @@ PRE="-m CDC -m MACF -m DIAB -m K14 -m TEL4 -d IOT=160000 -d ACT=400 \
 -d TDBI=410 -d TDBO=40 -d DIABD=156 -d DIABT=4 -d DLP=143 -d GRP1=1 \
 -d GRP2=2 -d GRP3=4 -d GRP4=10 -d MPR=3 -d 8LP=200 -d 9PPT=100 \
 -d 9TTI=40 -d 9TTO=40 -d 9FP=200 -d 9CR=5 -d NOPEN=16"
-build/mac-as $PRE ../src/TSS1.SYMB ../src/TSS2.SYMB ../src/TSS3.SYMB \
+build/mac-c $PRE ../src/TSS1.SYMB ../src/TSS2.SYMB ../src/TSS3.SYMB \
     ../src/TSS4.SYMB ../src/TSS5.SYMB \
     -o /tmp/tss.img -b /tmp/tss.bpun >/dev/null 2>/tmp/img.err
 echo "  exit=$?  errors=$(grep -c ERROR /tmp/img.err)"

@@ -33,8 +33,8 @@ wsl -d Ubuntu -- bash -lc "cd /mnt/e/Dev/Ronny/TSS/mac-c && make test"
 
 | command (from `mac-c/`) | purpose |
 |---|---|
-| `make` | build `build/mac-as` + `build/test_mac` (must stay warning-free under `-Wall -Wextra`) |
-| `make test` | run the whole suite (695 assertions, must be 0 failures) — builds `build/test_mac` but does NOT relink `build/mac-as`; run plain `make` before any `build_tss_*.sh` |
+| `make` | build `build/mac-c` + `build/test_mac` (must stay warning-free under `-Wall -Wextra`) |
+| `make test` | run the whole suite (695 assertions, must be 0 failures) — builds `build/test_mac` but does NOT relink `build/mac-c`; run plain `make` before any `build_tss_*.sh` |
 | `./scripts/verify/check_coverage.sh` | assert every public function and every implemented `)` command is referenced by a test |
 | `./scripts/build/run_tss.sh` | assemble the five TSS parts directly |
 | `./scripts/build/build_tss_assysa.sh` | **the real end-to-end test** — runs the original `ASSYSA`/`ASSYSB` command streams; writes to `../Build/` |
@@ -99,7 +99,7 @@ is defined; literal references go in `g_litrefs` and are patched at `)FILL`.
 retargeted TSS2 ROBJ's error exits and made LOGON's ()SCRATCH open loop
 forever — the login "hang". Pinned by test [15]; the golden dumps cannot
 see this class (addresses unchanged, only content). Also: `make test` does
-NOT relink `mac-as` — run plain `make` before any `build_tss_*.sh`.
+NOT relink `mac-c` — run plain `make` before any `build_tss_*.sh`.
 
 **Statement dispatch order in `assemble_stmt()` is load-bearing.** It is
 interval `<` → text string `'…'` → location-set `EXPR/` → label `NAME,` →

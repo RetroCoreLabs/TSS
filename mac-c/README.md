@@ -7,7 +7,7 @@ C99 reimplementation of the ND MAC assembler, written to rebuild the
 
 ```
 cd /mnt/e/Dev/Ronny/TSS/mac-c      # WSL / Linux
-make            # builds build/mac-as and build/test_mac (-Wall -Wextra, zero warnings)
+make            # builds build/mac-c and build/test_mac (-Wall -Wextra, zero warnings)
 make test       # runs the unit-test suite
 ./scripts/build/run_tss.sh         # assembles all five TSS parts as ASSYSA does
 ./scripts/verify/compare_asymb.sh ../Build/ASYMB.SYMB ../reference/ASYMB.SYMB
@@ -23,7 +23,7 @@ directory before doing anything.
 |---|---|
 | `src/` | the assembler, split by section — see `src/mac_internal.h` |
 | `tests/` | `test_mac.c`, the unit-test binary's source |
-| `build/` | **all** generated output: objects, `mac-as`, `test_mac`. Disposable. |
+| `build/` | **all** generated output: objects, `mac-c`, `test_mac`. Disposable. |
 | `scripts/build/` | the artifact builds — `build_tss_assysa.sh`, `build_tss_drum.sh`, `build_minit.sh`, `run_tss.sh` |
 | `scripts/verify/` | oracle scoring and repo checks — `verify_repo.sh`, `check_coverage.sh`, `compare_asymb.sh`, `first_divergence.sh`, `cmp_syms.sh` |
 | `scripts/extract/` | regenerate `src/mac_permsym.c` from a real MAC/MACM binary |
@@ -47,7 +47,7 @@ Instruction coverage is exhaustive rather than sampled:
 | `[1d]` | the register/IO forms built by summing sub-fields (COPY, RADD, SKP, SHA, BSET, BSKP, IOX, MON, TRA/TRR/MST/MCL, IRW/IRR, RMPY/RDIV, EXR, …) |
 
 **The original build script now runs end to end.** `./scripts/build/build_tss_assysa.sh`
-feeds the real `ASSYSA` command stream to `mac-as` — `)9ASSM TSS1,LIST1,0`
+feeds the real `ASSYSA` command stream to `mac-c` — `)9ASSM TSS1,LIST1,0`
 … `)9ASSM TSS5,LIST5,ASYMB:SYMB` followed by `)LIST` — so the assembler
 drives its own streams, nested source includes and ND file naming, and
 writes `ASYMB:SYMB` itself. Both variants build with **zero errors**:
@@ -179,7 +179,7 @@ run time. mac-c now reproduces that pipeline (see `docs/TSS-ARCHITECTURE.md (ove
   overlay from its assembly window at `ROVER` into a distinct `VOR` slot
   (040000, 041000, … 076000) so all 31 survive in memory. It copies memory
   only, so the golden symbol dump is unchanged.
-- **CDC-disc image (`mac-as -c FILE`)** — after assembly, writes a raw
+- **CDC-disc image (`mac-c -c FILE`)** — after assembly, writes a raw
   big-endian disc image placing overlay *n* on sectors `OVDK+2n` / `OVDK+2n+1`
   (two 256-word sectors, byte offset `sector*512`), exactly where the run-time
   overlay reader (routine `S5`) looks. Constants (`OVDK`, `VORS`, `RQR`, `VOR`)
@@ -254,7 +254,7 @@ covered by tests.
 | `src/mac_api.c` | the public `mac_*` entry points |
 | `src/mac_bpun.c` | image / CDC disc / BPUN tape readers and writers |
 | `src/mac_permsym.c` | generated permanent symbol table (do not hand-edit) |
-| `src/main.c` | `mac-as` driver |
+| `src/main.c` | `mac-c` driver |
 | `tests/test_mac.c` | unit tests |
 | `scripts/build/run_tss.sh` | assemble the TSS corpus as ASSYSA does |
 | `scripts/verify/check_coverage.sh` | audits that every public function and command is tested |

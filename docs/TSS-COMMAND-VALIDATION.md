@@ -735,13 +735,13 @@ free frames the very first iteration should have latched `IDXA`.
    to mode 6 = `((P)+disp)+(X)`, exactly right.
 
 *Why it is blocked:* locating `SW4`/`SW5`/`SW6` in memory requires mapping
-source lines to addresses, and **`mac-as` cannot emit an address listing** —
+source lines to addresses, and **`mac-c` cannot emit an address listing** —
 `-l` writes the *symbol* list only. Every hand-mapping attempt (P-relative
 displacement arithmetic) produced a wrong address; a breakpoint placed at the
 computed "SW5" landed in an unrelated loop whose indirect word held `172776`,
 an instruction word rather than an index.
 
-**Unblocking step:** add a listing mode to `mac-as` emitting
+**Unblocking step:** add a listing mode to `mac-c` emitting
 `address | emitted words | source line`. With that, `SW4`/`SW5`/`SW6` can be
 located exactly, a breakpoint set on the real scan, and the loaded value
 observed per iteration. Without it this question should not be answered by
@@ -2165,7 +2165,7 @@ Bring-up chain, in order, all from `/mnt/e/Dev/Ronny/TSS`:
 
 | step | command | verified end state |
 |---|---|---|
-| build | `make build` | mac-as + **708 assertions, 0 failures**; TSS, DRUM, MINIT and TDUMP artifacts |
+| build | `make build` | mac-c + **708 assertions, 0 failures**; TSS, DRUM, MINIT and TDUMP artifacts |
 | encoding guard | `make check-encoding` | `Build/drum/tss-drum.bpun: FIXED` |
 | wipe | `make clean-bringup` | `Build/bringup/` removed |
 | bring-up | `make auto` | MINIT format + cold-start, unattended over DAP |
@@ -2331,7 +2331,7 @@ All from `/mnt/e/Dev/Ronny/TSS`:
 
 | step | command | verified end state |
 |---|---|---|
-| build | `make build` | mac-as + **718 assertions, 0 failures**; TSS, DRUM, MINIT artifacts; **0** assembly errors |
+| build | `make build` | mac-c + **718 assertions, 0 failures**; TSS, DRUM, MINIT artifacts; **0** assembly errors |
 | encoding guard | `make check-encoding` | `Build/drum/tss-drum.bpun: FIXED`, `Build/bringup/tss.bpun: FIXED` |
 | wipe | `make clean-bringup` | `Build/bringup/` removed |
 | bring-up | `make auto` | MINIT format + cold-start, unattended over DAP |

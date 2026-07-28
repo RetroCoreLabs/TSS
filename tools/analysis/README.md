@@ -60,8 +60,8 @@ cold-start theory.
 ```
 
 Answers three questions in order: does `Build/` contain any image or tape
-today; do the build scripts ever ask `mac-as` for one (`-o` / `-b`); and
+today; do the build scripts ever ask `mac-c` for one (`-o` / `-b`); and
 what actually comes out if you assemble the corpus right now with the
 standard mark/define preamble. Useful when "is the build bootable?" needs a
-factual answer rather than an assumption. It runs `mac-as`, so run plain
+factual answer rather than an assumption. It runs `mac-c`, so run plain
 `make` in `mac-c/` first.

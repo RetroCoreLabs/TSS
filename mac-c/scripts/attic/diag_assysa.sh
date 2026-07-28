@@ -5,7 +5,7 @@ cd "$(dirname "$0")/../.." || exit 1
 set -u
 B=/tmp/tssbuild
 cd "$B" || exit 1
-MAC=/mnt/e/Dev/Ronny/TSS/mac-c/build/mac-as
+MAC=/mnt/e/Dev/Ronny/TSS/mac-c/build/mac-c
 
 rm -f LIST*.SYMB ASYMB.SYMB w.txt e.txt
 "$MAC" A2 > w.txt 2> e.txt

@@ -2,7 +2,7 @@
 # --- relocated to scripts/<group>/: restore mac-c/ as the working directory
 cd "$(dirname "$0")/../.." || exit 1
 # Build TSS the way the 1978 operator did: run the ASSYSA command stream
-# itself through mac-as. ASSYSA drives everything with )9ASSM, so this
+# itself through mac-c. ASSYSA drives everything with )9ASSM, so this
 # exercises the stream model, nested source includes, ND file naming and
 # the ")LIST -> object stream" rule, rather than us feeding files in order.
 set -u
@@ -35,7 +35,7 @@ echo
 tail -n +4 ../src/ASSYSB.SYMB | tr -d '\r' | grep -v '^@cc' \
     > "$BUILD/ASSYSB.SYMB"
 
-MAC=$PWD/build/mac-as
+MAC=$PWD/build/mac-c
 cd "$BUILD"
 
 run () {   # $1 = script, $2 = symbol dump it should produce

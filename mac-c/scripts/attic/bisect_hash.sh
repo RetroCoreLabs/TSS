@@ -9,7 +9,7 @@ lo=1
 hi=$TOTAL
 has_hash () {   # $1 = number of lines to include
     { sed -n "1,${1}p" "$SRC" | tr -d '\r'; echo ')LINE'; } > /tmp/b.symb
-    build/mac-as /tmp/b.symb -u >/dev/null 2>/tmp/b.txt
+    build/mac-c /tmp/b.symb -u >/dev/null 2>/tmp/b.txt
     grep -q '^UNDEFINED: ##$' /tmp/b.txt
 }
 if ! has_hash "$TOTAL"; then

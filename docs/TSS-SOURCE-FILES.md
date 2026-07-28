@@ -78,7 +78,7 @@ Every `.SYMB`/`.ORG` file, by directory. Sizes are from the working tree.
 
 | File | Lines | What it is |
 |---|---:|---|
-| `ASSYSA-MAC-INPUT.SYMB` | 26 | `ASSYSA` adapted to `mac-as` invocation |
+| `ASSYSA-MAC-INPUT.SYMB` | 26 | `ASSYSA` adapted to `mac-c` invocation |
 | `ASSYSB-MAC-INPUT.SYMB` | 24 | ditto for version B |
 | `ASSYS-DRUM-N10-MAC-INPUT.SYMB` | 27 | adds the `DRUM`+`N10` marks to compile the drum driver in |
 | `DRUM-DRIVER.SYMB` | 189 | the extracted `XDRUM` driver, for study |
@@ -96,7 +96,7 @@ flowchart TB
         TD["TDUMP.SYMB<br/><i>382 lines</i>"]
     end
 
-    MAC["mac-as<br/><i>C99 MAC assembler</i>"]
+    MAC["mac-c<br/><i>C99 MAC assembler</i>"]
 
     subgraph OUT["Artifacts"]
         OS["TSS core image<br/>tss.bpun"]
@@ -703,7 +703,7 @@ file looks wrong, the `archive/` bytes are the tiebreaker — that is how it was
 settled that `#SY` really has one `#`.
 
 `reference/ASYMB.SYMB` and `reference/BSYMB.SYMB` are **the validation oracle**.
-Every change to `mac-as` is judged by rebuilding and re-scoring against them.
+Every change to `mac-c` is judged by rebuilding and re-scoring against them.
 
 Current standing: **679/693 exact (A), 675/689 (B), zero assembly errors.**
 13 of the 14 unmatched entries in each are macro names, which real MAC lists
@@ -730,7 +730,7 @@ Not historical. Created by this project, and labelled as such inside the files.
 
 | File | Purpose |
 |---|---|
-| `ASSYSA-MAC-INPUT.SYMB` | `ASSYSA` adapted to `mac-as`'s invocation conventions |
+| `ASSYSA-MAC-INPUT.SYMB` | `ASSYSA` adapted to `mac-c`'s invocation conventions |
 | `ASSYSB-MAC-INPUT.SYMB` | ditto for B |
 | `ASSYS-DRUM-N10-MAC-INPUT.SYMB` | adds `DRUM`+`N10` so the `XDRUM` swapping-drum driver (device `IOX 540`, NORD-10 only) is compiled **in**. It is compiled **out** of both archived builds. |
 | `DRUM-DRIVER.SYMB` | the extracted `XDRUM` driver in isolation, for study |

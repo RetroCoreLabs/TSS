@@ -1,6 +1,6 @@
 # Compiled artifacts of the C assembler. Regenerate with: cd mac-c && make
 # EVERYTHING generated now lands in mac-c/build/ - objects and both
-# executables (mac-as, test_mac). `make clean` removes the whole directory.
+# executables (mac-c, test_mac). `make clean` removes the whole directory.
 mac-c/build/
 
 # NOTE: Build/ is deliberately NOT ignored. It holds the assembler's output

@@ -74,7 +74,7 @@ help: ## list all targets (this text)
 ##@ Build and test (delegates to mac-c/Makefile)
 # ---------------------------------------------------------------------------
 
-build: ## build mac-as + run tests + build all TSS artifacts (tss/drum/minit)
+build: ## build mac-c + run tests + build all TSS artifacts (tss/drum/minit)
 	$(MAKE) -C mac-c all
 
 test: ## run the mac-c unit-test suite (695 assertions, must be 0 failures)
@@ -139,7 +139,7 @@ auto: prepare need-nd ## ONE-COMMAND bring-up: prepare + format + cold-start, fu
 verify: ## check the bring-up disc: MIB free tracks + SYSTEM user present
 	python3 bringup/verify-disc.py
 
-check-encoding: ## assert the built/working BPUNs carry the FIXED ROBJ encoding (stale-mac-as trap)
+check-encoding: ## assert the built/working BPUNs carry the FIXED ROBJ encoding (stale-mac-c trap)
 	@python3 bringup/check-robj-encoding.py $(TSS_BPUN) $(wildcard $(BPUN))
 
 clean-bringup: ## delete the disposable bring-up disc set (Build/bringup/)

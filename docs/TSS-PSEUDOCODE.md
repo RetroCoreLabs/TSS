@@ -2302,7 +2302,7 @@ and for a non-shared page the loop would not have reached `J = NDPGS` at all.
 That reinforces, rather than resolves, the conclusion already recorded in
 `docs/TSS-COMMAND-VALIDATION.md`: the addresses used for that measurement were
 derived by hand and are almost certainly not `IDXA`/`IDXB`/`J`. The blocker is
-unchanged — `mac-as` has no listing mode, so source-to-address mapping is
+unchanged — `mac-c` has no listing mode, so source-to-address mapping is
 guesswork. **Nothing here is offered as a new root cause.**
 
 ## 7.2 `FTLER` — the fatal-error idle loop (`TSS1.SYMB:162-165`)
@@ -2408,7 +2408,7 @@ they can be checked or overturned:
 
 | item | status |
 |---|---|
-| Why the swapper appeared to find no free page | **UNRESOLVED** — blocked on a `mac-as` listing mode; §7.1 |
+| Why the swapper appeared to find no free page | **UNRESOLVED** — blocked on a `mac-c` listing mode; §7.1 |
 | Where SYSTEM's initial track quota comes from | **INFERRED** (likely `SINIT`), not read |
 | Whether a new user really cannot create a file | **PREDICTED**, not tested — the one live experiment |
 | `TDUMP` running under the emulated TSS | **UNTESTED** — assembles with 0 errors |

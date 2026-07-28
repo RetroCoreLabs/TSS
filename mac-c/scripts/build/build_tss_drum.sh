@@ -5,10 +5,10 @@ cd "$(dirname "$0")/../.." || exit 1
 # paper tape, for loading into an ND-100 emulator (nd100x).
 #
 # This drives the derived DRUM+N10 command stream
-# (derived/ASSYS-DRUM-N10-MAC-INPUT.SYMB) through mac-as exactly as ASSYSA
+# (derived/ASSYS-DRUM-N10-MAC-INPUT.SYMB) through mac-c exactly as ASSYSA
 # is driven in build_tss_assysa.sh: )9ASSM assembles each TSS part into the
 # in-memory image with time-ordered ()KILL) scope. Unlike the ASSYSA build,
-# which only wants the symbol dump, here we also ask mac-as for:
+# which only wants the symbol dump, here we also ask mac-c for:
 #   -b  the bootable BPUN tape  (what the emulator loads)
 #   -o  the flat MACIMG image   (for inspection / range checking)
 #
@@ -22,7 +22,7 @@ HERE=$(cd "$(dirname "$0")/../.." && pwd)
 ROOT=$(cd "$HERE/.." && pwd)
 BUILD="$ROOT/Build/drum"
 INPUT="$ROOT/derived/ASSYS-DRUM-N10-MAC-INPUT.SYMB"
-MAC="$HERE/build/mac-as"
+MAC="$HERE/build/mac-c"
 
 mkdir -p "$BUILD"
 # Clean previous drum outputs (this whole subfolder is disposable).

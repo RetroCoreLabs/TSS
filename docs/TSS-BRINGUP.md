@@ -44,7 +44,7 @@ validation tools.
 The **full chain works**, end to end:
 
 ```
-make build                                (mac-as + tests + all artifacts)
+make build                                (mac-c + tests + all artifacts)
   →  make prepare                         (padded CDC image)
   →  MINIT format: 4470 / 4670 / I       (16 free tracks in the MIB)
   →  cold-start --start=7 --opr=131313    (SINIT creates SYSTEM, disc-verified)
@@ -104,7 +104,7 @@ Everything is driven by the top-level `Makefile` (run from WSL,
 **Recommended — one command, fully unattended:**
 
 ```bash
-make build      # once: mac-as + 695 tests + the TSS/MINIT artifacts
+make build      # once: mac-c + 695 tests + the TSS/MINIT artifacts
 make auto       # prepare + format + cold-start, driven over DAP; disc PERSISTS
 make login      # interactive: log in and use TSS
 ```
@@ -188,9 +188,9 @@ Both TSS and MINIT build with **0 assembly errors**.
 > absent from the dump; they were recovered by decoding `tss-drum.img` for
 > the `TRA OPR` opcode (`150002`).
 
-### 2.2 CRITICAL build gotcha — `make test` does not relink `mac-as`
+### 2.2 CRITICAL build gotcha — `make test` does not relink `mac-c`
 
-`make test` rebuilds `test_mac` but does **not** relink `mac-as`. After any
+`make test` rebuilds `test_mac` but does **not** relink `mac-c`. After any
 edit under `mac-c/src/`, run plain **`make`** in `mac-c/` *before* any
 `build_tss_*.sh`, or the images are built with the **stale assembler** — a
 failure mode that cost a full debug cycle (the fixed code tested green while
@@ -334,7 +334,7 @@ How nd100x picks the start address: `LoadBPUNStream`
 loader ends `164316!` where `164316` also equals `start`, so an unmodified
 tape boots at `lastValue = 0` — for TSS a trap vector (`JMP I 3` → the
 monitor-return path) executed with uninitialised state, running off into
-zero memory. **The fix is in the tape:** `mac-as -e ENTRY` (octal address or
+zero memory. **The fix is in the tape:** `mac-c -e ENTRY` (octal address or
 symbol) replaces the final `164316!` token with `<entry>!`; since
 `entry != start`, nd100x reads `boot = entry`. `build_tss_drum.sh` passes
 **`-e ISTRT`** (`ISTRT = 025076`, `src/TSS2.SYMB` — `SAA 1; STA I (IDEV;
@@ -917,7 +917,7 @@ Disc addresses (NCR): `MIB/DKBIT` `50` · `USTBL` ≈ `51` · overlays `160`+ ·
 | cold-start never shows `@ENTER` | started at ISTRT, not 7 | ensure `--start=7` (the scripts set it) |
 | no console echo at all | wrong console/terminal | the TSS console is terminal 192 / the local console; check `--start=7`; not reachable via `--telnet` |
 | `verify-disc.py` shows 16 free after step 3 | SINIT never ran | you booted without `--opr=131313` or not at addr 7 |
-| login loops silently after the project number | stale `mac-as` (`make test` does NOT relink it) | run plain `make` in `mac-c/`, rebuild images, re-run steps 1–3; `check-robj-encoding.py` must say FIXED |
+| login loops silently after the project number | stale `mac-c` (`make test` does NOT relink it) | run plain `make` in `mac-c/`, rebuild images, re-run steps 1–3; `check-robj-encoding.py` must say FIXED |
 | boot hangs in `DWAIT`, CDC status `062024` | wrong CDC op-decode model (compare instead of read) | the device must decode the op at control-word bits 11–12 (§4.3) |
 | WSL nd100x build fails "Exec format error" | stale Windows-PE `mkptypes` | rebuild it: `cc -O2 -o mkptypes mkptypes.c` (§3.1) |
 | disc changes lost after a run | emulator not stopped with SIGINT | always Ctrl-C / `make stop` — that flushes the CDC surface |

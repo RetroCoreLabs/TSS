@@ -1,7 +1,7 @@
 #!/bin/bash
 # --- relocated to scripts/<group>/: restore mac-c/ as the working directory
 cd "$(dirname "$0")/../.." || exit 1
-# Compare the symbol table produced by mac-as against the archived
+# Compare the symbol table produced by mac-c against the archived
 # ASYMB:SYMB golden dump from the original 1978 MAC build.
 # Usage: scripts/verify/compare_asymb.sh <produced.list> <golden.txt>
 set -u

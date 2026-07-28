@@ -10,7 +10,7 @@ make help          # lists every target with a one-line description
 **Fastest — one unattended command** (does format + cold-start, disc persists):
 
 ```bash
-make build         # once: mac-as + 695 tests + all TSS artifacts
+make build         # once: mac-c + 695 tests + all TSS artifacts
 make auto          # prepare + format + cold-start, driven over DAP, no typing
 make login         # then log in interactively
 ```
@@ -46,7 +46,7 @@ you are in.
 | `dap_bringup.py` | **`make auto`'s engine** — a minimal DAP client that launches nd100x under the debugger, auto-answers the MINIT format prompts, runs cold-start, and stops each phase with a clean terminate (so the CDC disc is written back). |
 | `pty_drive.py` | generic PTY console driver (expect/send over nd100x's console). Useful for foreground scripting, but note SIGINT does not persist the CDC — prefer `dap_bringup.py` for anything that must persist. |
 | `verify-disc.py` | reads `Build/bringup/cdc.img` (or a path argument): MIB free-track count, SYSTEM present, and which step to run next |
-| `check-robj-encoding.py` | byte-checks a built BPUN/image for the fixed-vs-broken ROBJ encoding — catches the stale-`mac-as` trap (`make test` does not relink `mac-as`) |
+| `check-robj-encoding.py` | byte-checks a built BPUN/image for the fixed-vs-broken ROBJ encoding — catches the stale-`mac-c` trap (`make test` does not relink `mac-c`) |
 
 ### Emulator configuration
 
@@ -91,7 +91,7 @@ Connect a DAP client to `127.0.0.1:1777`, enable console capture on
 | MINIT prints `DISK ERROR` on every track | CDC image too small | re-run `make prepare` (pads to 8192 sectors) |
 | cold-start never shows `@ENTER` | started at ISTRT, not 7 | the make targets pass `--start=7`; check overrides |
 | `make verify` shows 16 free after coldstart | SINIT never ran | boot with `--opr=131313` at addr 7 (`make coldstart` does) |
-| login loops silently after the project number | stale `mac-as` | run `make build`, `make prepare`, redo steps; `make check-encoding` must say FIXED |
+| login loops silently after the project number | stale `mac-c` | run `make build`, `make prepare`, redo steps; `make check-encoding` must say FIXED |
 | disc changes lost after a run | emulator not stopped with SIGINT | always Ctrl-C / `make stop` |
 
 Override the emulator path or DAP port: `make login ND=/path/to/nd100x DAP_PORT=1780`.

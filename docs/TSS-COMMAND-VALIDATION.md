@@ -2472,25 +2472,30 @@ that the NLZ/DNZ defect is out of the way:
 | 32 | `26 JULY 1301:01` -> `40 JULY 1004:144` -> `25 JULY 1200:00` -> `26 JULY 1301:01` — moving, **non-monotonic, garbage**, and `TIME-USED` back to `-11056 SECS` |
 
 Neither width produces a correct clock, and **the 32-bit run cannot be used as
-evidence either way**, because nd100x's FPP32 mode is internally inconsistent.
-Read from its source:
+evidence about TSS** — but not for the reason first given here.
 
-- `src/cpu/cpu_instr.c` — `ndfunc_fad`, `ndfunc_fsb`, `ndfunc_fmu`,
-  `ndfunc_fdv`, `ndfunc_nlz`, `ndfunc_dnz` all branch on `CurrentFPPType` and
-  read **two** operand words in the 32-bit path (`ndfunc_fdv:1007-1012`,
-  with `gT` left untouched).
-- `ndfunc_stf` (`:637-643`) and `ndfunc_ldf` (`:681-688`) **do not branch at
-  all** — they unconditionally move **three** words.
+> **[CORRECTION 2026-07-28]** This section argued that nd100x's FPP32 mode was
+> internally inconsistent, because `ndfunc_stf`/`ndfunc_ldf` (`:637`, `:681`)
+> move three words while `ndfunc_fad/fsb/fmu/fdv/nlz/dnz` branch on
+> `CurrentFPPType` and read two. **nd100x is correct; the criticism was
+> wrong.** ND-110 RASK and ND-120 DELILAH-L microcode hardwire `LDF`/`STF` to
+> the 3-word `T/A/D` layout, with no entry point for a 2-word load. A
+> 32-bit-FPP machine uses `LDD`/`STD` for its `A,D` accumulator instead — two
+> register sets, two instruction pairs. A patch to make `LDF`/`STF` branch was
+> proposed here and **withdrawn before it was applied**; it would have made
+> nd100x diverge from real hardware.
 
-So under `--fpp=32` the arithmetic is 32-bit while `LDF`/`STF` remain 48-bit.
-That machine never existed. This is worth reporting upstream; it is an
-observation from their source, not a demand.
+The correct reason the 32-bit run proves nothing about TSS: **TSS is not a
+32-bit program.** It uses `STF`/`LDF` throughout, so running it under a 32-bit
+FPP mixes 3-word load/store with 2-word arithmetic in the program's own terms,
+and can only produce garbage. Full account in
+[`TSS-FLOAT-FORMAT.md`](TSS-FLOAT-FORMAT.md) §4.
 
 **This also retires my earlier "FP width is ruled out" claim properly.** That
 experiment was run *before* the NLZ/DNZ fix, so the dominant defect masked
-both arms — and it was run against an FPP32 mode that is not self-consistent.
-It was worthless twice over. What replaced it is the `K1` patch: one variable,
-one observable, on an otherwise untouched system.
+both arms, and it was run under a configuration TSS was never built for. What
+replaced it is the `K1` patch: one variable, one observable, on an otherwise
+untouched system.
 
 ## VIII.3 Attribution — this is NOT a `mac-c` defect
 

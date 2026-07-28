@@ -24,9 +24,15 @@ commands exercised with 87 of 89 invocations returning.
 consequence is that the time of day cannot advance. Confirmed by patching `K1`
 in memory; **not** a `mac-c` defect, and not to be "fixed" there.
 
-Settling it needs a primary source on the ND-100 `LDF`/`STF` word count per FPP
-option — something to read, not to reason about. No further emulator
-experiment can help until nd100x's FPP32 mode is self-consistent (see §6).
+**Largely answered 2026-07-28.** ND-110 RASK and ND-120 DELILAH-L microcode
+hardwire `LDF`/`STF` to 3 words, and TSS uses them throughout — so TSS is a
+48-bit program and its `TBANG` constants were **wrong in the 1978 build too**.
+The archived system's clock could not have advanced on real hardware either.
+
+What is still open is only the generational edge: RASK/DELILAH are
+ND-110/ND-120 while TSS 3.0 is NORD-1 / NORD-10. Closing it needs
+NORD-10-era microcode or an instruction manual of that generation — or an
+original site report of whether `DATE` ever advanced.
 
 ## 2. `QOV1C` — a one-word oracle mismatch
 
@@ -69,17 +75,13 @@ build variant**, not a code fix. See `TSS-COMMAND-VALIDATION.md` PART III §2.
 
 ## 6. nd100x items
 
-**FPP32 is internally inconsistent.** `ndfunc_fad/fsb/fmu/fdv/nlz/dnz` branch
-on `CurrentFPPType`, but `ndfunc_stf` (`src/cpu/cpu_instr.c:637`) and
-`ndfunc_ldf` (`:681`) move three words unconditionally. In 32-bit mode the
-accumulator is `A,D`, the arithmetic reads its operand from `EA+0,EA+1`, and
-`STF` stores that accumulator to `EA+1,EA+2` — **a one-word disagreement
-between the arithmetic and load/store**, with `EA+0` receiving a stale `gT`.
-Reported upstream. Until this changes, `--fpp=32` results are not evidence
-about TSS.
-
-This is a claim about internal consistency only. What real 32-bit-FPP hardware
-did with `LDF`/`STF` is §1's open question and is **not** asserted here.
+**~~FPP32 is internally inconsistent.~~ RETRACTED 2026-07-28 — nd100x is
+correct.** `ndfunc_stf`/`ndfunc_ldf` move three words unconditionally, and
+that is right: ND-110 RASK and ND-120 DELILAH-L microcode hardwire `LDF`/`STF`
+to the 3-word `T/A/D` layout with no 2-word entry point. A 32-bit-FPP machine
+uses `LDD`/`STD` for its `A,D` accumulator instead. **No emulator change is
+wanted**, and the patch proposed here was withdrawn before it was applied.
+Detail in `TSS-FLOAT-FORMAT.md` §4.
 
 **Adopt in the harness (nd100x >= 0465922, `feat/prog-loader-and-shell-exec`),
 per the nd100x team 2026-07-28:**

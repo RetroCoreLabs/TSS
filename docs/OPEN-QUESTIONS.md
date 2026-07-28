@@ -69,10 +69,17 @@ build variant**, not a code fix. See `TSS-COMMAND-VALIDATION.md` PART III §2.
 
 ## 6. nd100x items
 
-**FPP32 is not self-consistent.** `ndfunc_fad/fsb/fmu/fdv/nlz/dnz` branch on
-`CurrentFPPType`, but `ndfunc_stf` (`src/cpu/cpu_instr.c:637`) and
-`ndfunc_ldf` (`:681`) move three words unconditionally. Reported upstream.
-Until this changes, `--fpp=32` results are not evidence about TSS.
+**FPP32 is internally inconsistent.** `ndfunc_fad/fsb/fmu/fdv/nlz/dnz` branch
+on `CurrentFPPType`, but `ndfunc_stf` (`src/cpu/cpu_instr.c:637`) and
+`ndfunc_ldf` (`:681`) move three words unconditionally. In 32-bit mode the
+accumulator is `A,D`, the arithmetic reads its operand from `EA+0,EA+1`, and
+`STF` stores that accumulator to `EA+1,EA+2` — **a one-word disagreement
+between the arithmetic and load/store**, with `EA+0` receiving a stale `gT`.
+Reported upstream. Until this changes, `--fpp=32` results are not evidence
+about TSS.
+
+This is a claim about internal consistency only. What real 32-bit-FPP hardware
+did with `LDF`/`STF` is §1's open question and is **not** asserted here.
 
 **Adopt in the harness (nd100x >= 0465922, `feat/prog-loader-and-shell-exec`),
 per the nd100x team 2026-07-28:**

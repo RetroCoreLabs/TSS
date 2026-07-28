@@ -106,9 +106,28 @@ self-consistent.** From its source:
 | `ndfunc_stf` | `src/cpu/cpu_instr.c:637-643` | **no** — writes three words unconditionally |
 | `ndfunc_ldf` | `src/cpu/cpu_instr.c:681-688` | **no** — reads three words unconditionally |
 
-So under `--fpp=32` the arithmetic is 32-bit while `LDF`/`STF` remain 48-bit.
-That machine never existed, and no conclusion about TSS may be drawn from it.
-Reported upstream as an observation from their source.
+The precise consequence, which is what makes the mode unusable as evidence:
+
+- in 32-bit mode the accumulator is the **`A,D` pair** (`gT` untouched);
+- `FAD`/`FSB`/`FMU`/`FDV` read their memory operand from **`EA+0, EA+1`**;
+- `STF` writes `gT`->`EA+0`, `gA`->`EA+1`, `gD`->`EA+2`, so it stores the
+  accumulator at **`EA+1, EA+2`** — and `EA+0` gets `gT`, which the 32-bit
+  operations never write, so it is stale;
+- `LDF` reloads `gA,gD` from `EA+1, EA+2`, agreeing with `STF`.
+
+So `LDF` and `STF` are self-consistent with each other, but **disagree with
+the arithmetic by exactly one word**. A float stored with `STF` and then used
+as an `FDV` operand is misaligned. That is sufficient on its own to explain
+the non-monotonic garbage in the table above, without any of it telling us
+anything about TSS.
+
+**What this does not claim.** Whether real 32-bit-FPP hardware moved two words
+in `LDF`/`STF`, or used `LDD`/`STD` instead and left `LDF`/`STF` to the 48-bit
+option, is exactly the open question in §6 — it is not settled here, and
+"nd100x's FPP32 does not match real hardware" is *not* what this section
+says. The defensible claim is narrower and provable from their source alone:
+**the mode is internally inconsistent**, so no experiment run under it can be
+evidence about TSS either way. Reported upstream on that basis.
 
 ## 5. Attribution — do NOT "fix" this in `mac-c`
 

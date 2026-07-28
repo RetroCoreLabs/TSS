@@ -9,14 +9,16 @@ cd "$(dirname "$0")/../.." || exit 1
 echo "variant marker values: 32-bit => 2OR3=2 LDR=024000 STR=020000"
 echo "                       48-bit => 2OR3=3 LDR=034000 STR=030000"
 echo
-for f in /mnt/d/ND/BPUN/MAC.BPUN \
-         /mnt/d/ND/BPUN/FMAC-1408D.BPUN \
-         /mnt/d/ND/BPUN/MACM-1718L.BPUN \
-         /mnt/d/ND/c3/2024/x2/system/f48mac-1408d.prog \
-         /mnt/d/ND/c3/2024/x2/system/fmac-1920c.prog \
-         /mnt/d/ND/S/K03/F32-FMAC-1920CPROG \
-         /mnt/d/ND/c3/2024/x2/system/mac-1628c.prog \
-         /mnt/d/ND/c3/2024/x2/system/dmac-1915g.bpun; do
+# External ND binaries are NOT in the repo. ND_ROOT points at the ND archive.
+: "${ND_ROOT:?set ND_ROOT to the directory holding the ND binaries}"
+for f in "$ND_ROOT/BPUN/MAC.BPUN" \
+         "$ND_ROOT/BPUN/FMAC-1408D.BPUN" \
+         "$ND_ROOT/BPUN/MACM-1718L.BPUN" \
+         "$ND_ROOT/c3/2024/x2/system/f48mac-1408d.prog" \
+         "$ND_ROOT/c3/2024/x2/system/fmac-1920c.prog" \
+         "$ND_ROOT/S/K03/F32-FMAC-1920CPROG" \
+         "$ND_ROOT/c3/2024/x2/system/mac-1628c.prog" \
+         "$ND_ROOT/c3/2024/x2/system/dmac-1915g.bpun"; do
     [ -e "$f" ] || continue
     python3 scan_raw_table.py "$f" 2OR3 LDR STR 9MOVE 9TSS SOVER 8DUMP \
         | sed 's/^/  /'

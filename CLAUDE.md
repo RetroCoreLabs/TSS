@@ -28,7 +28,7 @@ never defined, which explains six of the twenty undefined symbols.
 Requires a POSIX toolchain. On this machine everything runs through WSL:
 
 ```bash
-wsl -d Ubuntu -- bash -lc "cd /mnt/e/Dev/Ronny/TSS/mac-c && make test"
+wsl -d Ubuntu -- bash -lc "cd mac-c && make test"
 ```
 
 | command (from `mac-c/`) | purpose |
@@ -72,8 +72,8 @@ faked.
 **Never guess MAC semantics.** When behaviour is unclear, resolve it from a
 primary source and record the evidence in a comment plus a test:
 
-1. `E:\Dev\Ronny\NDInsight\Reference-Manuals\ND-60.096.01 MAC Interactive Assembly and Debugging System User's Guide.md` — the language spec.
-2. `D:\ND\BPUN\MAC.BPUN` — the real 1978 MAC binary. Its permanent symbol
+1. `$NDINSIGHT/Reference-Manuals/ND-60.096.01 MAC Interactive Assembly and Debugging System User's Guide.md` — the language spec.
+2. `$ND_BPUN_DIR/MAC.BPUN` — the real 1978 MAC binary. Its permanent symbol
    table at `0xE9B3` is where every opcode value in `src/mac_permsym.c` came
    from (3-word entries, names packed 5 chars × 6 bits). Ghidra MCP tools
    work on it; see `docs/MAC-ASSEMBLER.md`.

@@ -19,11 +19,11 @@ for the tool itself; this one is the analysis and defect-history companion.
 
 | source | what it is |
 |---|---|
-| `D:\ND\BPUN\MAC.BPUN` (28389 bytes) | the real 1978 MAC binary (48-bit-float build), loaded in Ghidra as an ND-100 BPUN; origin of every permanent-symbol value in `mac-c/src/mac_permsym.c` |
+| `$ND_BPUN_DIR/MAC.BPUN` (28389 bytes) | the real 1978 MAC binary (48-bit-float build), loaded in Ghidra as an ND-100 BPUN; origin of every permanent-symbol value in `mac-c/src/mac_permsym.c` |
 | `fmac-1920c.prog` | FMAC, 32-bit-float build — **the assembler that built TSS** (§2) |
 | `f48mac-1408d.prog` | the same FMAC built for 48-bit floats |
 | `MACM-1718L.BPUN` | MACM, the mass-storage assembler (§4) |
-| `ND-60.096.01` MAC User's Guide | the language specification (in `E:\Dev\Ronny\NDInsight\Reference-Manuals\`) |
+| `ND-60.096.01` MAC User's Guide | the language specification (in `$NDINSIGHT/Reference-Manuals/`) |
 | `ND-60.009.02` | MACM manual (DGET, `)9BYTT`, `)ULIST`, `)SYSDF`) |
 | `reference/ASYMB.SYMB`, `reference/BSYMB.SYMB` | the golden oracle: symbol-table dumps of the original 1978 TSS builds |
 | `reference/LIST1`–`LIST5` | the original **list-stream** output: source echoed with macro expansions inserted and false conditionals dropped. **They contain no addresses and no assembled words** — verified 2026-07-28, zero address-like columns in all six files. Useful as a *which-lines-were-assembled* oracle, not an instruction-bit one |
@@ -81,7 +81,7 @@ commands.
 
 ## 3. MAC.BPUN reverse engineering
 
-Binary: `D:\ND\BPUN\MAC.BPUN`, analyzed 2026-07-19 with the Ghidra MCP tools.
+Binary: `$ND_BPUN_DIR/MAC.BPUN`, analyzed 2026-07-19 with the Ghidra MCP tools.
 
 ### 3.1 Identity
 

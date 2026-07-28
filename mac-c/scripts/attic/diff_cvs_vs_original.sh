@@ -4,7 +4,7 @@ cd "$(dirname "$0")/../.." || exit 1
 # What did "CVS" change? Compare the 1973 originals (archive/TSSn.ORG) with
 # the patched version (archive/TSSn.SYMB), both parity-stripped and with
 # whitespace normalised so only real edits show.
-cd /mnt/e/Dev/Ronny/TSS || exit 1
+cd "$(dirname "$0")/../../.." || exit 1   # repo root, from this script
 strip () { perl -pe 's/(.)/chr(ord($1)&0x7f)/ge' "$1" | tr -d '\r' \
            | sed 's/[ \t]\+/ /g; s/ *$//'; }
 

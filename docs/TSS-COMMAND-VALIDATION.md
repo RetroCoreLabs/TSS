@@ -40,7 +40,7 @@ The 2026-07-25 figures were: 57 of 60 returning, **2** hangs
    swapper addressed fixed words of code instead of `PDTBL[J]`. The scan
    therefore never saw a free frame, `IDXA`/`IDXB` stayed `-1`, and `SW6`
    fell into `FTLER`, killing the process. Full account in
-   `/mnt/e/Dev/Ronny/TSS/docs/MAC-ASSEMBLER.md` §6.7. `MEMORY 40000 44000`
+   `docs/MAC-ASSEMBLER.md` §6.7. `MEMORY 40000 44000`
    now assigns the page and returns; `MEMORY 0` then lists it as assigned,
    `EXAMINE` reads it, and `DELETE-MEMORY` releases it.
 
@@ -64,7 +64,7 @@ The 2026-07-25 figures were: 57 of 60 returning, **2** hangs
    `0152000 - 0000020 = 0151760`, which **is `NLZ`**. The machine normalised
    where the program asked it to denormalise, at all twelve sites, every one
    of them `TBANG`'s float-to-integer step. Full account in
-   `/mnt/e/Dev/Ronny/TSS/docs/MAC-ASSEMBLER.md` §6.8; verified end to end in
+   `docs/MAC-ASSEMBLER.md` §6.8; verified end to end in
    PART VI. **The 32-bit/48-bit floating-point theory in PART III §3 is
    retracted** — it was labelled PROVEN and was not.
 4. **`SET-REGISTER` sets the wrong register.** `SET-REGISTER A 1234` left
@@ -146,11 +146,11 @@ Full absolute paths used throughout:
 
 | thing | path |
 |---|---|
-| repo | `/mnt/e/Dev/Ronny/TSS` |
-| verified disc set (do not touch) | `/mnt/e/Dev/Ronny/TSS/Build/bringup/` |
-| per-phase disposable copies | `/mnt/e/Dev/Ronny/TSS/Build/cmdtest/<phase>/` |
-| results doc | `/mnt/e/Dev/Ronny/TSS/docs/TSS-COMMAND-VALIDATION.md` (this file) |
-| manual under test | `/mnt/e/Dev/Ronny/TSS/docs/TSS-USER-MANUAL.md` |
+| repo | the repository root (all paths below are relative to it) |
+| verified disc set (do not touch) | `Build/bringup/` |
+| per-phase disposable copies | `Build/cmdtest/<phase>/` |
+| results doc | `docs/TSS-COMMAND-VALIDATION.md` (this file) |
+| manual under test | `docs/TSS-USER-MANUAL.md` |
 
 ---
 
@@ -338,7 +338,7 @@ nd100x provides the host side: `--tape=FILE` (paper tape reader input,
 So Phase 4/5 emulator runs add:
 
 ```
---tape=/mnt/e/Dev/Ronny/TSS/Build/minit/minit.bpun
+--tape=Build/minit/minit.bpun
 ```
 
 and items 52 / 61 use `TAPE-READER` as the file name. Nothing has to be
@@ -367,7 +367,7 @@ in (§3a, device names are file names) and whether `PAUSE` can be escaped
 1. This document, with every checkbox resolved and each command's verbatim
    console transcript.
 2. A summary table: 60 commands × verdict.
-3. **Corrections to `/mnt/e/Dev/Ronny/TSS/docs/TSS-USER-MANUAL.md`** wherever
+3. **Corrections to `docs/TSS-USER-MANUAL.md`** wherever
    observed behaviour contradicts it — in particular the §5 items currently
    marked *(inferred)* or *not yet verified live*.
 4. A list of anything found that hangs or crashes, with the reproduction.
@@ -404,7 +404,7 @@ Investigated 2026-07-25 after the sweep. Each entry separates what is
 > 0151760`). ND-60.096.01 §3.2.2.4 states the correction explicitly ("Bit 7
 > is now examined and it is 1, so 400 is added"). All twelve affected sites
 > are `TBANG`'s float-to-integer step. See
-> `/mnt/e/Dev/Ronny/TSS/docs/MAC-ASSEMBLER.md` §6.8 and PART VI below.
+> `docs/MAC-ASSEMBLER.md` §6.8 and PART VI below.
 >
 > **FP width was ruled out by experiment**, not by argument. nd100x gained
 > `--fpp=32|48`; both widths produced the same garbage over six paired runs.
@@ -901,7 +901,7 @@ defects 5, 6 and probably 1.
 # PART II — RESULTS
 
 Executed 2026-07-25 on copies of the verified disc under
-`/mnt/e/Dev/Ronny/TSS/Build/cmdtest/`. Every transcript below is the
+`Build/cmdtest/`. Every transcript below is the
 verbatim console, captured over DAP terminal 192.
 
 ## Phase 1 — read-only
@@ -2157,11 +2157,11 @@ and `CRUSR` mislabels the failure as `ALREADY EXISTS`.
 
 The whole sweep was executed again from a **completely fresh bring-up**, to
 confirm that the addressing-mode-6 fix in `mac-c`
-(`/mnt/e/Dev/Ronny/TSS/docs/MAC-ASSEMBLER.md` §6.7) resolved the `MEMORY`
+(`docs/MAC-ASSEMBLER.md` §6.7) resolved the `MEMORY`
 hang without disturbing anything else. Nothing was carried over: the disc
 set was deleted and rebuilt from scratch.
 
-Bring-up chain, in order, all from `/mnt/e/Dev/Ronny/TSS`:
+Bring-up chain, in order, all from the repo root:
 
 | step | command | verified end state |
 |---|---|---|
@@ -2273,7 +2273,7 @@ ticks into days, hours, minutes and seconds. One wrong word corrupted every
 clock-derived value in the system.
 
 Commit `01dce34`. Pinned by test `[18]` in
-`/mnt/e/Dev/Ronny/TSS/mac-c/tests/test_mac.c`.
+`mac-c/tests/test_mac.c`.
 
 ## VI.2 Verified live, on a clean rebuild and bring-up
 
@@ -2327,7 +2327,7 @@ are the current results.** PART II and PART V are historical.
 
 ## VII.1 Bring-up chain
 
-All from `/mnt/e/Dev/Ronny/TSS`:
+All from the repo root:
 
 | step | command | verified end state |
 |---|---|---|

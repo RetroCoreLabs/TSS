@@ -10,7 +10,9 @@ address of an ND address A is simply A (both are the 16-bit word address).
 """
 import sys
 
-PATH = '/mnt/d/ND/BPUN/MACM-1718L.BPUN'
+import os
+# External ND binary, not in the repo: set ND_BPUN_DIR.
+PATH = os.path.join(os.environ['ND_BPUN_DIR'], 'MACM-1718L.BPUN')
 
 
 def load(path):

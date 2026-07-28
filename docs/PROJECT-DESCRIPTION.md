@@ -273,7 +273,7 @@ restoration** — no standard MAC has it.
 
 ### The MAC binary itself
 
-`D:\ND\BPUN\MAC.BPUN` is **MAC dated 14 March 1978**, the SINTRAN III
+`$ND_BPUN_DIR/MAC.BPUN` is **MAC dated 14 March 1978**, the SINTRAN III
 subsystem build, loading at octal `145000–177777`. **[VERIFIED]**:
 
 - **Cold-start entry = octal 173724** (`0xF7D4`), confirmed dynamically in

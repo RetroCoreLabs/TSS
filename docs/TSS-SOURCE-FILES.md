@@ -1,13 +1,13 @@
 # NORD TSS 3.0 — Per-File Source Reference
 
-**Full path:** `/mnt/e/Dev/Ronny/TSS/docs/TSS-SOURCE-FILES.md`
+**Full path:** `docs/TSS-SOURCE-FILES.md`
 
 This document answers one question for **every `.SYMB` file in the repository**:
 *what is this file, what does it contain, is it built, and where is it
 described in depth?*
 
 It is the file-oriented companion to
-`/mnt/e/Dev/Ronny/TSS/docs/TSS-ARCHITECTURE.md`, which is organised by
+`docs/TSS-ARCHITECTURE.md`, which is organised by
 **subsystem** (paging, scheduler, file system, drivers). If you know the
 subsystem, read that. If you have a filename, start here.
 
@@ -37,7 +37,7 @@ them. Statements that are inference rather than observation are labelled
 
 Every `.SYMB`/`.ORG` file, by directory. Sizes are from the working tree.
 
-### `/mnt/e/Dev/Ronny/TSS/src/` — the clean, buildable corpus
+### `src/` — the clean, buildable corpus
 
 | File | Lines | Kind | What it is |
 |---|---:|---|---|
@@ -51,7 +51,7 @@ Every `.SYMB`/`.ORG` file, by directory. Sizes are from the working tree.
 | `ASSYSA.SYMB` | 24 | command stream | the 1978 build stream for version A |
 | `ASSYSB.SYMB` | 23 | command stream | the 1978 build stream for version B (adds `DEBUG`) |
 
-### `/mnt/e/Dev/Ronny/TSS/archive/` — originals, never edited
+### `archive/` — originals, never edited
 
 | File | Lines | What it is |
 |---|---:|---|
@@ -65,16 +65,16 @@ Every `.SYMB`/`.ORG` file, by directory. Sizes are from the working tree.
 | `LIST.SYMB`, `LIST1–5.SYMB` | 28674 | the 1978 assembly listings |
 
 `archive/` holds the source **twice and they are different programs** — see
-`/mnt/e/Dev/Ronny/TSS/CLAUDE.md` and `docs/PROJECT-DESCRIPTION.md` §2.
+`CLAUDE.md` and `docs/PROJECT-DESCRIPTION.md` §2.
 
-### `/mnt/e/Dev/Ronny/TSS/reference/` — the oracle
+### `reference/` — the oracle
 
 | File | Lines | What it is |
 |---|---:|---|
 | `ASYMB.SYMB` / `BSYMB.SYMB` | 1384 | parity-stripped golden symbol dumps — **the validation oracle** |
 | `LIST.SYMB`, `LIST1–5.SYMB` | 28674 | parity-stripped golden listings |
 
-### `/mnt/e/Dev/Ronny/TSS/derived/` — project-made, not historical
+### `derived/` — project-made, not historical
 
 | File | Lines | What it is |
 |---|---:|---|
@@ -160,7 +160,7 @@ the 1978 operator fed to the assembler. They are the reason the golden dumps
 exist, and they are the definitive statement of which library marks the
 archived builds used.
 
-`/mnt/e/Dev/Ronny/TSS/src/ASSYSA.SYMB`, complete:
+`src/ASSYSA.SYMB`, complete:
 
 ```
 FMAC
@@ -227,7 +227,7 @@ the location counter and symbol table carry across `)9ASSM` boundaries, so the
 split is editorial, not architectural.
 
 Full subsystem-level treatment is in
-`/mnt/e/Dev/Ronny/TSS/docs/TSS-ARCHITECTURE.md` (13 sections). What follows is
+`docs/TSS-ARCHITECTURE.md` (13 sections). What follows is
 the file-level map: what lives where, so a filename and line number can be
 turned into a subsystem.
 
@@ -290,9 +290,9 @@ trusting over any prose — including this document.
 
 ## 5. `MINIT.SYMB` — the disc formatter
 
-**Full path:** `/mnt/e/Dev/Ronny/TSS/src/MINIT.SYMB` (809 lines)
-**Built by:** `/mnt/e/Dev/Ronny/TSS/mac-c/scripts/build/build_minit.sh`
-**Output:** `/mnt/e/Dev/Ronny/TSS/Build/minit/minit.bpun`, entry `MINIT` = `000206`
+**Full path:** `src/MINIT.SYMB` (809 lines)
+**Built by:** `mac-c/scripts/build/build_minit.sh`
+**Output:** `Build/minit/minit.bpun`, entry `MINIT` = `000206`
 
 Header, `MINIT.SYMB:1–6`:
 
@@ -345,9 +345,9 @@ produces field `[14,5]` of the CDC address. This is the same conversion the
 
 ## 6. `TDUMP.SYMB` — the distribution-tape dumper
 
-**Full path:** `/mnt/e/Dev/Ronny/TSS/src/TDUMP.SYMB` (382 lines)
-**Built by:** `/mnt/e/Dev/Ronny/TSS/mac-c/scripts/build/build_tdump.sh` *(new)*
-**Output:** `/mnt/e/Dev/Ronny/TSS/Build/tdump/tdump.bpun`
+**Full path:** `src/TDUMP.SYMB` (382 lines)
+**Built by:** `mac-c/scripts/build/build_tdump.sh` *(new)*
+**Output:** `Build/tdump/tdump.bpun`
 **Assembly result:** `000000 DIAGNOSTICS` — **0 errors**, 528 words at `040000`–`041017`
 
 > This file had never been assembled before 2026-07-26 and had no analysis
@@ -368,7 +368,7 @@ hardware bootstrap it carries as data.
 ### 6.2 Memory map (from the assembled symbol table)
 
 Produced by `build_tdump.sh`, at
-`/mnt/e/Dev/Ronny/TSS/Build/tdump/TSYMB.SYMB`:
+`Build/tdump/TSYMB.SYMB`:
 
 | Symbol | Address | What |
 |---|---|---|
@@ -573,7 +573,7 @@ flowchart TB
 ```
 
 Verified encoding, `TDUMP.SYMB:87` against the assembled image at
-`/mnt/e/Dev/Ronny/TSS/Build/tdump/tdump.img`:
+`Build/tdump/tdump.img`:
 
 ```
 source:  HLOAD, SAA 20; IOX 505; SAA 4; IOX 403
@@ -714,8 +714,8 @@ Scoring tools:
 
 | Script | Purpose |
 |---|---|
-| `/mnt/e/Dev/Ronny/TSS/mac-c/scripts/verify/compare_asymb.sh <produced> <golden>` | score a dump |
-| `/mnt/e/Dev/Ronny/TSS/mac-c/scripts/verify/first_divergence.sh <produced> <golden>` | first differing symbol, in definition order |
+| `mac-c/scripts/verify/compare_asymb.sh <produced> <golden>` | score a dump |
+| `mac-c/scripts/verify/first_divergence.sh <produced> <golden>` | first differing symbol, in definition order |
 
 **Caveat that cost real time once:** matching symbol *addresses* only proves the
 word **count** is right. A bug that emitted `000000` for every `COPY SA DT`
@@ -752,7 +752,7 @@ Not historical. Created by this project, and labelled as such inside the files.
 Run everything at once:
 
 ```bash
-wsl -d Ubuntu -- bash -lc "cd /mnt/e/Dev/Ronny/TSS/mac-c && make && ./scripts/verify/verify_repo.sh"
+wsl -d Ubuntu -- bash -lc "cd mac-c && make && ./scripts/verify/verify_repo.sh"
 ```
 
 ---
@@ -775,9 +775,9 @@ Recorded honestly rather than closed with a plausible story.
 
 | Document | Full path |
 |---|---|
-| Architecture, by subsystem | `/mnt/e/Dev/Ronny/TSS/docs/TSS-ARCHITECTURE.md` |
-| Project history and provenance | `/mnt/e/Dev/Ronny/TSS/docs/PROJECT-DESCRIPTION.md` |
-| The MAC assembler and `mac-c` | `/mnt/e/Dev/Ronny/TSS/docs/MAC-ASSEMBLER.md` |
-| Bring-up, clean checkout to `@` prompt | `/mnt/e/Dev/Ronny/TSS/docs/TSS-BRINGUP.md` |
-| Command validation, all 60 commands | `/mnt/e/Dev/Ronny/TSS/docs/TSS-COMMAND-VALIDATION.md` |
-| User manual | `/mnt/e/Dev/Ronny/TSS/docs/TSS-USER-MANUAL.md` |
+| Architecture, by subsystem | `docs/TSS-ARCHITECTURE.md` |
+| Project history and provenance | `docs/PROJECT-DESCRIPTION.md` |
+| The MAC assembler and `mac-c` | `docs/MAC-ASSEMBLER.md` |
+| Bring-up, clean checkout to `@` prompt | `docs/TSS-BRINGUP.md` |
+| Command validation, all 60 commands | `docs/TSS-COMMAND-VALIDATION.md` |
+| User manual | `docs/TSS-USER-MANUAL.md` |

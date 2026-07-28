@@ -12,7 +12,7 @@ analyse the *system that was assembled*, not the assembler.
 ### `overlay_layout.py` — where each overlay lives on the CDC disc
 
 ```
-python3 /mnt/e/Dev/Ronny/TSS/tools/analysis/overlay_layout.py ../../reference/ASYMB.SYMB
+python3 tools/analysis/overlay_layout.py ../../reference/ASYMB.SYMB
 ```
 
 Reads a golden symbol dump (`reference/ASYMB.SYMB` or `BSYMB.SYMB`) and
@@ -36,7 +36,7 @@ chapter) — regenerate it here rather than editing the table by hand.
 ### `cold_boot_init.py` — the cells involved in cold start
 
 ```
-python3 /mnt/e/Dev/Ronny/TSS/tools/analysis/cold_boot_init.py [path-to-DSYMB.SYMB]
+python3 tools/analysis/cold_boot_init.py [path-to-DSYMB.SYMB]
 ```
 
 Defaults to `../../Build/drum/DSYMB.SYMB` (the DRUM/N10 build). Prints the
@@ -56,7 +56,7 @@ cold-start theory.
 ### `check_bootable.sh` — can the current build boot at all?
 
 ```
-/mnt/e/Dev/Ronny/TSS/tools/analysis/check_bootable.sh
+tools/analysis/check_bootable.sh
 ```
 
 Answers three questions in order: does `Build/` contain any image or tape

@@ -1,7 +1,7 @@
 #!/bin/bash
 # End-to-end check after the reorganisation: build, test, rebuild TSS, score
 # against the oracle, and verify every markdown link resolves.
-cd /mnt/e/Dev/Ronny/TSS || exit 1
+cd "$(dirname "$0")/../../.." || exit 1   # repo root, from this script
 
 echo "=== layout ==="
 for d in archive src reference derived Build mac-c tools bringup docs ppt; do

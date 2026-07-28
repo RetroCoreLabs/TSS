@@ -605,7 +605,7 @@ void assemble_stmt(mac_state *st, char *stmt)
      *   32-bit (optional): 2 words, 22+1 bit mantissa, exponent bias 0400
      *
      * WHICH ONE APPLIES HERE IS DECIDED BY EVIDENCE, NOT PREFERENCE:
-     *   - D:\ND\BPUN\MAC.BPUN is the 48-bit variant: its permanent table
+     *   - MAC.BPUN is the 48-bit variant: its permanent table
      *     carries 2OR3=3, LDR=034000 (=LDF) and STR=030000 (=STF), which
      *     Appendix E lists as the 48-bit values.
      *   - The archived ASYMB:SYMB golden dump, however, was produced by a

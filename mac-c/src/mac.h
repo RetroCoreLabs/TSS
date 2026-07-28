@@ -7,7 +7,7 @@
 **   1. ND-60.096.01 "MAC Interactive Assembly and Debugging System"     **
 **      (the language spec).                                             **
 **   2. The permanent symbol table extracted from the real MAC.BPUN      **
-**      binary (D:\ND\BPUN\MAC.BPUN, "MAC - 14. MARS 1978"): 3-word      **
+**      binary MAC.BPUN ("MAC - 14. MARS 1978"): 3-word                **
 **      entries at 0xE9B3, names packed 5 chars x 6 bits. Every opcode   **
 **      value in mac_permsym[] is byte-verified against that table.      **
 **   3. The TSS sources themselves as the target corpus; the archived    **
@@ -223,7 +223,7 @@ typedef struct
     /* Floating-point variant for '[' constants. false (default) = the
      * optional 32-bit format, 2 words per constant, which is what the
      * archived ASYMB:SYMB golden dump was built with. true = the standard
-     * 48-bit format, 3 words (the variant D:\ND\BPUN\MAC.BPUN itself is).
+     * 48-bit format, 3 words (the variant MAC.BPUN itself is).
      * See the '[' handler in mac.c for the evidence behind the default.   */
     bool        float48;
 

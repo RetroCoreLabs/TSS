@@ -1,13 +1,13 @@
 # NORD TSS 3.0 — The Architecture Reference
 
-**Full path:** `E:\Dev\Ronny\TSS\docs\TSS-ARCHITECTURE.md`
+**Full path:** `docs/TSS-ARCHITECTURE.md`
 
 This is the single comprehensive architecture document for the recovered 1973
 **NORD TSS 3.0** timesharing system (Bo Lewendal base; NORD-10 drivers by NJL =
 Nils Jakob Langeland), read directly from `src/TSS1.SYMB` … `src/TSS5.SYMB`,
 `src/MINIT.SYMB`, and verified live on the nd100x emulator. Every factual claim
 is tagged **[VERIFIED]** with a `file:line` citation (into
-`E:\Dev\Ronny\TSS\src\` unless another tree is named), **[ASSUMPTION]** /
+`src\` unless another tree is named), **[ASSUMPTION]** /
 **[INFERRED]** for interpretation, or **NOT DETERMINED FROM SOURCE**. All
 numbers are **OCTAL** unless marked "dec" (that is how MAC prints and how the
 source is written). How to read it: chapters 1–4 are the resident kernel
@@ -2412,7 +2412,7 @@ identity (`IOT 6`, `IOX 11/13`) is used but never named.
 
 ## 11. Emulated devices (nd100x)
 
-Emulator repo: `E:\Dev\Emulators\ND\nd100x`. Two TSS-era devices were
+Emulator repo: `$ND100X_SRC`. Two TSS-era devices were
 added specifically so TSS can run: the CDC cartridge disc (500-507) and
 the swapping drum (540-547).
 

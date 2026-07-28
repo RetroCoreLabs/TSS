@@ -4,7 +4,7 @@ cd "$(dirname "$0")/../.." || exit 1
 # My mac_permsym.c was extracted from MAC.BPUN, which is the 48-bit float
 # build. TSS was assembled with FMAC-1920C, the 32-bit build, where three
 # entries differ. Does the corpus actually use them?
-cd /mnt/e/Dev/Ronny/TSS || exit 1
+cd "$(dirname "$0")/../../.." || exit 1   # repo root, from this script
 echo "=== values embedded in mac-c (taken from MAC.BPUN, 48-bit) ==="
 grep -E '"(LDR|STR|2OR3|LDF|STF|LDD|STD)"' src/mac_permsym.c | sed 's/^/  /'
 echo

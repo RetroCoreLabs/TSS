@@ -25,12 +25,12 @@
 #     final blocker; fix = stage OV15 (and the other overlays) loadably on the CDC
 #     disc, OR neutralise the ERMSG call in LEV2 (diagnostic only).
 #
-# Usage:  /mnt/e/Dev/Ronny/TSS/bringup/logon_trace_probe.sh [max_instructions]   (default 6000000)
+# Usage:  bringup/logon_trace_probe.sh [max_instructions]   (default 6000000)
 #
 set -euo pipefail
 
-ND100X=${ND100X:-/mnt/e/Dev/Emulators/ND/nd100x/build-linux/bin/nd100x}
-TSSDIR=${TSSDIR:-/mnt/e/Dev/Ronny/TSS/Build/drum}
+ND100X=${ND100X:?set ND100X to the nd100x binary}
+TSSDIR=${TSSDIR:-Build/drum}
 MAXI=${1:-6000000}
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT

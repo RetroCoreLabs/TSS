@@ -1,8 +1,7 @@
 # Open questions — NORD TSS 3.0
 
-**This file:** `/mnt/e/Dev/Ronny/TSS/docs/OPEN-QUESTIONS.md`
-**Repository root:** `/mnt/e/Dev/Ronny/TSS`
-**Read first:** `/mnt/e/Dev/Ronny/TSS/CLAUDE.md` — the standing rules override
+**This file:** `docs/OPEN-QUESTIONS.md`
+**Read first:** `CLAUDE.md` — the standing rules override
 everything here.
 
 The live list. This file replaces the dated session handoffs: when an item is
@@ -18,7 +17,7 @@ commands exercised with 87 of 89 invocations returning.
 
 ## 1. Which floating-point format was TSS built for?
 
-**Own document:** `/mnt/e/Dev/Ronny/TSS/docs/TSS-FLOAT-FORMAT.md`
+**Own document:** `docs/TSS-FLOAT-FORMAT.md`
 
 `TBANG`'s constants are 2-word 32-bit; `FPDAT` and `NORM` require 48-bit. The
 consequence is that the time of day cannot advance. Confirmed by patching `K1`
@@ -45,7 +44,7 @@ Not started.
 
 ## 3. `TDUMP` has never executed
 
-`/mnt/e/Dev/Ronny/TSS/Build/tdump/tdump.bpun` assembles with zero diagnostics
+`Build/tdump/tdump.bpun` assembles with zero diagnostics
 and was mounted as paper tape for the `PLACE-BINARY`, `RBLOAD` and
 `LOAD-BINARY` phases of the command sweep. All three returned cleanly; none
 actually loaded and entered TDUMP.
@@ -65,13 +64,13 @@ disagree. Worth a source dive; likely the same root cause as the above.
 `STS = 234`. No error reported. Reproduced again on the post-fix sweep.
 
 An earlier root cause for this was **retracted** — see
-`/mnt/e/Dev/Ronny/TSS/docs/TSS-COMMAND-VALIDATION.md` PART III §4. Not
+`docs/TSS-COMMAND-VALIDATION.md` PART III §4. Not
 re-investigated since. Treat the retracted analysis as untrusted.
 
 ## 5. `LOAD-SYSTEM` does not return — mechanism confirmed, fix identified
 
 The only command that never comes back, and the reason is now read from
-source rather than guessed. `LOADV` (`/mnt/e/Dev/Ronny/TSS/src/TSS5.SYMB:604-626`,
+source rather than guessed. `LOADV` (`src/TSS5.SYMB:604-626`,
 `"CDC`-only):
 
 ```
@@ -128,7 +127,7 @@ depends only on `KLOK` advancing monotonically, not on its rate.
 
 Unknown. Probably documented command or console conventions rather than
 source. Start with
-`E:\Dev\Ronny\NDInsight\Reference-Manuals\ND-60.096.01 MAC Interactive Assembly and Debugging System User's Guide.md`.
+`$NDINSIGHT/Reference-Manuals/ND-60.096.01 MAC Interactive Assembly and Debugging System User's Guide.md`.
 
 ## 8. `LIST-ACCOUNTS LINE-PRINTER` produced no file
 

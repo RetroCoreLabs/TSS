@@ -3,7 +3,7 @@
 **                                                                       **
 ** GENERATED, DO NOT HAND-EDIT. Every (name,value) pair below was        **
 ** decoded directly from the permanent symbol table in the real MAC      **
-** binary D:\ND\BPUN\MAC.BPUN ("MAC - 14. MARS 1978"), 3-word entries    **
+** binary MAC.BPUN ("MAC - 14. MARS 1978"), 3-word entries              **
 ** starting at address octal 164663 (0xE9B3), names packed 5 chars x     **
 ** 6 bits. The mac_sym_class column is assigned from the mnemonic:       **
 **   MRI   = memory-reference (address operand -> 8-bit displacement)    **

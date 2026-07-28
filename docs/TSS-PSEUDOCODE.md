@@ -1,6 +1,6 @@
 # NORD TSS 3.0 — The Source in Pseudo-C
 
-**Full path:** `/mnt/e/Dev/Ronny/TSS/docs/TSS-PSEUDOCODE.md`
+**Full path:** `docs/TSS-PSEUDOCODE.md`
 
 Every routine in the TSS corpus, rewritten as readable pseudo-C so the
 *intent* of the 1973 MAC assembly can be understood without decoding octal.
@@ -9,8 +9,8 @@ This is the companion to:
 
 | document | full path | what it gives you |
 |---|---|---|
-| per-file reference | `/mnt/e/Dev/Ronny/TSS/docs/TSS-SOURCE-FILES.md` | what each file **is** |
-| architecture | `/mnt/e/Dev/Ronny/TSS/docs/TSS-ARCHITECTURE.md` | how the **subsystems** work |
+| per-file reference | `docs/TSS-SOURCE-FILES.md` | what each file **is** |
+| architecture | `docs/TSS-ARCHITECTURE.md` | how the **subsystems** work |
 | **this document** | — | what each **routine does**, in C |
 
 ---
@@ -111,7 +111,7 @@ bodies.
 
 # 1. `TDUMP.SYMB` — the distribution-tape dumper
 
-**Full path:** `/mnt/e/Dev/Ronny/TSS/src/TDUMP.SYMB`
+**Full path:** `src/TDUMP.SYMB`
 
 A **user program that runs under a live TSS**. Every I/O it performs is a
 monitor call. It reads a saved core-image file and punches the bootable
@@ -386,8 +386,8 @@ That is the single substantive difference between the two copies.
 
 # 2. `MINIT.SYMB` — the mass-storage initialisation program
 
-**Full path:** `/mnt/e/Dev/Ronny/TSS/src/MINIT.SYMB`
-**Built by:** `/mnt/e/Dev/Ronny/TSS/mac-c/scripts/build/build_minit.sh`
+**Full path:** `src/MINIT.SYMB`
+**Built by:** `mac-c/scripts/build/build_minit.sh`
 
 Header, `MINIT.SYMB:1-6`:
 
@@ -641,7 +641,7 @@ divide-by-12, and the file's own comments narrate it step by step
 
 # 3. `TSS5.SYMB` — users and files
 
-**Full path:** `/mnt/e/Dev/Ronny/TSS/src/TSS5.SYMB`
+**Full path:** `src/TSS5.SYMB`
 
 The user- and file-management layer: create/delete users, create/rename files,
 search the user's index block, set access rights. Only 3% of this file sits
@@ -1548,7 +1548,7 @@ Note `SC31` does not exist - the name table skips from `SC30` to `SC32`, and
 
 # 4. `TSS4.SYMB` — login, accounting, mail, and operator commands
 
-**Full path:** `/mnt/e/Dev/Ronny/TSS/src/TSS4.SYMB`
+**Full path:** `src/TSS4.SYMB`
 
 Only 1% of this file is inside conditional mark regions, so it builds almost
 identically everywhere. It holds `LOGON` — the routine that turns a terminal
@@ -1673,7 +1673,7 @@ again, so an operator cannot tell "no such user" from "wrong password".
 `()SCRATCH` (`TSS4.SYMB:544`), and `L10` copies it character by character into
 the command line before returning. Every session therefore begins by executing
 `()SCRATCH`. This is the code path where a dropped expression addend once made
-the login appear to hang — see `/mnt/e/Dev/Ronny/TSS/CLAUDE.md`.
+the login appear to hang — see `CLAUDE.md`.
 
 The echo is turned off around the password prompt with `sxbrk(3)` and back on
 with `sxbrk(1)` — including on the failure path, which is why a wrong password
@@ -1780,7 +1780,7 @@ These implement the exclusive-use model behind `RESERVE`, `RELEASE` and
 
 # 5. `TSS3.SYMB` — the overlay machinery and the string utilities
 
-**Full path:** `/mnt/e/Dev/Ronny/TSS/src/TSS3.SYMB`
+**Full path:** `src/TSS3.SYMB`
 
 Three distinct things live here: the **overlay system** (four assembler macros
 that make the whole 31-overlay design work), an **embedded copy of the tape
@@ -1888,7 +1888,7 @@ void govx(void)                 /* entered with X -> stub[3] */
 `GOVX` then jumps straight to the entry address — by the time it runs, the
 overlay is in place.
 
-This is also why the note in `/mnt/e/Dev/Ronny/TSS/CLAUDE.md` matters: an
+This is also why the note in `CLAUDE.md` matters: an
 unconditional `STZ I (EXRGP` that resolved to address 0 **overwrote the
 dispatch vector at word 0**, and every overlay call in the system jumped into
 nothing.
@@ -1998,7 +1998,7 @@ ambiguous across `DUMP`, `DELETE-FILE`, `DELETE-FRIEND`, `DELETE-MEMORY`,
 
 # 6. `TSS2.SYMB` — the runtime: frames, stack, overlay-aware return
 
-**Full path:** `/mnt/e/Dev/Ronny/TSS/src/TSS2.SYMB`
+**Full path:** `src/TSS2.SYMB`
 
 The largest file, and the one that defines *how every other routine in TSS is
 written*. The `PROGM` / `DATA` / `ENTER` / `RET` skeleton used throughout §3-§5
@@ -2167,7 +2167,7 @@ out with `)WRTM` / `)WRITE`, so the context-block size is a build-time constant
 derived from the declarations rather than a hand-maintained number.
 
 `EXRGP` (`TSS2.SYMB:108-121`) is the reconstructed word discussed at length in
-`/mnt/e/Dev/Ronny/TSS/CLAUDE.md` — it must precede `SAVEX`, which heads a
+`CLAUDE.md` — it must precede `SAVEX`, which heads a
 three-word float save area.
 
 ## 6.6 Memory management and program control
@@ -2199,7 +2199,7 @@ checks, each of which halts the system rather than write the wrong block.
 
 # 7. `TSS1.SYMB` — page zero, drivers, the scheduler, the swapper
 
-**Full path:** `/mnt/e/Dev/Ronny/TSS/src/TSS1.SYMB`
+**Full path:** `src/TSS1.SYMB`
 
 The largest and most conditional file: 4738 lines, **35% inside library-mark
 regions**, so many routines have two or four bodies. Everything below describes
@@ -2353,7 +2353,7 @@ first and signals the terminal on the second.
 | region | lines | what it is |
 |---|---|---|
 | page zero and vectors | 62-71 | the three trampolines, `MCTBL`, and the location-7 cold start (§6.1) |
-| `EXRG` reconstruction | 106-119 | `N10`-gated equate; see `/mnt/e/Dev/Ronny/TSS/CLAUDE.md` |
+| `EXRG` reconstruction | 106-119 | `N10`-gated equate; see `CLAUDE.md` |
 | `BSS` | 167-171 | **a macro, not a builtin** — it only advances the location counter |
 | `STSET` | 172-193 | set up a string descriptor (used by every command that parses arguments) |
 | `SAVE`/`UNSAVE` | 194-209 | register save/restore |

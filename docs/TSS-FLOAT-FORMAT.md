@@ -1,7 +1,6 @@
 # The floating-point format question — TBANG vs FPDAT
 
-**This file:** `/mnt/e/Dev/Ronny/TSS/docs/TSS-FLOAT-FORMAT.md`
-**Repository root:** `/mnt/e/Dev/Ronny/TSS`
+**This file:** `docs/TSS-FLOAT-FORMAT.md`
 
 **ANSWERED 2026-07-28** (§4, §6) — kept as a document because it took six
 wrong answers to get here and the reasoning is worth preserving. TSS 3.0 is a
@@ -40,7 +39,7 @@ garbage was gone.
 
 ### 3a. `TBANG` says 32-bit  [READ FROM MEMORY]
 
-`TBANG` (`/mnt/e/Dev/Ronny/TSS/src/TSS2.SYMB:1143-1155`) divides the elapsed
+`TBANG` (`src/TSS2.SYMB:1143-1155`) divides the elapsed
 tick count by four constants to get days / hours / minutes / seconds:
 
 ```
@@ -88,10 +87,10 @@ necessarily clobbers `K2`'s word 0. The day field alone is the discriminator.
 
 ### 3b. `FPDAT` and `NORM` say 48-bit  [READ FROM SOURCE]
 
-- `FPDAT` (`/mnt/e/Dev/Ronny/TSS/src/TSS5.SYMB:520`) does `STF TEMP,B` into a
+- `FPDAT` (`src/TSS5.SYMB:520`) does `STF TEMP,B` into a
   `DATA TEMP,3` buffer and unpacks **six** byte fields from **three** words.
   A 32-bit `STF` would write two words and leave the third stale.
-- `NORM` (`/mnt/e/Dev/Ronny/TSS/src/TSS2.SYMB:2230`) builds an `040000`-biased
+- `NORM` (`src/TSS2.SYMB:2230`) builds an `040000`-biased
   exponent in **T**. The 32-bit operations never touch T.
 - ND-60.096.01 Appendix E states that a genuine 32-bit machine uses `LDD`/`STD`
   for the float accumulator. TSS uses `STF`/`LDF` throughout.
@@ -110,7 +109,7 @@ necessarily clobbers `K2`'s word 0. The day field alone is the discriminator.
 > were wrong, and the patch was withdrawn before it was applied.**
 
 **Primary source — ND-110 RASK microcode**
-(`E:\Dev\Repos\Ronny\ND110Compile\ND110Compile\uCode\ND-110-RASK.uc`), via the
+(`$ND110COMPILE/uCode\ND-110-RASK.uc`), via the
 microcode owner:
 
 - `LDF1` (line 407) puts the word fetched from `ea` into **T** and issues the
@@ -126,7 +125,7 @@ each of those jumps to `LDF1`. **There is no entry point that starts at
 (lines 462-486) is byte-for-byte the same structure.
 
 **Primary source — NORD-10/S Reference Manual §2.5.2.6** (`ND-06.008.01`, in
-`E:\Dev\Ronny\NDInsight\Reference-Manuals\10\`). This is **TSS's own machine
+`$NDINSIGHT/Reference-Manuals/10\`). This is **TSS's own machine
 generation**, and it settles the question in prose:
 
 > "As an option, the NORD-10/S may be equipped with microprogram for 32-bit

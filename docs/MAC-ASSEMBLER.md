@@ -26,7 +26,7 @@ for the tool itself; this one is the analysis and defect-history companion.
 | `ND-60.096.01` MAC User's Guide | the language specification (in `E:\Dev\Ronny\NDInsight\Reference-Manuals\`) |
 | `ND-60.009.02` | MACM manual (DGET, `)9BYTT`, `)ULIST`, `)SYSDF`) |
 | `reference/ASYMB.SYMB`, `reference/BSYMB.SYMB` | the golden oracle: symbol-table dumps of the original 1978 TSS builds |
-| `reference/LIST1`–`LIST5` | the original assembly listings — the only archive artifact containing the original **instruction words** (still unused as an oracle; §8) |
+| `reference/LIST1`–`LIST5` | the original **list-stream** output: source echoed with macro expansions inserted and false conditionals dropped. **They contain no addresses and no assembled words** — verified 2026-07-28, zero address-like columns in all six files. Useful as a *which-lines-were-assembled* oracle, not an instruction-bit one |
 
 ---
 
@@ -799,7 +799,8 @@ project number.
 above except §6.5's dangling names left every symbol address in the golden
 dumps bit-identical. No instruction-bit oracle exists in the archive's
 symbol dumps — the only archive artifact holding original instruction words
-is `reference/LIST1`–`LIST5` (still unused, §8), and the only oracles that
+is nothing at all — `reference/LIST1`–`LIST5` were long assumed to hold
+them and do not (§8) — and the only oracles that
 caught these bugs were (a) exhaustive per-instruction encoding tests,
 (b) hand-verification on the real MAC, and (c) **running the OS** — the
 ultimate oracle, which found §6.1 and §6.6 as a dead console and a hung
@@ -861,9 +862,16 @@ stale assembler.
   gap (§6.4) shows the extraction can miss entries — a full re-audit against
   `fmac-1920c.prog` (and `f48mac-1408d.prog` for the 48-bit variant) is the
   right hygiene.
-- **Use `reference/LIST1`–`LIST5` as an instruction-bit oracle** — the only
-  archive artifact containing the original assembled words; a
-  listing-vs-produced word diff would close the oracle gap of §6.7.
+- ~~**Use `reference/LIST1`–`LIST5` as an instruction-bit oracle.**~~
+  **WITHDRAWN 2026-07-28 — the premise was false.** Those files carry no
+  addresses and no assembled words: `grep -cP '^\s*[0-7]{6}(\s+[0-7]{6})'`
+  returns **0** for all six. They are the list stream — source with macro
+  expansions inserted and false-conditional blocks removed. **No
+  instruction-bit oracle exists anywhere in the archive**, which is exactly
+  why §6.7 and §6.8 had to be caught by hand-written encoding tests.
+  What the listings *are* good for is confirming **which lines MAC
+  assembled**, including macro expansion order — that is how the `QOV1C`
+  search established mac-c and MAC assemble the identical 236 lines.
 - **`fmac-c`** — FMAC is MAC plus floats, `)9MOVE`, `)ULIST`, `)SYSDF`;
   since mac-c already implements the floats and `)9MOVE`, FMAC is a
   *configuration* of mac-c (a `--variant=mac|fmac|f48mac` switch selecting

@@ -787,8 +787,11 @@ project number.
   and cannot be corrected without diverging from the archive. It does not
   show at small elapsed times because dividing by a 2^1473-sized number
   underflows to zero and `DNZ` now correctly returns zero — but it means
-  the **day and hour counters can never advance**, which no short test can
-  observe. See `docs/HANDOFF-2026-07-26.md`.
+  the **time of day can never advance**, which no short test can observe.
+  **Confirmed 2026-07-28** by patching `K1` in memory: the day field then
+  advances and rolls over correctly. Full account, including why
+  `--fpp=32` cannot settle the underlying question, in
+  [`TSS-FLOAT-FORMAT.md`](TSS-FLOAT-FORMAT.md).
 
 ### 6.9 The moral
 

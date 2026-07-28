@@ -81,7 +81,7 @@ make build                                (mac-c + tests + all artifacts)
 At the `@` prompt, `HELP` lists the full ~60-command catalogue and
 `WHO-IS-ON` prints `1 SYSTEM`. **[VERIFIED]** live.
 
-Quality gates at this state: mac-c tests **695 passed / 0 failed**; golden
+Quality gates at this state: mac-c tests **718 passed / 0 failed**; golden
 oracle **679/693 exact matches (version A), 675/689 (version B)**, zero
 assembly errors; `verify_repo.sh` fully green.
 
@@ -104,7 +104,7 @@ Everything is driven by the top-level `Makefile` (run from WSL,
 **Recommended — one command, fully unattended:**
 
 ```bash
-make build      # once: mac-c + 695 tests + the TSS/MINIT artifacts
+make build      # once: mac-c + 718 tests + the TSS/MINIT artifacts
 make auto       # prepare + format + cold-start, driven over DAP; disc PERSISTS
 make login      # interactive: log in and use TSS
 ```

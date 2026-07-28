@@ -1,7 +1,7 @@
 # MAC-C — a host-side MAC assembler for the NORD TSS sources
 
 C99 reimplementation of the ND MAC assembler, written to rebuild the
-**NORD TSS 3.0** sources in `E:\Dev\Ronny\TSS\Sources\`.
+**NORD TSS 3.0** sources in `/mnt/e/Dev/Ronny/TSS/src/`.
 
 ## Build and run
 
@@ -23,7 +23,7 @@ directory before doing anything.
 |---|---|
 | `src/` | the assembler, split by section — see `src/mac_internal.h` |
 | `tests/` | `test_mac.c`, the unit-test binary's source |
-| `build/` | **all** generated output: objects, `mac-c`, `test_mac`. Disposable. |
+| `build/` | **all** generated output: objects, `mac`, `test_mac`. Disposable. |
 | `scripts/build/` | the artifact builds — `build_tss_assysa.sh`, `build_tss_drum.sh`, `build_minit.sh`, `run_tss.sh` |
 | `scripts/verify/` | oracle scoring and repo checks — `verify_repo.sh`, `check_coverage.sh`, `compare_asymb.sh`, `first_divergence.sh`, `cmp_syms.sh` |
 | `scripts/extract/` | regenerate `src/mac_permsym.c` from a real MAC/MACM binary |
@@ -34,7 +34,7 @@ assembler's own C source, `../src/` is the TSS MAC corpus it assembles.
 
 ## Current state — measured, not claimed
 
-**Unit tests: 695 passed, 0 failed.** `./scripts/verify/check_coverage.sh` reports
+**Unit tests: 718 passed, 0 failed.** `./scripts/verify/check_coverage.sh` reports
 *no uncovered public functions or implemented commands*.
 
 Instruction coverage is exhaustive rather than sampled:

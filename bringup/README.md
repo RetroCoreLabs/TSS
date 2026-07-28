@@ -10,7 +10,7 @@ make help          # lists every target with a one-line description
 **Fastest — one unattended command** (does format + cold-start, disc persists):
 
 ```bash
-make build         # once: mac-c + 695 tests + all TSS artifacts
+make build         # once: mac-c + 718 tests + all TSS artifacts
 make auto          # prepare + format + cold-start, driven over DAP, no typing
 make login         # then log in interactively
 ```

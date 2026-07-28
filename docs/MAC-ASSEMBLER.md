@@ -829,7 +829,7 @@ was wrong — in §6.7 the measurement was right and the binary was not.
    the macro-body address inside MAC's own memory image — not reproducible
    and not to be faked. Remember §6.7: this oracle proves addresses/counts
    only.
-2. **The unit-test suite** — `make test`: **695 passed, 0 failed**
+2. **The unit-test suite** — `make test`: **718 passed, 0 failed**
    **[VERIFIED by running it, 2026-07-23]**. Sections [1]–[15]; [1]–[1d]
    are the exhaustive encoding tests, [12] the overlay-snapshot guard,
    [14] undefined-operand + CLD, [15] the addend rule.

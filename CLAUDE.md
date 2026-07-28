@@ -34,7 +34,7 @@ wsl -d Ubuntu -- bash -lc "cd /mnt/e/Dev/Ronny/TSS/mac-c && make test"
 | command (from `mac-c/`) | purpose |
 |---|---|
 | `make` | build `build/mac` + `build/test_mac` (must stay warning-free under `-Wall -Wextra`) |
-| `make test` | run the whole suite (695 assertions, must be 0 failures) — builds `build/test_mac` but does NOT relink `build/mac`; run plain `make` before any `build_tss_*.sh` |
+| `make test` | run the whole suite (718 assertions, must be 0 failures) — builds `build/test_mac` but does NOT relink `build/mac`; run plain `make` before any `build_tss_*.sh` |
 | `./scripts/verify/check_coverage.sh` | assert every public function and every implemented `)` command is referenced by a test |
 | `./scripts/build/run_tss.sh` | assemble the five TSS parts directly |
 | `./scripts/build/build_tss_assysa.sh` | **the real end-to-end test** — runs the original `ASSYSA`/`ASSYSB` command streams; writes to `../Build/` |

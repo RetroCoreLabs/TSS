@@ -54,7 +54,7 @@ Each has its own README with the detail.
 | [`src/`](src/README.md) | the one clean, assemblable copy of the source |
 | [`reference/`](reference/README.md) | **the golden oracle** — the symbol dumps and listings the original assembler produced, used to prove any rebuild correct |
 | [`derived/`](derived/README.md) | files this project made: the extracted drum driver, and build variants including a NORD-10 + drum configuration |
-| [`mac-c/`](mac-c/README.md) | a MAC assembler in C — 695 unit tests, runs the 1973 build scripts |
+| [`mac-c/`](mac-c/README.md) | a MAC assembler in C — 718 unit tests, runs the 1973 build scripts |
 | [`Build/`](Build/README.md) | **output only**, disposable — everything the assembler produces |
 | [`bringup/`](bringup/README.md) | bring-up validation tools (the bring-up itself is `make help` at the root) |
 | [`docs/`](docs/README.md) | the documents above |
@@ -64,7 +64,7 @@ Each has its own README with the detail.
 
 ```bash
 cd mac-c
-make test                 # 695 unit tests
+make test                 # 718 unit tests
 ./mac-c/scripts/build/build_tss_assysa.sh     # run the real ASSYSA and ASSYSB scripts
 ./mac-c/scripts/verify/compare_asymb.sh Build/ASYMB.SYMB ../reference/ASYMB.SYMB
 ```

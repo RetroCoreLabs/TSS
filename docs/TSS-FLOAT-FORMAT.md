@@ -3,9 +3,11 @@
 **This file:** `/mnt/e/Dev/Ronny/TSS/docs/TSS-FLOAT-FORMAT.md`
 **Repository root:** `/mnt/e/Dev/Ronny/TSS`
 
-One unresolved question about the original system, isolated here because it
-keeps being rediscovered, keeps being "explained", and every explanation so
-far has been wrong. **Nothing in this document is a defect in `mac-c`.** Read
+**ANSWERED 2026-07-28** (§4, §6) — kept as a document because it took six
+wrong answers to get here and the reasoning is worth preserving. TSS 3.0 is a
+**48-bit** floating-point program, and its `TBANG` clock constants were in the
+2-word 32-bit format: **wrong when the system was built in 1973/78**, not
+wrong in this reconstruction. **Nothing in this document is a defect in `mac-c`.** Read
 §5 before changing any code because of it.
 
 ---
@@ -13,8 +15,12 @@ far has been wrong. **Nothing in this document is a defect in `mac-c`.** Read
 ## 1. The question, in one line
 
 **Was NORD TSS 3.0 built for a 32-bit floating-point processor or a 48-bit
-one?** Its own source answers both ways, and the two answers are load-bearing
-in different routines.
+one?** Its own source appeared to answer both ways, and the two answers are
+load-bearing in different routines.
+
+**Answer: 48-bit.** `LDF`/`STF` — which TSS uses throughout — always move
+three words, on every machine generation from the NORD-10/S to the ND-120.
+The `TBANG` constants are simply wrong. Evidence in §4; consequences in §6.
 
 ## 2. Why it matters: the clock is frozen
 
@@ -89,8 +95,13 @@ necessarily clobbers `K2`'s word 0. The day field alone is the discriminator.
   exponent in **T**. The 32-bit operations never touch T.
 - ND-60.096.01 Appendix E states that a genuine 32-bit machine uses `LDD`/`STD`
   for the float accumulator. TSS uses `STF`/`LDF` throughout.
+- **Decisive, and for the right machine generation:** the NORD-10/S Reference
+  Manual §2.5.2.6 (`ND-06.008.01`) says the 32-bit option replaces the
+  microprogram for exactly six instructions — **`FAD`, `FSB`, `FMU`, `FDV`,
+  `NLZ`, `DNZ`** — and adds "the T register is not affected by 32-bit Floating
+  Point operations". `LDF` and `STF` are **not** on that list. See §4.
 
-## 4. `LDF`/`STF` are always 3-word — settled by microcode
+## 4. `LDF`/`STF` are always 3-word — settled by manual and microcode
 
 > **[RETRACTION 2026-07-28]** This section previously argued that nd100x's
 > FPP32 mode was internally inconsistent, because `ndfunc_stf`/`ndfunc_ldf`
@@ -114,9 +125,41 @@ each of those jumps to `LDF1`. **There is no entry point that starts at
 `LDD1`**, which is what a 2-word `A,D` load would require. ND-120 DELILAH-L
 (lines 462-486) is byte-for-byte the same structure.
 
+**Primary source — NORD-10/S Reference Manual §2.5.2.6** (`ND-06.008.01`, in
+`E:\Dev\Ronny\NDInsight\Reference-Manuals\10\`). This is **TSS's own machine
+generation**, and it settles the question in prose:
+
+> "As an option, the NORD-10/S may be equipped with microprogram for 32-bit
+> floating point format instead of the standard 48-bit format... **The
+> instructions affected are: FAD, FSB, FMU, FDV, NLZ, DNZ**"
+>
+> "In CPU registers, bits 0-15 of the mantissa are in the D register, bits
+> 16-21 and exponent and sign are in the A register. These two registers
+> together are defined as the 32-bit floating accumulator. **The T register is
+> not affected by 32-bit Floating Point operations.**"
+
+**`LDF` and `STF` are not on that list.** The option replaces the microprogram
+for six arithmetic/conversion instructions and nothing else. The manual also
+states the two formats' memory footprints directly: 48-bit occupies "three
+16-bit core locations, addressed by the address of the exponent part"
+(§2.5.2.5), 32-bit occupies "two 16-bit memory locations" (§2.5.2.6).
+
 **So `LDF`/`STF` are hardwired to the 3-word `T/A/D` layout, and nd100x is
-correct as it stands.** The proposed `CurrentFPPType` branch has no counterpart
-in either microcode and would have made nd100x diverge from real hardware.
+correct as it stands** — on the NORD-10/S by manual, and on the ND-110/ND-120
+by microcode. The proposed `CurrentFPPType` branch has no counterpart in
+either and would have made nd100x diverge from real hardware.
+
+**nd100x branches on exactly those six instructions and no others** — `fad`,
+`fsb`, `fmu`, `fdv`, `nlz`, `dnz`. Its implementation matches the manual
+instruction for instruction.
+
+> **One discrepancy, noted not resolved.** The manual says the 32-bit exponent
+> is "biased with 2^8" (256); nd100x uses `FP32_BIAS 257`, commented as
+> "derived from and validated against a live 32-bit-FPP ND-110 running RASK
+> microcode... (not the manual's 256)". Decoding `K1` with bias **256** yields
+> exactly `4320000.0` (§3a), which is evidence that MAC encoded to the manual's
+> value. Manual, MAC and a live ND-110 need not agree; this is flagged for the
+> nd100x owner rather than judged here.
 
 **The resolution of the apparent contradiction:** `LDF`/`STF` *are* the 48-bit
 accumulator's load/store. A 32-bit-FPP machine uses **`LDD`/`STD`** for its
@@ -200,17 +243,25 @@ likely."*
    *seconds* can run for years that way, and the operator sets the date at
    every cold start anyway.
 
-**The remaining caveat, and it is a real one.** RASK is ND-110 microcode and
-DELILAH-L is ND-120. **TSS 3.0 is 1973, for the NORD-1 / NORD-10** — earlier
-machines than either. The microcode owner was explicit about this limit: *"I
-can't say whether some other ND-100 CPU variant justifies it; I have no
-microcode or manual text here that defines a 2-word LDF/STF."* Nothing yet
-excludes a NORD-10-era machine having behaved differently, so reading 3 is
-**strongly favoured, not proven**.
+**The generational caveat is now closed.** It previously read: *"RASK is
+ND-110 and DELILAH-L is ND-120, while TSS 3.0 is 1973 for the NORD-1 /
+NORD-10 — nothing yet excludes a NORD-10-era machine having behaved
+differently."* The NORD-10/S Reference Manual §2.5.2.6 (§4) is that machine's
+own documentation, and it names the six instructions the 32-bit option
+affects. `LDF`/`STF` are not among them.
 
-**What would close it:** NORD-1 / NORD-10-era microcode or an instruction
-manual of that generation defining `LDF`/`STF`. Failing that, an original TSS
-site report of whether `DATE` advanced would settle it empirically.
+**The question is therefore answered.** TSS 3.0 is a 48-bit floating-point
+program running on a machine whose `LDF`/`STF` always move three words, and
+its `TBANG` constants are two-word 32-bit values. They were **wrong when the
+system was built**, and the archived 1978 system's time of day could not have
+advanced on real hardware any more than it does under emulation.
+
+What is left is not a question about the machine but about the history: *how*
+the wrong constants got there and why it went unnoticed for years. The
+`[`-directive width in the 1973 MAC that first assembled this source is the
+obvious place to look, and the honest answer today is that nobody knows. An
+original TSS site report of whether `DATE` ever advanced would be a pleasant
+confirmation but is no longer needed to decide the technical point.
 
 **What is already excluded:** any further `--fpp=32` experiment. TSS is not a
 32-bit program, so running it as one mixes 3-word load/store with 2-word
@@ -230,7 +281,7 @@ Recorded because the pattern is the point, not the individual errors.
 | "`-F48` rebuild does not fix the date, so constants are not the cause" | **retracted** | false negative: the rebuild shifted every address after the first `[` |
 | "nd100x's FPP32 is internally inconsistent; `LDF`/`STF` should move 2 words" | **retracted** | over-read one manual sentence about the 48-bit accumulator as a statement about `LDF`'s base. RASK and DELILAH-L microcode show `LDF`/`STF` hardwired 3-word. A 32-bit machine uses `LDD`/`STD`. The proposed patch would have made nd100x diverge from real hardware; withdrawn before it was applied |
 | "the constants are the cause" (§3a) | **confirmed** | one variable patched in memory, one observable, otherwise untouched system |
-| "TSS is a 48-bit program and the constants were always wrong" (§6.3) | **strongly favoured** | microcode settles `LDF`/`STF`; the open edge is that RASK/DELILAH are ND-110/ND-120 while TSS is NORD-10-era |
+| "TSS is a 48-bit program and the constants were always wrong" (§6.3) | **ANSWERED** | NORD-10/S Reference Manual §2.5.2.6 names the six instructions the 32-bit option affects; `LDF`/`STF` are not among them. TSS's own machine generation, in prose |
 
 Every retracted entry was reasoned from source or from a correlation. The one
 that held was a single-variable experiment on a running machine.

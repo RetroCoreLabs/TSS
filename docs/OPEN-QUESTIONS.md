@@ -24,15 +24,16 @@ commands exercised with 87 of 89 invocations returning.
 consequence is that the time of day cannot advance. Confirmed by patching `K1`
 in memory; **not** a `mac-c` defect, and not to be "fixed" there.
 
-**Largely answered 2026-07-28.** ND-110 RASK and ND-120 DELILAH-L microcode
-hardwire `LDF`/`STF` to 3 words, and TSS uses them throughout — so TSS is a
-48-bit program and its `TBANG` constants were **wrong in the 1978 build too**.
-The archived system's clock could not have advanced on real hardware either.
+**ANSWERED 2026-07-28 — no longer an open question.** The NORD-10/S Reference
+Manual §2.5.2.6 (`ND-06.008.01`, TSS's own machine generation) lists the
+instructions the 32-bit FPP option affects: **`FAD`, `FSB`, `FMU`, `FDV`,
+`NLZ`, `DNZ`**. `LDF`/`STF` are not among them, and ND-110 RASK / ND-120
+DELILAH-L microcode agree. TSS uses `STF`/`LDF` throughout, so it is a 48-bit
+program and its `TBANG` constants were **wrong in the 1978 build too** — the
+archived system's clock could not have advanced on real hardware either.
 
-What is still open is only the generational edge: RASK/DELILAH are
-ND-110/ND-120 while TSS 3.0 is NORD-1 / NORD-10. Closing it needs
-NORD-10-era microcode or an instruction manual of that generation — or an
-original site report of whether `DATE` ever advanced.
+Remaining is historical curiosity only: how the wrong constants got there.
+Kept in this list solely as a pointer to the document.
 
 ## 2. `QOV1C` — a one-word oracle mismatch
 
@@ -67,11 +68,34 @@ An earlier root cause for this was **retracted** — see
 `/mnt/e/Dev/Ronny/TSS/docs/TSS-COMMAND-VALIDATION.md` PART III §4. Not
 re-investigated since. Treat the retracted analysis as untrusted.
 
-## 5. `LOAD-SYSTEM` does not return
+## 5. `LOAD-SYSTEM` does not return — mechanism confirmed, fix identified
 
-The only command that never comes back. The command itself is correct; the
-working disc carries no bootstrap for it to reload. This needs a **different
-build variant**, not a code fix. See `TSS-COMMAND-VALIDATION.md` PART III §2.
+The only command that never comes back, and the reason is now read from
+source rather than guessed. `LOADV` (`/mnt/e/Dev/Ronny/TSS/src/TSS5.SYMB:604-626`,
+`"CDC`-only):
+
+```
+L2,  SAX 0; SAT 0; SAA 1; JPL I (SDISK     % read disc page 0 -> core 0
+     IOF; RCLR DP                          % P := 0, execute what was loaded
+```
+
+`RCLR DP` zeroes the program counter, so the next instruction executed is
+`core[0]` — which `SDISK` has just loaded from **disc page 0**. On a working
+system that page holds `DKRST` (`JMP *+2; CORLD`), which pulls page 2,
+`DBOOT` reads the coreload address out of `core[1]`, reloads core and jumps
+through `0301`. No front-panel intervention is involved.
+
+**Our MINIT-formatted disc has never had a bootstrap written to page 0**, so
+`RCLR DP` transfers control to whatever is there. That is the whole defect:
+the command is correct and the disc is unprepared.
+
+**The fix is to write the boot sector**, not to change any code — establish
+what `DKRST`/`CORLD`/`DBOOT` expect at pages 0 and 2 and at `core[1]`, and
+have the bring-up write it. Deciding whether that belongs in MINIT, in a
+build variant, or in a separate bring-up step is the first question.
+
+See also `TSS-COMMAND-VALIDATION.md` PART III §2 and
+`TSS-PSEUDOCODE.md` §3.9.
 
 ## 6. nd100x items
 

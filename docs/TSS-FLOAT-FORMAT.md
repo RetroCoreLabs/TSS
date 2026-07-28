@@ -90,44 +90,50 @@ necessarily clobbers `K2`'s word 0. The day field alone is the discriminator.
 - ND-60.096.01 Appendix E states that a genuine 32-bit machine uses `LDD`/`STD`
   for the float accumulator. TSS uses `STF`/`LDF` throughout.
 
-## 4. Why `--fpp=32` cannot settle it
+## 4. `LDF`/`STF` are always 3-word — settled by microcode
 
-nd100x gained `--fpp=32|48`. Under 32-bit the date moves but is garbage and
-**non-monotonic** (`26 JULY 1301:01` -> `40 JULY 1004:144` -> `25 JULY
-1200:00` -> `26 JULY 1301:01`), with `TIME-USED` back to negative seconds.
+> **[RETRACTION 2026-07-28]** This section previously argued that nd100x's
+> FPP32 mode was internally inconsistent, because `ndfunc_stf`/`ndfunc_ldf`
+> move three words while the 32-bit arithmetic reads two. A patch was proposed
+> to make them branch on `CurrentFPPType`. **Both the diagnosis and the patch
+> were wrong, and the patch was withdrawn before it was applied.**
 
-That result proves nothing, because **nd100x's FPP32 mode is not
-self-consistent.** From its source:
+**Primary source — ND-110 RASK microcode**
+(`E:\Dev\Repos\Ronny\ND110Compile\ND110Compile\uCode\ND-110-RASK.uc`), via the
+microcode owner:
 
-| function | file:line | honours `CurrentFPPType`? |
-|---|---|---|
-| `ndfunc_fad` / `fsb` / `fmu` / `fdv` | `src/cpu/cpu_instr.c:890, 922, 954, 986` | **yes** — 32-bit path reads two operand words, leaves `gT` untouched |
-| `ndfunc_nlz` / `ndfunc_dnz` | `src/cpu/cpu_instr.c:294, 302` | **yes** |
-| `ndfunc_stf` | `src/cpu/cpu_instr.c:637-643` | **no** — writes three words unconditionally |
-| `ndfunc_ldf` | `src/cpu/cpu_instr.c:681-688` | **no** — reads three words unconditionally |
+- `LDF1` (line 407) puts the word fetched from `ea` into **T** and issues the
+  read of `ea+1`, then jumps to `LDD1`;
+- `LDD1` (line 402) takes the previous word into **A** and issues the read of
+  `ea+2`;
+- the fall-through (line 403) takes the last word into **D**.
 
-The precise consequence, which is what makes the mode unusable as evidence:
+All 32 `LDF` addressing-mode dispatch slots (lines 11647-11690) funnel into
+that one chain — 12 to `LDF1`, 8 to `LDFI`, 8 to `LDFIX`, 4 to `LDFXB`, and
+each of those jumps to `LDF1`. **There is no entry point that starts at
+`LDD1`**, which is what a 2-word `A,D` load would require. ND-120 DELILAH-L
+(lines 462-486) is byte-for-byte the same structure.
 
-- in 32-bit mode the accumulator is the **`A,D` pair** (`gT` untouched);
-- `FAD`/`FSB`/`FMU`/`FDV` read their memory operand from **`EA+0, EA+1`**;
-- `STF` writes `gT`->`EA+0`, `gA`->`EA+1`, `gD`->`EA+2`, so it stores the
-  accumulator at **`EA+1, EA+2`** — and `EA+0` gets `gT`, which the 32-bit
-  operations never write, so it is stale;
-- `LDF` reloads `gA,gD` from `EA+1, EA+2`, agreeing with `STF`.
+**So `LDF`/`STF` are hardwired to the 3-word `T/A/D` layout, and nd100x is
+correct as it stands.** The proposed `CurrentFPPType` branch has no counterpart
+in either microcode and would have made nd100x diverge from real hardware.
 
-So `LDF` and `STF` are self-consistent with each other, but **disagree with
-the arithmetic by exactly one word**. A float stored with `STF` and then used
-as an `FDV` operand is misaligned. That is sufficient on its own to explain
-the non-monotonic garbage in the table above, without any of it telling us
-anything about TSS.
+**The resolution of the apparent contradiction:** `LDF`/`STF` *are* the 48-bit
+accumulator's load/store. A 32-bit-FPP machine uses **`LDD`/`STD`** for its
+`A,D` accumulator — exactly what ND-60.096.01 Appendix E says — and that pair
+addresses `ea`/`ea+1`, matching the arithmetic's operand layout. Two register
+sets, two instruction pairs, no inconsistency. The error was expecting `LDF` to
+serve a role it never had, from over-reading one manual sentence ("a further
+register (T) and memory location (ea+2) are used"), which describes the 48-bit
+accumulator and not a rebasing of `LDF`.
 
-**What this does not claim.** Whether real 32-bit-FPP hardware moved two words
-in `LDF`/`STF`, or used `LDD`/`STD` instead and left `LDF`/`STF` to the 48-bit
-option, is exactly the open question in §6 — it is not settled here, and
-"nd100x's FPP32 does not match real hardware" is *not* what this section
-says. The defensible claim is narrower and provable from their source alone:
-**the mode is internally inconsistent**, so no experiment run under it can be
-evidence about TSS either way. Reported upstream on that basis.
+**What `--fpp=32` results still cannot do.** Under 32-bit the date moves but is
+garbage and non-monotonic (`26 JULY 1301:01` -> `40 JULY 1004:144` -> `25 JULY
+1200:00` -> `26 JULY 1301:01`), with `TIME-USED` back to negative seconds. That
+is now explained rather than excused: TSS uses `STF`/`LDF` throughout, so
+running it under a 32-bit FPP mixes a 3-word load/store with 2-word arithmetic
+*in the program's own terms*. **TSS is simply not a 32-bit program**, and
+running it as one produces garbage for that reason. See §6.
 
 ## 5. Attribution — do NOT "fix" this in `mac-c`
 
@@ -153,44 +159,63 @@ flowchart TD
     Q["Which FPP was TSS 3.0 built for?"]
     A["TBANG constants<br/>2 words, 32-bit format<br/>decode exactly to 4.32e6 / 1.8e5"]
     B["FPDAT: STF into DATA TEMP,3<br/>unpacks 6 fields from 3 words<br/>NORM biases exponent in T"]
-    C["32-bit FPP"]
-    D["48-bit FPP"]
-    E["UNRESOLVED<br/>no evidence yet distinguishes<br/>the three readings below"]
+    C["32-bit FPP<br/>uses LDD/STD"]
+    D["48-bit FPP<br/>uses LDF/STF"]
+    E["RASK + DELILAH-L microcode:<br/>LDF/STF are hardwired 3-word T/A/D<br/>no 2-word entry point exists"]
+    F["TSS uses STF/LDF throughout<br/>-> a 48-bit program<br/>-> the constants were wrong in 1978"]
 
     Q --> A --> C
     Q --> B --> D
     C --> E
     D --> E
+    E --> F
 
     classDef src fill:#E3F2FD,stroke:#0D47A1,color:#0D47A1
     classDef mid fill:#E0F7FA,stroke:#00838F,color:#00838F
     classDef open fill:#FFF3E0,stroke:#E65100,color:#E65100
+    classDef ok fill:#E8F5E9,stroke:#2E7D32,color:#2E7D32
     class A,B src
     class C,D mid
-    class Q,E open
+    class Q open
+    class E,F ok
 ```
 
-Three readings remain open, and **no evidence currently distinguishes them**:
+§6 previously listed three readings and stated in advance what each possible
+answer would mean. **The microcode answered that question on 2026-07-28** (§4),
+and it answered the branch that was written down ahead of time: *"If they
+always move three, then the constants were always wrong and reading 3 is
+likely."*
 
-1. The 1973 source predates the machine it was finally built for, and the
-   constants were never revisited.
-2. The `[` directive's width differed between MAC builds, so the 1978
-   assembler emitted what its target machine wanted.
-3. It was already broken in 1978 and nobody noticed — a timesharing system
-   that boots, logs in and bills in seconds can run for years with a frozen
-   day counter, and the operator sets the date at every cold start anyway.
+1. ~~The 1973 source predates the machine it was finally built for.~~ Still
+   possible as *history* — it may well be how the constants came to be wrong —
+   but it is no longer a competing account of the machine.
+2. ~~The `[` directive's width differed between MAC builds.~~ Weak. It would
+   still leave `FPDAT` and `NORM` requiring 48-bit while the constants assume
+   otherwise, in a program assembled by one MAC.
+3. **It was already broken in 1978 and nobody noticed — now the strongly
+   favoured reading.** TSS uses `STF`/`LDF` throughout, those instructions are
+   hardwired 3-word, so TSS is a 48-bit program and its `TBANG` constants were
+   simply wrong. The archived system's time of day could not have advanced on
+   real hardware either. A timesharing system that boots, logs in and bills in
+   *seconds* can run for years that way, and the operator sets the date at
+   every cold start anyway.
 
-**What would settle it:** a primary source on the ND-100's `LDF`/`STF` word
-count per FPP option. If `LDF`/`STF` move two words on a 32-bit machine, then
-TSS is a 32-bit program, `FPDAT` was always broken, and reading 1 is likely.
-If they always move three, then the constants were always wrong and reading 3
-is likely. This is something to **read**, not to reason about — start with
-`E:\Dev\Ronny\NDInsight\Reference-Manuals\` and the `MAC.BPUN` disassembly
-route described in `/mnt/e/Dev/Ronny/TSS/docs/MAC-ASSEMBLER.md`.
+**The remaining caveat, and it is a real one.** RASK is ND-110 microcode and
+DELILAH-L is ND-120. **TSS 3.0 is 1973, for the NORD-1 / NORD-10** — earlier
+machines than either. The microcode owner was explicit about this limit: *"I
+can't say whether some other ND-100 CPU variant justifies it; I have no
+microcode or manual text here that defines a 2-word LDF/STF."* Nothing yet
+excludes a NORD-10-era machine having behaved differently, so reading 3 is
+**strongly favoured, not proven**.
 
-**What would not settle it:** any further emulator experiment, until nd100x's
-FPP32 mode moves two words in `LDF`/`STF`. Until then the only faithful
-configuration is 48-bit, under which the time of day cannot advance.
+**What would close it:** NORD-1 / NORD-10-era microcode or an instruction
+manual of that generation defining `LDF`/`STF`. Failing that, an original TSS
+site report of whether `DATE` advanced would settle it empirically.
+
+**What is already excluded:** any further `--fpp=32` experiment. TSS is not a
+32-bit program, so running it as one mixes 3-word load/store with 2-word
+arithmetic in the program's own terms and can only produce garbage. The 48-bit
+configuration is the faithful one, and under it the time of day cannot advance.
 
 ## 7. History of wrong answers to this question
 
@@ -203,7 +228,9 @@ Recorded because the pattern is the point, not the individual errors.
 | "the clock runs 10x slow — an emulator bug" | **retracted** | measured the instrumented rig, not the system |
 | "FP width is ruled out by experiment" | **retracted** | run before the NLZ/DNZ fix (which masked both arms) *and* against the inconsistent FPP32 mode |
 | "`-F48` rebuild does not fix the date, so constants are not the cause" | **retracted** | false negative: the rebuild shifted every address after the first `[` |
+| "nd100x's FPP32 is internally inconsistent; `LDF`/`STF` should move 2 words" | **retracted** | over-read one manual sentence about the 48-bit accumulator as a statement about `LDF`'s base. RASK and DELILAH-L microcode show `LDF`/`STF` hardwired 3-word. A 32-bit machine uses `LDD`/`STD`. The proposed patch would have made nd100x diverge from real hardware; withdrawn before it was applied |
 | "the constants are the cause" (§3a) | **confirmed** | one variable patched in memory, one observable, otherwise untouched system |
+| "TSS is a 48-bit program and the constants were always wrong" (§6.3) | **strongly favoured** | microcode settles `LDF`/`STF`; the open edge is that RASK/DELILAH are ND-110/ND-120 while TSS is NORD-10-era |
 
 Every retracted entry was reasoned from source or from a correlation. The one
 that held was a single-variable experiment on a running machine.

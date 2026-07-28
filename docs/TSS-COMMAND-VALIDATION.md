@@ -2401,17 +2401,127 @@ time-of-day display did not move a second.
 so `TBANG`'s decomposition is working. What is lost is the elapsed
 contribution to the *absolute* clock.
 
-**Inferred, NOT established:** this is consistent with the latent constant
-issue recorded in PART III §3 and in the handoff — TSS's `[` constants are
-2-word (32-bit) while every consumer is 48-bit, so `K1`'s word0 `042701` reads
-as exponent 1473 rather than 23, and a divisor of that size drives the day and
-hour terms to zero. That would freeze the high-order fields exactly as seen.
-**It has not been tested**, the minute field would need explaining separately,
-and it must not be written up as the cause until it is. The discriminating
-experiment is to patch `K1`-`K4` in memory to their 48-bit equivalents and
-re-read `DATE` after a known interval.
+**CONFIRMED 2026-07-28 by direct experiment — see PART VIII.** The cause is
+the constant format: `K1`-`K4` are 2-word (32-bit) floats, `FDV` reads a
+3-word (48-bit) operand, every quotient underflows to zero, and all four
+fields stay at whatever `DEFINE-DATE` set.
 
 **Note that this defect was invisible before.** While the day field was
 randomly garbage on every read it *looked* like it was changing. Fixing the
 loud bug is what made the quiet one observable — and the same is likely true
 of whatever sits under this one.
+
+---
+
+# PART VIII. THE FROZEN CLOCK — CONFIRMED CAUSE, 2026-07-28
+
+## VIII.1 The measurement chain
+
+Three experiments, each isolating one variable, in the order run.
+
+**1. Is the input moving?** (`klok_probe.py`) `KLOK` at `000016`/`000017`
+advances steadily at ~350 ticks/s and never goes backwards. Over 134 seconds
+the elapsed count reached **6736 ticks**, which at the nominal 50 Hz is
+2 min 14 s — so `DATE` should have read `1202:14`. It read `1200:00`.
+
+The input moves. The arithmetic discards it. That alone rules out the clock
+interrupt and moves the fault downstream, into `TBANG`.
+
+(The ~350 ticks/s rather than 50 is the instruction-locked RTC, as the nd100x
+team described. It is not a defect and is not relevant here — only the
+*monotonic advance* matters.)
+
+**2. Locate `K1` — by search, not by arithmetic.** Reading `042701` out of
+memory near `RDATE` put `K1` at **`022650`**. Arithmetic off `RDATE=022700`
+minus eight words predicts `022670` — **wrong by 16 words**, because a
+16-word table sits between `K4` and `RDATE`. This is the fourth time
+hand-derived addressing has failed in this project; the constants were found
+by pattern search instead.
+
+**3. Patch one constant.** `K1` overwritten in memory with a well-formed
+48-bit float of **3000** (`040014 135600 000000`) — deliberately small, so
+the "days" term ticks every 3000 ticks (~9 s) instead of every 4.32e6
+(~3.4 h) and the effect is observable in one session.
+
+```
+BEFORE   DATE IS 25 JULY 2026   1200:00   (x3, frozen)
+PATCH    K1 := 040014 135600 000000       (readback confirmed)
+AFTER    DATE IS 28 JULY 2026   1200:00
+         DATE IS 29 JULY 2026   1200:00
+         DATE IS 30 JULY 2026   1200:00
+         DATE IS 31 JULY 2026   1200:00
+         DATE IS  1 AUGUST 2026 1200:00   <- month rollover works
+         DATE IS  2 AUGUST 2026 1200:00
+```
+
+The day field advances the moment `K1` is well-formed, and the calendar
+rollover logic is correct. **The cause is the constant format.** The
+hour/minute/second fields stay frozen because `K2`-`K4` were left alone —
+a 48-bit `K1` needs three words where two were reserved, so the patch
+necessarily clobbers `K2`'s word0. That was accepted: the day field alone is
+the discriminator.
+
+## VIII.2 Why `--fpp=32` does not settle it
+
+nd100x gained `--fpp=32|48`. Re-running the date probe under both widths, now
+that the NLZ/DNZ defect is out of the way:
+
+| width | result |
+|---|---|
+| 48 | `25 JULY 2026 1200:00` on all six reads — frozen, stable |
+| 32 | `26 JULY 1301:01` -> `40 JULY 1004:144` -> `25 JULY 1200:00` -> `26 JULY 1301:01` — moving, **non-monotonic, garbage**, and `TIME-USED` back to `-11056 SECS` |
+
+Neither width produces a correct clock, and **the 32-bit run cannot be used as
+evidence either way**, because nd100x's FPP32 mode is internally inconsistent.
+Read from its source:
+
+- `src/cpu/cpu_instr.c` — `ndfunc_fad`, `ndfunc_fsb`, `ndfunc_fmu`,
+  `ndfunc_fdv`, `ndfunc_nlz`, `ndfunc_dnz` all branch on `CurrentFPPType` and
+  read **two** operand words in the 32-bit path (`ndfunc_fdv:1007-1012`,
+  with `gT` left untouched).
+- `ndfunc_stf` (`:637-643`) and `ndfunc_ldf` (`:681-688`) **do not branch at
+  all** — they unconditionally move **three** words.
+
+So under `--fpp=32` the arithmetic is 32-bit while `LDF`/`STF` remain 48-bit.
+That machine never existed. This is worth reporting upstream; it is an
+observation from their source, not a demand.
+
+**This also retires my earlier "FP width is ruled out" claim properly.** That
+experiment was run *before* the NLZ/DNZ fix, so the dominant defect masked
+both arms — and it was run against an FPP32 mode that is not self-consistent.
+It was worthless twice over. What replaced it is the `K1` patch: one variable,
+one observable, on an otherwise untouched system.
+
+## VIII.3 Attribution — this is NOT a `mac-c` defect
+
+The 1978 original had the same 2-word constants:
+
+- `TBANG=022611` and `RDATE=022700` in **both** `reference/ASYMB.SYMB` and our
+  `Build/ASYMB.SYMB` — a 55-word span, identical.
+- Our build's `K1`-`K4` occupy eight words, read directly out of memory at
+  `022650`-`022657`, not inferred.
+- Three-word constants would push `RDATE` to `022704`. The golden dump says
+  `022700`.
+
+`mac-c` reproduces the archived binary faithfully. Nothing here should be
+"fixed" in the assembler — doing so would diverge from the artifact this
+project exists to reconstruct.
+
+## VIII.4 What remains genuinely unknown
+
+There is a real tension in the original system, and it should not be papered
+over:
+
+- `TBANG`'s constants are in the **2-word** format, which suits a 32-bit FPP.
+- `FPDAT` (`src/TSS5.SYMB:520`) does `STF TEMP,B` into a `DATA TEMP,3` buffer
+  and unpacks **six** byte fields from **three** words, which suits a 48-bit
+  FPP.
+
+Both are read from the source; they point opposite ways. Possible readings:
+the 1973 source predates the machine it was finally built for; the `[` format
+differed between MAC builds; or one of the two routines was already broken in
+1978 and nobody noticed, since a timesharing system that boots and bills in
+seconds can run for years with a wrong day counter. **No evidence currently
+distinguishes these.** Settling it needs a primary source on the ND-100
+`LDF`/`STF` word count per FPP option, which is the next thing to read rather
+than reason about.

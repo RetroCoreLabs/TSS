@@ -22,7 +22,7 @@ HERE=$(cd "$(dirname "$0")/../.." && pwd)
 ROOT=$(cd "$HERE/.." && pwd)
 BUILD="$ROOT/Build/drum"
 INPUT="$ROOT/derived/ASSYS-DRUM-N10-MAC-INPUT.SYMB"
-MAC="$HERE/build/mac-c"
+MAC="$HERE/build/mac"
 
 mkdir -p "$BUILD"
 # Clean previous drum outputs (this whole subfolder is disposable).

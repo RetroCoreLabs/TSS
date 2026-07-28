@@ -2552,7 +2552,7 @@ sector to a physical address via `DKADR` **before** loading LBA, so the
 LBA value arriving at the device is already physical. The device therefore
 treats LBA directly as the linear physical sector (`cdc_lba_to_sector` is
 the identity); DKADR is applied once, at overlay-write time, by
-`mac-c -c` (mac-c `cdc_dkadr`, §5.4-5.5). **Do not add DKADR in the
+`mac -c` (mac-c `cdc_dkadr`, §5.4-5.5). **Do not add DKADR in the
 device** — that double-converts. Backing image is linear: sector `S` at
 bytes `[S*512, +512)`, raw big-endian ND word order.
 

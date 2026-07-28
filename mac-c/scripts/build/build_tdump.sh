@@ -27,7 +27,7 @@ set -u
 HERE=$(cd "$(dirname "$0")/../.." && pwd)
 ROOT=$(cd "$HERE/.." && pwd)
 BUILD="$ROOT/Build/tdump"
-MAC="$HERE/build/mac-c"
+MAC="$HERE/build/mac"
 
 mkdir -p "$BUILD"
 find "$BUILD" -maxdepth 1 -type f -delete

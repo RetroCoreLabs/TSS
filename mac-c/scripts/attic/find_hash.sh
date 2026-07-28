@@ -10,7 +10,7 @@ PRE="-m CDC -m MACF -m DIAB -m K14 -m TEL4 -d IOT=160000 -d ACT=400 \
 -d 9TTI=40 -d 9TTO=40 -d 9FP=200 -d 9CR=5 -d NOPEN=16"
 for f in ../src/TSS1.SYMB ../src/TSS2.SYMB ../src/TSS3.SYMB \
          ../src/TSS4.SYMB ../src/TSS5.SYMB; do
-    build/mac-c $PRE "$f" -u >/dev/null 2>/tmp/one.txt
+    build/mac $PRE "$f" -u >/dev/null 2>/tmp/one.txt
     if grep -q '^UNDEFINED: ##$' /tmp/one.txt; then
         echo "bare '##' produced by $f"
     fi

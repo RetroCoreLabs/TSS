@@ -14,7 +14,7 @@ PRE="-m CDC -m MACF -m DIAB -m K14 -m TEL4 -d IOT=160000 -d ACT=400 \
 
 probe () {
     { sed -n "1,${1}p" "$SRC" | tr -d '\r'; echo "PX=*"; echo ')LINE'; } > /tmp/p.symb
-    build/mac-c $PRE /tmp/p.symb -l /tmp/p.list 2>/dev/null
+    build/mac $PRE /tmp/p.symb -l /tmp/p.list 2>/dev/null
     v=$(grep -E '^ *PX=' /tmp/p.list | tr -d ' \r' | cut -d= -f2)
     echo "$v"
 }

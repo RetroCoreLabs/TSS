@@ -5,8 +5,11 @@ and writing it back only on a clean shutdown. This makes disc writes survive any
 stop (SIGINT/crash/kill), matching how SMD/floppy already behave."""
 import sys
 
-CDC = "/home/ronny/repos/nd100x/src/devices/cdc/deviceCDC.c"
-DRUM = "/home/ronny/repos/nd100x/src/devices/drum/deviceDrum.c"
+import os
+# nd100x lives outside this repo: point ND100X_SRC at its source tree.
+ND100X_SRC = os.environ["ND100X_SRC"]
+CDC = os.path.join(ND100X_SRC, "src/devices/cdc/deviceCDC.c")
+DRUM = os.path.join(ND100X_SRC, "src/devices/drum/deviceDrum.c")
 
 cdc_old = """    case CDC_OP_WRITE: /* 01: core -> disc (persisted via the backing file) */
         for (uint32_t i = 0; i < count; i++)

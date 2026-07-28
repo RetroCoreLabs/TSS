@@ -1,12 +1,12 @@
 # MAC-C — a host-side MAC assembler for the NORD TSS sources
 
 C99 reimplementation of the ND MAC assembler, written to rebuild the
-**NORD TSS 3.0** sources in `/mnt/e/Dev/Ronny/TSS/src/`.
+**NORD TSS 3.0** sources in `src/`.
 
 ## Build and run
 
 ```
-cd /mnt/e/Dev/Ronny/TSS/mac-c      # WSL / Linux
+cd mac-c      # WSL / Linux
 make            # builds build/mac and build/test_mac (-Wall -Wextra, zero warnings)
 make test       # runs the unit-test suite
 ./scripts/build/run_tss.sh         # assembles all five TSS parts as ASSYSA does
@@ -233,7 +233,7 @@ Each of these was verified and then locked into a unit test:
 
 ### A deliberate divergence worth knowing
 
-`D:\ND\BPUN\MAC.BPUN` is the **48-bit** floating-point MAC (its table has
+`$ND_BPUN_DIR/MAC.BPUN` is the **48-bit** floating-point MAC (its table has
 `2OR3=3`, `LDR=034000`, `STR=030000` — the 48-bit values per Appendix E),
 but the archived `ASYMB:SYMB` was produced by a **32-bit** float MAC. They
 are different builds. MAC-C defaults to the 32-bit format so it reproduces

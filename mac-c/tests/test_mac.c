@@ -5,7 +5,7 @@
 **   - MAC_PERMSYM[]: the 154 permanent symbols byte-verified against    **
 **     the real MAC.BPUN binary. Every one is assembled and its emitted  **
 **     word compared to the value the binary itself carries.             **
-**   - ND-100 addressing modes: E:\Dev\Ronny\nd100-markdown\docs\        **
+**   - ND-100 addressing modes: the nd100-markdown docs set          **
 **     addressing_modes.md (X=bit10=02000, I=bit9=01000, B=bit8=0400).   **
 **   - P-relative rule EA=(P)+disp with P = the instruction's OWN        **
 **     address: ND-60.096.01 sec 2.3.1, cross-checked against real code  **

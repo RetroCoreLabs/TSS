@@ -99,3 +99,33 @@ Needs a POSIX toolchain; on Windows use WSL.
   boot normally — every terminal prints `@ENTER`; log in as `SYSTEM` and you
   reach the `@` command prompt. Full procedure:
   [`docs/TSS-BRINGUP.md`](docs/TSS-BRINGUP.md).
+
+## External resources — set these, never hard-code them
+
+Nothing in this repository contains an absolute path. Every path in a script,
+Makefile, config file, source comment or document is **relative to the
+repository root**, so a clone works on any machine, drive or OS.
+
+A few inputs genuinely live outside the repo — the original ND binaries,
+reference manuals, microcode and the emulator. Those are reached through
+environment variables. Set only the ones a given task needs:
+
+| variable | points at | used by |
+|---|---|---|
+| `ND100X` or `ND` | the `nd100x` emulator **binary** | `Makefile` (bring-up targets), the probe scripts |
+| `ND100X_SRC` | the `nd100x` **source tree** | `bringup/patch-nd100x.py`, device-analysis docs |
+| `ND_BPUN_DIR` | directory holding `MAC.BPUN`, `MACM-*.BPUN`, `FMAC-*.BPUN` | `mac-c/scripts/extract/`, `docs/MAC-ASSEMBLER.md` |
+| `ND_ROOT` | the wider ND software archive (`BPUN/`, `c3/`, `S/`) | `mac-c/scripts/attic/identify_float_variant.sh` |
+| `NDINSIGHT` | the NDInsight reference-manual collection | the manual citations throughout `docs/` |
+| `ND110COMPILE` | the ND110Compile tree holding `uCode/` | the microcode citations in `docs/TSS-FLOAT-FORMAT.md` |
+
+Example:
+
+```bash
+export ND_BPUN_DIR=/path/to/ND/BPUN
+export NDINSIGHT=/path/to/NDInsight
+```
+
+Scripts that need one of these fail immediately with a message naming the
+variable, rather than silently searching a path that only exists on one
+machine.

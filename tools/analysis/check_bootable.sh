@@ -1,7 +1,7 @@
 #!/bin/bash
 # Can the current build produce a bootable TSS? Check what actually exists
 # and what the assembled image looks like.
-cd /mnt/e/Dev/Ronny/TSS/mac-c || exit 1
+cd "$(dirname "$0")/../../mac-c" || exit 1   # repo root, from this script
 
 echo "=== 1. does Build/ contain any image or tape today? ==="
 ls -1 ../Build | grep -iE '\.(bpun|bin|img|core)$' || \

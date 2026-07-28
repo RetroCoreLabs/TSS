@@ -3,7 +3,7 @@
 The bring-up is driven by the **repo-root `Makefile`** — run from WSL:
 
 ```bash
-cd /mnt/e/Dev/Ronny/TSS
+cd the repo root
 make help          # lists every target with a one-line description
 ```
 
@@ -52,7 +52,7 @@ you are in.
 
 | file | purpose |
 |---|---|
-| `tss.cfg` | nd100x configuration for booting the DRUM/N10 build directly: `nd100x --config=/mnt/e/Dev/Ronny/TSS/bringup/tss.cfg`. Boots `Build/drum/tss-drum.bpun`, whose autostart address (`ISTRT=025076`) the BPUN itself carries, and points the swapping drum at `Build/drum.img` — deliberately **not** `Build/drum/`, which `build_tss_drum.sh` wipes. It also records why the run must be MMS1: TSS 3.0 programs the MMU the Paging-System-I way (single 16-bit page-table words to `0177400`, then `PON` — `src/TSS1.SYMB` `IPGTB`), and MMS2 mis-decodes those PCR values so user virtual page 0 never maps to the resident vector page and `GOVER` loops. |
+| `tss.cfg` | nd100x configuration for booting the DRUM/N10 build directly: `nd100x --config=bringup/tss.cfg`. Boots `Build/drum/tss-drum.bpun`, whose autostart address (`ISTRT=025076`) the BPUN itself carries, and points the swapping drum at `Build/drum.img` — deliberately **not** `Build/drum/`, which `build_tss_drum.sh` wipes. It also records why the run must be MMS1: TSS 3.0 programs the MMU the Paging-System-I way (single 16-bit page-table words to `0177400`, then `PON` — `src/TSS1.SYMB` `IPGTB`), and MMS2 mis-decodes those PCR values so user virtual page 0 never maps to the resident vector page and `GOVER` loops. |
 
 ### Trace probes — for when a bring-up step misbehaves
 

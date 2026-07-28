@@ -2,7 +2,7 @@
 # step by step, from a bare disc to an interactive login on nd100x.
 #
 #   Run from WSL (the nd100x emulator and the POSIX tools live there):
-#       cd /mnt/e/Dev/Ronny/TSS && make help
+#       make help          (run from the repo root)
 #
 # This Makefile replaces the former bringup/*.sh wrappers; the concrete
 # emulator command lines live in the recipes below.  The two real tools
@@ -39,11 +39,13 @@ DRUM := $(WORK)/drum.img
 # `make dap-login DAP_PORT=1780` if needed.
 DAP_PORT ?= 1777
 
-# Locate the nd100x emulator binary; override with `make login ND=/path/to/nd100x`.
+# Locate the nd100x emulator binary. nd100x lives OUTSIDE this repo, so it is
+# found via $HOME or the ND100X environment variable - never a hard-coded path.
+# Override with `make login ND=/path/to/nd100x`.
 ND ?= $(firstword $(wildcard \
         $(HOME)/repos/nd100x/build/bin/nd100x \
         $(HOME)/repos/nd100x/build-linux/bin/nd100x \
-        /mnt/e/Dev/Emulators/ND/nd100x/build-linux/bin/nd100x))
+        $(ND100X)))
 
 .DEFAULT_GOAL := help
 

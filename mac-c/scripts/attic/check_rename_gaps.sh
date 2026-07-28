@@ -4,7 +4,7 @@ cd "$(dirname "$0")/../.." || exit 1
 # The CVS rename looks incomplete. For each old/new name, show where it is
 # DEFINED (label "NAME," or "NAME=" or a DATA declaration) versus merely
 # REFERENCED, in the patched sources.
-cd /mnt/e/Dev/Ronny/TSS || exit 1
+cd "$(dirname "$0")/../../.." || exit 1   # repo root, from this script
 for n in STR XTR STRX XTRX STR0 XTR0 STR1 XTR1 STR2 XTR2 LSS XSS LSSX \
          STR1X STR2X; do
     d=$(grep -h -c -E "(^|[ \t;])$n[,=]|DATA $n," src/TSS*.SYMB 2>/dev/null \

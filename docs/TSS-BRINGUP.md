@@ -99,7 +99,7 @@ assembly errors; `verify_repo.sh` fully green.
 ### 1.4 Bring-up — the automated path and the manual inputs
 
 Everything is driven by the top-level `Makefile` (run from WSL,
-`cd /mnt/e/Dev/Ronny/TSS`; `make help` lists every target).
+`make help` from the repo root lists every target).
 
 **Recommended — one command, fully unattended:**
 
@@ -163,7 +163,7 @@ inline one-liners — always write a script file and run it.**
 
 ```bash
 # The assembler + its test suite (must be 0 failures)
-cd /mnt/e/Dev/Ronny/TSS/mac-c && make test
+cd mac-c && make test
 
 # The runnable NORD-10/DRUM TSS: bootable BPUN + drum image + CDC overlay disc
 ./scripts/build/build_tss_drum.sh    # -> Build/drum/{tss-drum.bpun, tss-drum.img, tss-cdc.img, DSYMB.SYMB}
@@ -291,8 +291,8 @@ cold-start vector (§6.1).
 ### 3.1 Which copy, and how to build it
 
 **The authoritative nd100x checkout is the WSL-native one:**
-`~/repos/nd100x` (= `/home/ronny/repos/nd100x`). A second copy at
-`E:\Dev\Emulators\ND\nd100x` **diverges** (`config.c`, `nd100x.c` differ) —
+`~/repos/nd100x` (= `$ND100X_SRC`). A second copy at
+`$ND100X_SRC` **diverges** (`config.c`, `nd100x.c` differ) —
 build and use the WSL copy, which carries the CDC/OPR/MMS1 work. Do not
 modify nd100x without explicit approval (project rule).
 

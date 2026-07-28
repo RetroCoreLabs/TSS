@@ -7,9 +7,9 @@
 # mapping off the LIVE, now-correctly-compiled DKADR.
 set -uo pipefail
 ND=${ND:-$HOME/repos/nd100x/build/bin/nd100x}
-BUILD=/mnt/e/Dev/Ronny/TSS/Build/drum
+BUILD=Build/drum
 MAXI=${1:-4000000}
-OUT=${OUT:-/mnt/e/Dev/Ronny/TSS/bringup/dkadr_trace_$$.txt}
+OUT=${OUT:-bringup/dkadr_trace_$$.txt}
 T=$(mktemp -d)
 trap 'rm -rf "$T"' EXIT
 cp "$BUILD/tss-drum.img" "$T/drum.img"

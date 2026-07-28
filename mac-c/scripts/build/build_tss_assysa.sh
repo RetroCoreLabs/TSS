@@ -35,7 +35,7 @@ echo
 tail -n +4 ../src/ASSYSB.SYMB | tr -d '\r' | grep -v '^@cc' \
     > "$BUILD/ASSYSB.SYMB"
 
-MAC=$PWD/build/mac-c
+MAC=$PWD/build/mac
 cd "$BUILD"
 
 run () {   # $1 = script, $2 = symbol dump it should produce

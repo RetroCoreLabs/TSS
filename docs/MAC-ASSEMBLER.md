@@ -441,7 +441,7 @@ why a verbatim copy is correct (internal references stay `ROVER`-relative).
 or literal fixups inside any overlay window at the `)9MOVE` snapshot point;
 pinned by `test_mac.c [12]`.
 
-`mac_write_cdc_disc` (`mac-c/src/mac_bpun.c`, `mac-c -c FILE`) then writes each
+`mac_write_cdc_disc` (`mac-c/src/mac_bpun.c`, `mac -c FILE`) then writes each
 overlay *n* to CDC-disc sectors `OVDK+2n` / `OVDK+2n+1`, applying the
 linear→physical map **at write time**:
 
@@ -688,7 +688,7 @@ project number.
   the reconciliation held at 679/693 (A) and 675/689 (B) across the fix.
 
 - **How it was actually found:** not by debugging, but by an invariant sweep
-  over the `mac-c -L` listing that assumes nothing about MAC semantics —
+  over the `mac -L` listing that assumes nothing about MAC semantics —
   **a P-relative instruction assembled at two different addresses must
   encode two different displacements.** `LDA I J2,X` emitted the identical
   word `047324` at both `006732` and `006746`, which is arithmetically

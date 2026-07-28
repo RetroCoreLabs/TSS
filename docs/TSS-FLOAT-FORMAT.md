@@ -190,7 +190,7 @@ The 1978 original had the same two-word constants:
   `022700`.
 
 `mac-c` reproduces the archived binary faithfully, and its 32-bit encoding is
-correct per Appendix E. Rebuilding TSS with 48-bit constants (`mac-c -F48`)
+correct per Appendix E. Rebuilding TSS with 48-bit constants (`mac -F48`)
 is a **diagnostic only**: it shifts every address after the first `[`, breaks
 the golden-dump match, and has already produced one false negative that sent
 this investigation down the wrong path for a session.

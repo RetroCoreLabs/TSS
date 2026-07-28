@@ -23,7 +23,7 @@ fi
 # ()WRTM + )WRITE $A1 prints each overlay's size); keep it out of the way.
 OUT=../Build
 mkdir -p "$OUT"
-build/mac-c $PRE $FILES -l "$OUT/asymb.list" -u \
+build/mac $PRE $FILES -l "$OUT/asymb.list" -u \
     > "$OUT/write.txt" 2> "$OUT/err.txt"
 echo "errors    : $(grep -c ERROR "$OUT/err.txt")"
 echo "undefined : $(grep -c UNDEFINED "$OUT/err.txt")"

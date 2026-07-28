@@ -7,7 +7,7 @@ C99 reimplementation of the ND MAC assembler, written to rebuild the
 
 ```
 cd /mnt/e/Dev/Ronny/TSS/mac-c      # WSL / Linux
-make            # builds build/mac-c and build/test_mac (-Wall -Wextra, zero warnings)
+make            # builds build/mac and build/test_mac (-Wall -Wextra, zero warnings)
 make test       # runs the unit-test suite
 ./scripts/build/run_tss.sh         # assembles all five TSS parts as ASSYSA does
 ./scripts/verify/compare_asymb.sh ../Build/ASYMB.SYMB ../reference/ASYMB.SYMB
@@ -179,7 +179,7 @@ run time. mac-c now reproduces that pipeline (see `docs/TSS-ARCHITECTURE.md (ove
   overlay from its assembly window at `ROVER` into a distinct `VOR` slot
   (040000, 041000, … 076000) so all 31 survive in memory. It copies memory
   only, so the golden symbol dump is unchanged.
-- **CDC-disc image (`mac-c -c FILE`)** — after assembly, writes a raw
+- **CDC-disc image (`mac -c FILE`)** — after assembly, writes a raw
   big-endian disc image placing overlay *n* on sectors `OVDK+2n` / `OVDK+2n+1`
   (two 256-word sectors, byte offset `sector*512`), exactly where the run-time
   overlay reader (routine `S5`) looks. Constants (`OVDK`, `VORS`, `RQR`, `VOR`)

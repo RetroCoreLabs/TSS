@@ -334,7 +334,7 @@ How nd100x picks the start address: `LoadBPUNStream`
 loader ends `164316!` where `164316` also equals `start`, so an unmodified
 tape boots at `lastValue = 0` — for TSS a trap vector (`JMP I 3` → the
 monitor-return path) executed with uninitialised state, running off into
-zero memory. **The fix is in the tape:** `mac-c -e ENTRY` (octal address or
+zero memory. **The fix is in the tape:** `mac -e ENTRY` (octal address or
 symbol) replaces the final `164316!` token with `<entry>!`; since
 `entry != start`, nd100x reads `boot = entry`. `build_tss_drum.sh` passes
 **`-e ISTRT`** (`ISTRT = 025076`, `src/TSS2.SYMB` — `SAA 1; STA I (IDEV;

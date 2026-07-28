@@ -34,12 +34,12 @@ CORE_SRC = $(SRCDIR)/mac_symtab.c $(SRCDIR)/mac_expr.c   $(SRCDIR)/mac_macro.c \
            $(SRCDIR)/mac_bpun.c   $(SRCDIR)/mac_permsym.c
 CORE_OBJ = $(patsubst $(SRCDIR)/%.c,$(BUILDDIR)/%.o,$(CORE_SRC))
 
-MAC_C   = $(BUILDDIR)/mac-c
+MAC   = $(BUILDDIR)/mac
 TEST_MAC = $(BUILDDIR)/test_mac
 
 # Default goal: build the tool and the tests, nothing heavy.
 .DEFAULT_GOAL := tools
-tools: $(MAC_C) $(TEST_MAC)
+tools: $(MAC) $(TEST_MAC)
 
 $(BUILDDIR):
 	mkdir -p $(BUILDDIR)
@@ -53,7 +53,7 @@ $(BUILDDIR)/main.o: $(SRCDIR)/main.c $(SRCDIR)/mac.h | $(BUILDDIR)
 $(BUILDDIR)/test_mac.o: $(TESTDIR)/test_mac.c $(SRCDIR)/mac.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(MAC_C): $(CORE_OBJ) $(BUILDDIR)/main.o
+$(MAC): $(CORE_OBJ) $(BUILDDIR)/main.o
 	$(CC) $(CFLAGS) -o $@ $^
 
 $(TEST_MAC): $(CORE_OBJ) $(BUILDDIR)/test_mac.o
@@ -69,17 +69,17 @@ test: $(TEST_MAC)
 
 # The golden build: the real ASSYSA/ASSYSB command streams -> ../Build/*.SYMB,
 # scored against ../reference/ASYMB.SYMB / BSYMB.SYMB.
-tss: $(MAC_C)
+tss: $(MAC)
 	./scripts/build/build_tss_assysa.sh
 
 # NORD-10 + swapping-drum variant -> ../Build/drum/tss-drum.bpun (+ CDC image).
-drum: $(MAC_C)
+drum: $(MAC)
 	./scripts/build/build_tss_drum.sh
 
 # Standalone MINIT disc formatter -> ../Build/minit/minit.bpun.  Must exist
 # before a bare-disc bring-up (it writes the MIB free-track bitmap that
 # SINIT's GTRK needs).  See ../docs/TSS-BRINGUP.md.
-minit: $(MAC_C)
+minit: $(MAC)
 	./scripts/build/build_minit.sh
 
 # Everything that mac-c produces from the sources.

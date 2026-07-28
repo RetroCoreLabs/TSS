@@ -21,12 +21,12 @@ OUT=/tmp/probe.symb
   echo ')LINE'
 } > "$OUT"
 
-build/mac-c -m CDC -m MACF -m DIAB -m K14 -m TEL4 \
+build/mac -m CDC -m MACF -m DIAB -m K14 -m TEL4 \
   -d TDBI=410 -d TDBO=40 -d 8LP=200 -d 9PPT=100 -d 9TTI=40 -d 9TTO=40 \
   -d 9FP=200 -d 9CR=5 -d NOPEN=16 \
   "$OUT" -l /tmp/probe.list 2>/dev/null
 
-echo "--- region size measured by mac-c ---"
+echo "--- region size measured by mac ---"
 grep -E '^ *SIZE=' /tmp/probe.list | tr -d ' \r'
 echo
 echo "--- expected component sizes (octal -> decimal) ---"

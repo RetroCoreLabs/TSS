@@ -1,0 +1,89 @@
+name: release
+
+# Build the bootable TSS disc set and attach it to a GitHub release.
+# Runs on any tag like v1.0, v2026.07, ...
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:        # allow a manual run to test the workflow
+
+permissions:
+  contents: write           # needed to create the release
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out TSS
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake libcjson-dev python3
+
+      # ---- 1. the assembler, its tests, and the TSS artifacts ----------
+      - name: Build mac and assemble TSS
+        run: |
+          make build
+          make check-encoding
+
+      - name: Score against the 1978 golden dump
+        run: ./mac-c/scripts/verify/compare_asymb.sh Build/ASYMB.SYMB reference/ASYMB.SYMB
+
+      # ---- 2. the emulator, needed to format and cold-start the disc ---
+      - name: Build nd100x
+        run: |
+          git clone --depth 1 https://github.com/HackerCorpLabs/nd100x.git "$RUNNER_TEMP/nd100x"
+          cmake -S "$RUNNER_TEMP/nd100x" -B "$RUNNER_TEMP/nd100x/build" -DCMAKE_BUILD_TYPE=Release
+          cmake --build "$RUNNER_TEMP/nd100x/build" -j"$(nproc)"
+          echo "ND=$(find "$RUNNER_TEMP/nd100x/build" -name nd100x -type f -perm -u+x | head -1)" >> "$GITHUB_ENV"
+
+      # ---- 3. MINIT format + cold start -> a disc with user SYSTEM -----
+      - name: Bring up a fresh disc
+        run: |
+          make clean-bringup
+          make auto ND="$ND"
+          make verify
+
+      # ---- 4. package ---------------------------------------------------
+      - name: Assemble the release archive
+        run: |
+          VER="${GITHUB_REF_NAME:-dev}"
+          OUT="nord-tss-3.0-$VER"
+          mkdir -p "$OUT"
+          cp Build/bringup/tss.bpun Build/bringup/cdc.img Build/bringup/drum.img "$OUT/"
+          cp dist/tss.cfg dist/run-tss.sh "$OUT/"
+          cp dist/QUICKSTART.md "$OUT/README.md"
+          chmod +x "$OUT/run-tss.sh"
+          tar czf "$OUT.tar.gz" "$OUT"
+          sha256sum "$OUT.tar.gz" > "$OUT.tar.gz.sha256"
+          echo "ARCHIVE=$OUT.tar.gz" >> "$GITHUB_ENV"
+
+      - name: Upload as a build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tss-disc-set
+          path: |
+            ${{ env.ARCHIVE }}
+            ${{ env.ARCHIVE }}.sha256
+
+      - name: Attach to the release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ${{ env.ARCHIVE }}
+            ${{ env.ARCHIVE }}.sha256
+          body: |
+            A ready-to-run NORD TSS 3.0 disc set, built from the 1973 sources
+            by this repository's own MAC assembler and brought up on nd100x.
+
+            Unpack, then:
+
+                ./run-tss.sh /path/to/nd100x
+
+            Log in as **SYSTEM**, project **1**, no password.
+
+            Needs nd100x from https://github.com/HackerCorpLabs/nd100x

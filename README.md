@@ -34,6 +34,10 @@ The documentation:
 | [`docs/TSS-BRINGUP.md`](docs/TSS-BRINGUP.md) | **from clean checkout to a logged-in `@` prompt** — build, emulator, MINIT disc format, cold-start, login, validation and debugging (scripts in [`bringup/`](bringup/README.md)) |
 | [`docs/PROJECT-DESCRIPTION.md`](docs/PROJECT-DESCRIPTION.md) | **history and provenance** — what this is, who wrote it, the `.ORG`-vs-`.SYMB` restoration, how it was originally built and booted |
 | [`docs/MAC-ASSEMBLER.md`](docs/MAC-ASSEMBLER.md) | **the assembler** — the MAC/FMAC family, the MAC.BPUN reverse engineering, and the full record of silent-miscompile defects found and fixed in `mac-c` |
+| [`docs/TSS-USER-MANUAL.md`](docs/TSS-USER-MANUAL.md) | **user manual** — logging in, the command processor, and all 60 `@`-prompt commands, with the error-message table and device list |
+| [`docs/TSS-COMMAND-VALIDATION.md`](docs/TSS-COMMAND-VALIDATION.md) | **what actually happens when you run it** — every one of the 60 commands exercised against the emulator, verbatim transcripts, root causes, and the corrections they forced on the manual |
+| [`docs/OPEN-QUESTIONS.md`](docs/OPEN-QUESTIONS.md) | **the live list** of what is still unanswered, and what would settle each item |
+| [`docs/TSS-FLOAT-FORMAT.md`](docs/TSS-FLOAT-FORMAT.md) | why the clock cannot advance: TSS is a 48-bit floating-point program whose `TBANG` constants were assembled in the 32-bit format — a defect in the 1978 original, not in this rebuild |
 
 This repository holds the recovered source, the original build outputs, and
 a C reimplementation of the MAC assembler that rebuilds the system. The
@@ -60,16 +64,74 @@ Each has its own README with the detail.
 | [`docs/`](docs/README.md) | the documents above |
 | [`ppt/`](ppt/README.md) | *Intro to TSS* — the guided tour |
 
-## Rebuilding it
+## Getting started
+
+Two ways in: **download a ready-made disc set**, or **build everything from
+source**.
+
+### A. Just run it
+
+Every tagged release ships a bootable disc set built by CI from these
+sources — see [Releases](https://github.com/HackerCorpLabs/TSS/releases).
+
+```bash
+tar xzf nord-tss-3.0-*.tar.gz && cd nord-tss-3.0-*
+./run-tss.sh /path/to/nd100x
+```
+
+Log in as **SYSTEM**, project **1**, no password. `HELP` lists all 60
+commands. The archive carries its own quick-start guide
+([`dist/QUICKSTART.md`](dist/QUICKSTART.md) in this repo).
+
+You still need the emulator — it is a separate project:
+
+```bash
+git clone https://github.com/HackerCorpLabs/nd100x.git
+cd nd100x
+sudo apt install build-essential cmake libcjson-dev    # Debian/Ubuntu
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j
+```
+
+> **`--mms=1` is required and cannot go in the config file.** TSS is 1973 code
+> that programs the MMU the Paging-System-I way; under nd100x's default MMS2
+> the machine starts and then hangs in the overlay loader. `run-tss.sh` passes
+> the flag for you.
+
+### B. Build it from source
+
+Needs a POSIX toolchain and `python3`; on Windows use WSL.
+
+```bash
+git clone https://github.com/HackerCorpLabs/TSS.git && cd TSS
+make build            # assembler + 718 tests + TSS, DRUM and MINIT artifacts
+make auto             # MINIT format + cold start -> a disc with user SYSTEM
+make verify           # free tracks + SYSTEM present
+make login            # boot and log in
+```
+
+`make help` lists every target. `make auto` drives the bring-up over the DAP
+debugger and needs `nd100x` — point at it with `ND=/path/to/nd100x` or set
+`ND100X`. The whole procedure, including doing it by hand at the operator
+panel, is in [`docs/TSS-BRINGUP.md`](docs/TSS-BRINGUP.md).
+
+To check the rebuild against the 1978 original:
+
+```bash
+./mac-c/scripts/verify/verify_repo.sh     # build, tests, oracle, links
+```
+
+## Reproducing the 1973 build exactly
+
+`make build` above is the convenient path. To run the *original* `ASSYSA` and
+`ASSYSB` command streams — the scripts the operators typed in 1978 — and score
+the result against the archived symbol dump:
 
 ```bash
 cd mac-c
-make test                 # 718 unit tests
-./mac-c/scripts/build/build_tss_assysa.sh     # run the real ASSYSA and ASSYSB scripts
-./mac-c/scripts/verify/compare_asymb.sh Build/ASYMB.SYMB ../reference/ASYMB.SYMB
+./scripts/build/build_tss_assysa.sh
+./scripts/verify/compare_asymb.sh ../Build/ASYMB.SYMB ../reference/ASYMB.SYMB
 ```
-
-Needs a POSIX toolchain; on Windows use WSL.
 
 ## Quick answers
 

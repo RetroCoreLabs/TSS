@@ -27,6 +27,9 @@ static void usage(const char *argv0)
         "               docs/TSS-ARCHITECTURE.md (overlay chapter)). Requires an overlay/OVERX\n"
         "               build so OVDK/VORS/RQR/VOR are defined.\n"
         "  -b FILE      write a bootable BPUN paper tape\n"
+        "  -p FILE      attach FILE as the fast PUNCH device. )8DUMP punches\n"
+        "               the TSS-binary-format distribution tape here, byte-\n"
+        "               exact to TSS's own 8DUMP routine (TSS3.SYMB:191).\n"
         "  -e ENTRY     BPUN autostart address: an octal number or a symbol\n"
         "               name (e.g. -e ISTRT). Sets the tape's start address.\n"
         "  -u           report symbols still undefined at the end\n",
@@ -42,6 +45,7 @@ int main(int argc, char **argv)
     const char *asmlistfile = NULL;   /* -L: source-to-address listing */
     const char *imgfile = NULL;
     const char *cdcfile = NULL;   /* -c: CDC-disc overlay image */
+    const char *punchfile = NULL; /* -p: fast-punch device file ()8DUMP) */
     const char *bpunfile = NULL;
     const char *entryarg = NULL;   /* -e: BPUN autostart (symbol or octal) */
     bool report_undef = false;
@@ -103,6 +107,11 @@ int main(int argc, char **argv)
         {
             bpunfile = argv[++i];
         }
+        else if ((strcmp(argv[i], "-p") == 0 || strcmp(argv[i], "--punch") == 0)
+                 && i + 1 < argc)
+        {
+            punchfile = argv[++i];
+        }
         else if (strcmp(argv[i], "-e") == 0 && i + 1 < argc)
         {
             entryarg = argv[++i];   /* resolved after assembly (symbols known) */
@@ -126,6 +135,19 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    /* The punch device must be attached before assembly starts: )8DUMP
+     * punches DURING the command stream, like the real fast punch.        */
+    if (punchfile != NULL)
+    {
+        st.punch = fopen(punchfile, "wb");
+        if (st.punch == NULL)
+        {
+            fprintf(stderr, "cannot create %s\n", punchfile);
+            return 1;
+        }
+        st.own_punch = true;
+    }
+
     /* second pass: assemble every non-option argument in order */
     for (int i = 1; i < argc; i++)
     {
@@ -133,6 +155,7 @@ int main(int argc, char **argv)
             strcmp(argv[i], "-l") == 0 || strcmp(argv[i], "-L") == 0 ||
             strcmp(argv[i], "-o") == 0 ||
             strcmp(argv[i], "-b") == 0 || strcmp(argv[i], "-e") == 0 ||
+            strcmp(argv[i], "-p") == 0 || strcmp(argv[i], "--punch") == 0 ||
             strcmp(argv[i], "-c") == 0 || strcmp(argv[i], "--cdc") == 0)
         {
             i++; /* skip the option argument */

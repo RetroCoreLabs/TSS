@@ -193,13 +193,17 @@ run time. mac-c now reproduces that pipeline (see `docs/TSS-ARCHITECTURE.md (ove
 
 ## Not implemented (and why)
 
-- `)SOVER`, `)8DUMP` — `)SYMBOL`-style invocations of assembled ND-100
-  routines that would need **ND-100 execution** to run. They live only in the
-  `"NMACF` / `"TSBIN` paths, which the MACF/DRUM builds never assemble
-  (`TSS-ARCHITECTURE.md (overlay chapter)` §1.3, §6), so on the builds mac-c targets they are a
-  **documented intentional no-op** — and unnecessary, because the run-time
-  disc contract they implement is reproduced directly by `)9MOVE` + the CDC
-  image writer above. mac-c does **not** fake ND-100 execution.
+- `)SOVER` — a `)SYMBOL`-style invocation of TSS's assembled SOVER/XDISK
+  code that would need **ND-100 execution** to run (it writes the disc
+  during assembly). It lives only in the `"NMACF` path, which the MACF/DRUM
+  builds never assemble (`TSS-ARCHITECTURE.md (overlay chapter)` §1.3, §6),
+  so on the builds mac-c targets it is a **documented intentional no-op** —
+  and unnecessary, because the run-time disc contract it implements is
+  reproduced directly by `)9MOVE` + the CDC image writer above. mac-c does
+  **not** fake ND-100 execution.
+  Its sibling `)8DUMP` **is implemented** (2026-07-31): a byte-exact
+  reproduction of TSS's 8DUMP tape puncher onto the `-p` punch file — see
+  `../docs/MAC-ASSEMBLER.md` §2.3 and `../docs/TSS-BRINGUP.md` §6.7.
   (Note: `)SCRATCH` / `)FRIEND` are **not** MAC commands at all — they appear
   only inside quoted strings in the corpus; an earlier version of this list
   named them wrongly.)

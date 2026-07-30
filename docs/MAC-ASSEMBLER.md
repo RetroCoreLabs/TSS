@@ -66,10 +66,24 @@ saying `FMAC` yields 2-word floats.
 assemblers. They are MAC's `)SYMBOL` form — *"causes a jump to the address
 given by the value of the symbol"* (ND-60.096.01 §3.2.3.9) — invoking
 routines TSS assembles itself (`SOVER,` at TSS3:37, `8DUMP,` at TSS3:195 and
-TDUMP:221), which return to the assembler via `JMP 103,B`. Both live only in
-the `"NMACF` / `"TSBIN` conditional paths, which no golden or DRUM build ever
-assembles, so mac-c correctly treats them as documented no-ops
-(see `../mac-c/README.md` "Not implemented").
+TDUMP:221), which return to the assembler via `JMP 103,B`.
+
+mac handles the two differently, per what each routine does:
+
+- **`)8DUMP` is implemented** (2026-07-31): `cmd_8dump` reproduces the
+  8DUMP routine's punch output **byte for byte** on the `-p` punch-device
+  file — the TSS-binary-format distribution tape (`src/TSS3.SYMB:191-231`:
+  blank leader, octal-ASCII `HLOAD` framing, `8WOUT` high-byte-first
+  binary, the 0xAAAA sync word, `[8CADR][8DKA][8NWD][words][checksum]`
+  blocks, the `8CADR=-1` trailer). Pinned by test [19]. It touches no
+  disc: on the real machine the disc was written when the punched tape was
+  **booted** (`TBOOT` → `HDKOP`, `src/TSS3.SYMB:126`), and that is still
+  how the disc gets written here — nd100x `--boot=tape` boots the tape and
+  TSS's own code installs itself (`TSS-BRINGUP.md` §6.7).
+- **`)SOVER` stays a documented no-op**: its `"NMACF` body *executes*
+  TSS's `XDISK` driver to write the disc during assembly, which would need
+  ND-100 execution; the disc contract is reproduced by `)9MOVE` + the CDC
+  image writer instead (§5.1). mac does **not** fake ND-100 execution.
 
 Related correction: **`)SCRATCH` and `)FRIEND` are not commands at all.**
 **[VERIFIED]** they appear in the corpus only *inside quoted text strings*
@@ -458,10 +472,11 @@ run-time reader (`S5`, `GOVX`, `OVDK`, `ROVER`/`ROV4`) are documented in
 
 ### 5.2 Intentionally not implemented
 
-- `)SOVER` / `)8DUMP` — `)SYMBOL`-form invocations of TSS's own assembled
-  routines (§2.3); would need ND-100 execution, and are compiled out of
-  every build mac-c targets. The disc contract they implement is reproduced
-  directly by `)9MOVE` + the CDC image writer (§5.1).
+- `)SOVER` — `)SYMBOL`-form invocation of TSS's own assembled SOVER/XDISK
+  code (§2.3); would need ND-100 execution, and is compiled out of every
+  build mac-c targets. The disc contract it implements is reproduced
+  directly by `)9MOVE` + the CDC image writer (§5.1). (`)8DUMP`, its
+  sibling, IS implemented — as the byte-exact tape puncher, §2.3.)
 - BRF relocatable object output (`)9BEG )9END )9ENT )9EXT )9LIB )9FABS
   )9EOF )9ASF )9ADS )9LC )9RT`) — TSS is an absolute assembly.
 - The interactive debugger commands (`.` `!` `\`) — debugger features, not
@@ -793,7 +808,30 @@ project number.
   `--fpp=32` cannot settle the underlying question, in
   [`TSS-FLOAT-FORMAT.md`](TSS-FLOAT-FORMAT.md).
 
-### 6.9 The moral
+### 6.9 The two-forward-reference sign loss — the CDBIN tape killer (2026-07-31)
+
+> Numbering note: "the moral" below was §6.9 until 2026-07-31 and is
+> referenced as such elsewhere; it is now §6.10.
+
+`HSIZ, 8TBE-TBOOT` (`src/TDUMP.SYMB:100`, same shape at `src/TSS3.SYMB:108`)
+has **both** symbols forward at that line. mac registered a fixup only for
+the FIRST undefined symbol, add-only: the cell assembled as `8TBE`'s value
+(040246) instead of `8TBE-TBOOT` = 0177, so `HLOAD` on the punched CDBIN
+tape tried to read 16549 words instead of 127 and ran the reader off the
+end of the tape. Invisible to every oracle: the `TSBIN` regions are
+assembled in no golden build, and symbol addresses were all unchanged.
+Found live, on the first boot of the first mac-punched install tape.
+
+The manual specifies the correct machinery precisely: the undefined table
+holds one entry **per use** (ND-60.096.01 line 1519) and the pending value
+is later "**added or subtracted (whichever is appropriate)**" (line 1949).
+Fix: `eval_expr` records every undefined use with the sign of its term
+(`mac_state.eu`), the plain-word emitter registers one **signed** FULL
+fixup per use (`mac_fixup.sign`), and `sym_resolve_fixups` applies it with
+that sign. `A-A` with A forward nets to zero through two entries on the
+same chain, exactly as the table model implies.
+
+### 6.10 The moral
 
 **Symbol-address oracles validate word COUNTS, not encodings.** Every defect
 above except §6.5's dangling names left every symbol address in the golden

@@ -137,6 +137,17 @@ typedef struct mac_fixup
                                   directory forever = the login hang.
                                   (FULL fixups instead keep the constant
                                   pre-stored in the word and add to it.)  */
+    int8_t           sign;   /**< +1 or -1: the sign of the TERM the
+                                  undefined symbol appeared with. The manual
+                                  is explicit that a pending value is "later
+                                  added or subtracted (whichever is
+                                  appropriate)" (ND-60.096.01 line 1949) -
+                                  "HSIZ, 8TBE-TBOOT" with both symbols
+                                  forward needs one +fixup and one -fixup on
+                                  the same word. Dropping the sign silently
+                                  assembled that cell as 8TBE's VALUE, which
+                                  made HLOAD read 16549 words instead of
+                                  0177 when the CDBIN tape was first booted. */
     mac_fix_kind     kind;
     struct mac_fixup *next;
 } mac_fixup;
@@ -165,6 +176,10 @@ typedef struct
  * A packed text line ('...') is the worst case in this corpus; 64 covers
  * every line in TSS1-5, MINIT and TDUMP. Beyond it the row is marked "...". */
 #define MAC_ASM_LIST_MAX    64
+
+/* Distinct undefined-symbol USES one expression can carry (each becomes a
+ * signed fixup). The corpus maximum is 2 ("HSIZ, 8TBE-TBOOT").            */
+#define MAC_EXPR_MAX_UNDEF  8
 typedef struct
 {
     char name[MAC_SYM_LEN + 1];
@@ -212,6 +227,14 @@ typedef struct
     uint16_t    chg_new;
     uint16_t    chg_mask;
 
+    /* Every undefined symbol referenced by the LAST top-level eval_expr
+     * call, each with the sign of its term. MAC's undefined table holds one
+     * entry PER USE (ND-60.096.01 line 1519), applied "added or subtracted
+     * (whichever is appropriate)" (line 1949); the plain-word emitter turns
+     * each entry into one signed FULL fixup.                              */
+    struct { mac_sym *sym; int sign; } eu[MAC_EXPR_MAX_UNDEF];
+    int         neu;
+
     bool        write_mode;   /**< )WRTM enables )WRITE, )NWRT disables it */
     bool        parity_check; /**< )9PARI toggles input parity checking    */
     bool        dup_literals; /**< )9LITR toggles literal duplication      */
@@ -258,6 +281,15 @@ typedef struct
     FILE       *object;               /**< object stream (NULL = dummy)       */
     bool        own_listing;          /**< close on mac_close_streams         */
     bool        own_object;
+
+    /* The fast punch DEVICE (not one of MAC's three streams). )8DUMP is a
+     * )SYMBOL-form execution of TSS's assembled 8DUMP routine, which punches
+     * the TSS-binary-format distribution tape directly to the punch
+     * (src/TSS3.SYMB:191-231, "IOT ACT SKA PFA"). mac maps that device to
+     * the -p FILE. NULL = no punch attached; )8DUMP then errors, because on
+     * the real machine the punch was always present.                        */
+    FILE       *punch;
+    bool        own_punch;            /**< close on mac_close_streams         */
     bool        end_of_file_seen;     /**< set by )LINE                       */
 
     /* -------- address listing (-L) ------------------------------------

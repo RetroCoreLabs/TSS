@@ -1186,18 +1186,18 @@ static void test_remaining_commands(void)
     mac_line(&st, ")9TSS");
     check_true(")9TSS is an alias of )9EXIT ", st.end_of_file_seen);
 
-    /* ---- )SOVER / )8DUMP are documented intentional no-ops ----------- */
-    /* Per docs/TSS-ARCHITECTURE.md (overlay chapter) they live only in the "NMACF / "TSBIN
-     * paths (never assembled in the MACF builds) and would need ND-100
-     * execution. mac-c correctly does nothing with them: no image effect,
-     * no error. (The overlay pipeline is reproduced by )9MOVE + the CDC
-     * writer instead - tested separately below.)                         */
+    /* ---- )SOVER is a documented intentional no-op --------------------- */
+    /* Per docs/TSS-ARCHITECTURE.md (overlay chapter) it lives only in the
+     * "NMACF path (never assembled in the MACF builds) and would need
+     * ND-100 execution of TSS's SOVER/XDISK code. mac-c correctly does
+     * nothing with it: no image effect, no error. (The overlay pipeline is
+     * reproduced by )9MOVE + the CDC writer instead - tested separately
+     * below. )8DUMP is IMPLEMENTED - the tape puncher, test [19].)        */
     fresh(&st);
     st.loc = 01000;
     mac_line(&st, ")SOVER");
-    mac_line(&st, ")8DUMP");
-    check_int(")SOVER/)8DUMP emit nothing  ", st.loc, 01000);
-    check_int("...and raise no errors      ", st.errors, 0);
+    check_int(")SOVER emits nothing        ", st.loc, 01000);
+    check_int("...and raises no error      ", st.errors, 0);
 }
 
 /* ---------------------------------------------------------------------- */
@@ -2122,6 +2122,128 @@ static void test_nlz_dnz_scaling_field(void)
 }
 
 /* ---------------------------------------------------------------------- */
+/* 19. )8DUMP - the TSS-binary-format distribution tape, byte for byte    */
+/*                                                                        */
+/* )8DUMP is MAC's )SYMBOL form executing TSS's own 8DUMP routine         */
+/* (src/TSS3.SYMB:191-231, "%DUMP ONTO TSS BINARY FORMAT TAPE"). Every    */
+/* byte below is derived from that routine:                               */
+/*   - the 127-zero leader        (SAX -177; SAA 0; punch; JNC *-2)       */
+/*   - 8NOUT: 6 octal ASCII digits, top bit first (SAD 1 then 5x SAD 3)   */
+/*   - the "<HLOAD>/ words CRLF ... <HLOAD>!" ASCII framing (8LOOP)       */
+/*   - 8WOUT: HIGH byte then LOW byte (SAD ZIN SHR 10 / SAD 10)           */
+/*   - the sync word 125252 = 0xAAAA, which TBOOT scans for and which is  */
+/*     byte-phase proof (both bytes 0xAA)                                 */
+/*   - block = [8CADR][8DKA][8NWD][words][16-bit sum checksum] (8D2/8LP2) */
+/*   - trailer = 177777, 8DKA twice (8WOUT restores A), leader (8D1)      */
+/* The disc is NOT touched: the original wrote the disc only when the     */
+/* punched tape was BOOTED (TBOOT TB3 -> HDKOP, src/TSS3.SYMB:126).       */
+/* ---------------------------------------------------------------------- */
+static void expect_bytes(const char *what, const unsigned char *got,
+                         const unsigned char *want, int n)
+{
+    int ok = 1;
+    for (int i = 0; i < n; i++)
+    {
+        if (got[i] != want[i]) { ok = 0; break; }
+    }
+    check_true(what, ok != 0);
+}
+
+static void test_8dump_tape(void)
+{
+    printf("[19] )8DUMP punches the TSS binary format tape\n");
+    mac_state st;
+    fresh(&st);
+
+    /* a miniature bootstrap region with the real symbol names            */
+    mac_line(&st, "40000/");
+    mac_line(&st, "HLOAD, 123456; 54321");
+    mac_line(&st, "HLDE=*");
+    mac_line(&st, "1234; 174321");
+    mac_line(&st, "8TBE=*");
+    /* the parameter cells, and a payload for the block form              */
+    mac_line(&st, "8FCN, 0");
+    mac_line(&st, "8CADR, 0");
+    mac_line(&st, "8DKA, 0");
+    mac_line(&st, "8NWD, 0");
+    mac_line(&st, "PAY, 111; 222; 333");
+
+    st.punch = fopen("mac_test_8dump.tape", "wb");
+    check_true(")8DUMP: punch file open      ", st.punch != NULL);
+
+    mac_line(&st, ")8DUMP");                       /* fcn=0: tape header  */
+    mac_line(&st, "8FCN/ 1");
+    mac_line(&st, "8CADR/ PAY");
+    mac_line(&st, "8DKA/ 2");
+    mac_line(&st, "8NWD/ 3");
+    mac_line(&st, ")8DUMP");                       /* one load block      */
+    mac_line(&st, "8CADR/ -1");
+    mac_line(&st, "8DKA/ 7");
+    mac_line(&st, ")8DUMP");                       /* the trailer         */
+    fclose(st.punch);
+    st.punch = NULL;
+    check_int(")8DUMP: no errors            ", st.errors, 0);
+
+    unsigned char buf[512];
+    FILE *f = fopen("mac_test_8dump.tape", "rb");
+    long n = (long)fread(buf, 1, sizeof(buf), f);
+    fclose(f);
+
+    /* total = header 163 + block 14 + trailer 133                        */
+    check_int(")8DUMP: tape length          ", n, 163 + 14 + 133);
+
+    int p = 0, ok;
+    for (ok = 1; p < 0177; p++) { if (buf[p] != 0) { ok = 0; } }
+    check_true(")8DUMP: 127-zero leader      ", ok != 0);
+    expect_bytes(")8DUMP: '<HLOAD>/' framing   ", buf + p,
+                 (const unsigned char *)"040000/", 7);
+    p += 7;
+    expect_bytes(")8DUMP: word 1 octal ASCII   ", buf + p,
+                 (const unsigned char *)"123456\r\n", 8);
+    p += 8;
+    expect_bytes(")8DUMP: word 2 octal ASCII   ", buf + p,
+                 (const unsigned char *)"054321\r\n", 8);
+    p += 8;
+    expect_bytes(")8DUMP: '<HLOAD>!' framing   ", buf + p,
+                 (const unsigned char *)"040000!", 7);
+    p += 7;
+    {   /* binary section, 8WOUT high byte first: 001234, 174321, sync    */
+        const unsigned char bin[6] =
+            { 0x02, 0x9C, 0xF8, 0xD1, 0xAA, 0xAA };
+        expect_bytes(")8DUMP: binary + AAAA sync   ", buf + p, bin, 6);
+        p += 6;
+    }
+    check_int(")8DUMP: header length        ", p, 163);
+    {   /* block: [PAY][2][3][111][222][333][chk 666]                     */
+        uint16_t pay = sym_lookup_value(&st, "PAY");
+        const unsigned char blk[14] =
+            { (unsigned char)(pay >> 8), (unsigned char)(pay & 0xFF),
+              0x00, 0x02,  0x00, 0x03,
+              0x00, 0x49,  0x00, 0x92,  0x00, 0xDB,   /* 111 222 333 */
+              0x01, 0xB6 };                           /* sum = 000666 */
+        expect_bytes(")8DUMP: load block bytes     ", buf + p, blk, 14);
+        p += 14;
+    }
+    {   /* trailer: 177777, 8DKA=7 twice, then the blank leader           */
+        const unsigned char tr[6] =
+            { 0xFF, 0xFF, 0x00, 0x07, 0x00, 0x07 };
+        expect_bytes(")8DUMP: trailer words        ", buf + p, tr, 6);
+        p += 6;
+        for (ok = 1; p < n; p++) { if (buf[p] != 0) { ok = 0; } }
+        check_true(")8DUMP: trailer leader       ", ok != 0);
+    }
+
+    /* without a punch device )8DUMP must error, not silently vanish      */
+    mac_state st2;
+    fresh(&st2);
+    mac_line(&st2, "8FCN, 1");
+    mac_line(&st2, ")8DUMP");
+    check_int(")8DUMP: no punch = error     ", st2.errors, 1);
+
+    remove("mac_test_8dump.tape");
+}
+
+/* ---------------------------------------------------------------------- */
 int main(void)
 {
     printf("=== MAC-C assembler unit tests ===\n\n");
@@ -2152,6 +2274,7 @@ int main(void)
     test_asm_listing();
     test_mode6_is_p_relative();
     test_nlz_dnz_scaling_field();
+    test_8dump_tape();
 
     printf("\n=== %d passed, %d failed ===\n", g_pass, g_fail);
     return g_fail == 0 ? 0 : 1;

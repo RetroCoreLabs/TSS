@@ -491,7 +491,7 @@ void assemble_stmt(mac_state *st, char *stmt)
             /* emit() so the -L listing records this word too; identical
              * semantics to the former inline store (here == st->loc). */
             emit(st, (uint16_t)(opc + oper.mode));
-            pending_add(oper.undef, here, here, MAC_FIX_PREL8, oper.disp);
+            pending_add(oper.undef, here, here, MAC_FIX_PREL8, oper.disp, 1);
             /* Flag: undefined VALUE OPERAND of a defined MRI (e.g. "STT STRX,B").
              * A real forward ref clears this by being defined; if still
              * undefined at end, mac_check_undefined_opcodes() hard-errors.   */
@@ -563,7 +563,7 @@ void assemble_stmt(mac_state *st, char *stmt)
             emit(st, opc);
             /* oper.disp = constant part of "JMP RFN+2" (2); without it all
              * three ROBJ error exits landed on RFN itself - see mac.h note */
-            pending_add(oper.undef, here, here, MAC_FIX_PREL8, oper.disp);
+            pending_add(oper.undef, here, here, MAC_FIX_PREL8, oper.disp, 1);
             oper.undef->used_as_operand = true; /* undefined JUMP8 target */
             return;
         }
@@ -588,7 +588,7 @@ void assemble_stmt(mac_state *st, char *stmt)
              * semantics to the former inline store (here == st->loc). */
             emit(st, opc);
             /* arg = constant part of the expression (undef sym counted 0)  */
-            pending_add(uo, here, here, MAC_FIX_ARG8, arg);
+            pending_add(uo, here, here, MAC_FIX_ARG8, arg, 1);
             /* Flag: undefined VALUE OPERAND of a defined ARG8 instr, e.g.
              * "SAT STR1" (the STR->XTR rename casualty) -> silently SAT 0.
              * Errors at end of assembly if still undefined.                  */
@@ -712,15 +712,18 @@ void assemble_stmt(mac_state *st, char *stmt)
         bool a = false;
         uint16_t v = eval_expr(st, stmt, &u, &a);
         uint16_t here = st->loc;
-        if (u != NULL)
-        {
-            /* emit() so the -L listing records this word too; identical
-             * semantics to the former inline store (here == st->loc). */
-            emit(st, v);   /* constant part pre-stored; FULL patch ADDS */
-            pending_add(u, here, here, MAC_FIX_FULL, 0);
-            return;
-        }
+        /* emit() so the -L listing records this word too; the constant
+         * part is pre-stored and every undefined USE gets its own SIGNED
+         * FULL fixup - "HSIZ, 8TBE-TBOOT" with both forward is one +8TBE
+         * and one -TBOOT patch on the same word (ND-60.096.01 line 1949).
+         * Registering only the first, unsigned, assembled that cell as
+         * 8TBE's value and broke the CDBIN tape's HLOAD word count.       */
         emit(st, v);
+        for (int k = 0; k < st->neu; k++)
+        {
+            pending_add(st->eu[k].sym, here, here, MAC_FIX_FULL, 0,
+                        st->eu[k].sign);
+        }
     }
 }
 
@@ -1233,21 +1236,29 @@ static void mac_line_inner(mac_state *st, const char *line)
          * )9ASSM handler above (which fully implements nested includes)
          * matches first and returns, so control never reached it. Removed.  */
 
-        /* )SOVER and )8DUMP: INTENTIONAL, documented no-ops.
+        /* )8DUMP: IMPLEMENTED (cmd_8dump). MAC's )SYMBOL form executing
+         * TSS's assembled 8DUMP routine, which PUNCHES the TSS-binary-
+         * format distribution tape (src/TSS3.SYMB:191-231). mac reproduces
+         * that routine's punch output byte for byte on the -p file and
+         * touches no disc - exactly like the original, where the disc was
+         * written only when the punched tape was BOOTED (TBOOT -> HDKOP,
+         * src/TSS3.SYMB:126). See docs/TSS-BRINGUP.md sec 6.7.            */
+        if (strncmp(s, ")8DUMP", 6) == 0)
+        {
+            cmd_8dump(st);
+            return;
+        }
+
+        /* )SOVER: INTENTIONAL, documented no-op.
          * [VERIFIED docs/TSS-ARCHITECTURE.md (overlay chapter) HEADLINE + sec 1.3 + sec 6]
          * )SOVER exists only inside the "NMACF variant of the OVERX macro
          * (TSS3.SYMB:78); every golden build (ASSYSA/ASSYSB/DRUM) sets the
-         * MACF mark, so "NMACF is FALSE and )SOVER is never assembled at all.
-         * )8DUMP appears only in the "TSBIN binary-tape bootstrap region
-         * (TSS5.SYMB:1987,1992) and in the TDUMP utility; TSBIN is FALSE in
-         * these builds. Both are )SYMBOL-style invocations of assembled
-         * ND-100 routines (they would run SOVER/8DUMP machine code to write
-         * the overlay/core image to disc). Reproducing them would require
-         * ND-100 EXECUTION, which this host assembler deliberately does not
-         * do - and it is unnecessary: the run-time disc contract is
-         * reproduced directly by )9MOVE (image staging) + the CDC-disc image
-         * writer (mac_write_cdc_disc), per TSS-ARCHITECTURE.md (overlay chapter) sec 7. So on
-         * the builds mac-c targets these commands correctly do nothing.
+         * MACF mark, so "NMACF is FALSE and )SOVER is never assembled at
+         * all. It would run SOVER machine code to write the overlay image
+         * to disc; the run-time disc contract is reproduced directly by
+         * )9MOVE (image staging) + the CDC-disc image writer
+         * (mac_write_cdc_disc), per TSS-ARCHITECTURE.md (overlay chapter)
+         * sec 7, so on the builds mac-c targets it correctly does nothing.
          * We do NOT fake ND-100 execution.                                  */
 
         /* Any other unhandled ')' command: accepted and ignored. The TSS

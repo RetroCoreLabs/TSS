@@ -133,6 +133,8 @@ uint16_t eval_expr(mac_state *st, const char *expr, mac_sym **undef_sym,
     uint16_t acc = 0;
     int sign = 1;
     char tok[64];
+    /* fresh undefined-use list for this expression (see mac_state.eu)     */
+    st->neu = 0;
     int ti = 0;
     bool have_shift = false;
     uint16_t shift_amt = 0;
@@ -166,7 +168,8 @@ uint16_t eval_expr(mac_state *st, const char *expr, mac_sym **undef_sym,
             {
                 tok[ti] = '\0';
                 bool taddr = false;
-                uint16_t v = eval_term(st, tok, undef_sym, &taddr);
+                mac_sym *tu = NULL;
+                uint16_t v = eval_term(st, tok, &tu, &taddr);
                 if (taddr)
                 {
                     *is_addr = true;
@@ -198,6 +201,26 @@ uint16_t eval_expr(mac_state *st, const char *expr, mac_sym **undef_sym,
                 int eff_sign = shr_pending ? -sign : sign;
                 shr_pending = false;
                 acc = (uint16_t)(acc + eff_sign * v);
+                if (tu != NULL)
+                {
+                    /* one undefined-table entry PER USE, carrying the sign
+                     * of its term (ND-60.096.01 lines 1519 and 1949)      */
+                    if (*undef_sym == NULL)
+                    {
+                        *undef_sym = tu;
+                    }
+                    if (st->neu < MAC_EXPR_MAX_UNDEF)
+                    {
+                        st->eu[st->neu].sym = tu;
+                        st->eu[st->neu].sign = eff_sign;
+                        st->neu++;
+                    }
+                    else
+                    {
+                        mac_err(st, "too many undefined symbols in one "
+                                    "expression:", tok);
+                    }
+                }
                 if (strcmp(tok, "SHR") == 0)
                 {
                     shr_pending = true; /* negate the following count term */

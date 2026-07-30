@@ -37,7 +37,7 @@ void cmd_fill(mac_state *st)
             {
                 st->mem[st->loc] = L->extra;
                 st->used[st->loc] = 1;
-                pending_add(s, st->loc, st->loc, MAC_FIX_FULL, 0);
+                pending_add(s, st->loc, st->loc, MAC_FIX_FULL, 0, 1);
                 st->loc++;
             }
         }
@@ -406,6 +406,174 @@ void cmd_9move(mac_state *st, const char *args)
             if (d > st->hi_used) { st->hi_used = d; }
         }
     }
+}
+
+/* ---- )8DUMP helpers: the three output primitives of TSS's 8DUMP -------- */
+
+/* one raw byte to the punch (the "IOT ACT SKA PFA" of the routine)        */
+static void punch_byte(FILE *out, int b)
+{
+    fputc(b & 0xFF, out);
+}
+
+/* 8WOUT (src/TSS3.SYMB:223-224): one word as TWO bytes, HIGH byte first.
+ * Derivation from the shifts: "SAD ZIN SHR 10" moves A's high byte into
+ * A's low byte (punched first); "SAD 10" shifts the pair back so A holds
+ * the original word again and its LOW byte is punched second.             */
+static void punch_word(FILE *out, uint16_t w)
+{
+    punch_byte(out, (w >> 8) & 0xFF);
+    punch_byte(out, w & 0xFF);
+}
+
+/* 8NOUT (src/TSS3.SYMB:226-229): one word as SIX octal ASCII digits.
+ * "SAD 1" extracts the top bit for the first digit, then five "SAD 3"
+ * rounds of three bits each (SAX -5 / JNC *-5); every digit gets
+ * "AAA ##0" added, i.e. plain '0'-based ASCII with no parity bit.         */
+static void punch_oct6(FILE *out, uint16_t w)
+{
+    punch_byte(out, '0' + ((w >> 15) & 1));
+    for (int sh = 12; sh >= 0; sh -= 3)
+    {
+        punch_byte(out, '0' + ((w >> sh) & 7));
+    }
+}
+
+/* the blank leader: "SAX -177; SAA 0; punch; JNC *-2" = 127 zero bytes    */
+static void punch_leader(FILE *out)
+{
+    for (int i = 0; i < 0177; i++)
+    {
+        punch_byte(out, 0);
+    }
+}
+
+/* )8DUMP - punch onto the TSS-binary-format distribution tape.
+ *
+ * NOT a MAC command: it is MAC's )SYMBOL form (ND-60.096.01 sec 3.2.3.9,
+ * "causes a jump to the address given by the value of the symbol")
+ * executing TSS's OWN assembled routine 8DUMP, "%DUMP ONTO TSS BINARY
+ * FORMAT TAPE" (src/TSS3.SYMB:191-231; same cells and framing in
+ * src/TDUMP.SYMB:203-259). mac reproduces that routine's PUNCH OUTPUT
+ * byte for byte on the -p punch file. It does not touch any disc: on the
+ * real machine the disc was written later, when the punched tape was
+ * BOOTED and TBOOT wrote every disc-tagged block through HDKOP
+ * (src/TSS3.SYMB:126 "TB3, LDX HCORX; LDT HDKA; JPL HDKOP").
+ *
+ * The parameters are memory CELLS, set by location-set lines just before
+ * the command (src/TSS3.SYMB:284-296 "8FCN/ 1  8CADR/ DKRST ..."):
+ *
+ *   8FCN  = 0  punch the tape header: blank leader, then the HLOAD
+ *              hardware bootstrap as octal ASCII framed "<HLOAD>/ ...
+ *              <HLOAD>!" (the format the ROM tape leader loads), then
+ *              the words HLDE..8TBE-1 (TBOOT + 8WORD + HDKOP) as raw
+ *              binary, then the sync word 125252 - 0xAAAA, byte-phase
+ *              proof, which TBOOT scans for (src/TSS3.SYMB:115)
+ *  != 0  punch one load block, per 8CADR:
+ *          8CADR = -1  the trailer: 177777, then 8DKA twice, then a
+ *                      blank leader. TBOOT reads the trailer's 8DKA:
+ *                      -1 = WAIT (halt), else JMP to that address
+ *                      (src/TSS3.SYMB:116-118; TSS5.SYMB:1989-1992 uses
+ *                      7, entering the SYSSV cold-start vector)
+ *          else        [8CADR][8DKA][8NWD][8NWD words from core 8CADR]
+ *                      [checksum = 16-bit sum of the words]. TBOOT loads
+ *                      the words to core 8CADR and, for 8DKA != -1,
+ *                      writes them to disc address 8DKA.
+ *
+ * Loop shapes are the routine's own do-while (MIN ...; SUB ...; JAN):
+ * kept exactly, including punching one word when 8NWD = 0.                */
+void cmd_8dump(mac_state *st)
+{
+    if (st->punch == NULL)
+    {
+        mac_err(st, ")8DUMP: no punch device (give mac -p FILE)", NULL);
+        return;
+    }
+    if (!sym_is_defined(st, "8FCN"))
+    {
+        mac_err(st, ")8DUMP parameter cell is undefined:", "8FCN");
+        return;
+    }
+    FILE *out = st->punch;
+    uint16_t fcn = st->mem[sym_lookup_value(st, "8FCN")];
+
+    if (fcn == 0)
+    {
+        /* tape header: needs the assembled bootstrap/loader region        */
+        static const char *hdr[3] = {"HLOAD", "HLDE", "8TBE"};
+        for (int i = 0; i < 3; i++)
+        {
+            if (!sym_is_defined(st, hdr[i]))
+            {
+                mac_err(st, ")8DUMP fcn 0 needs the bootstrap symbol:",
+                        hdr[i]);
+                return;
+            }
+        }
+        uint16_t hload = sym_lookup_value(st, "HLOAD");
+        uint16_t hlde  = sym_lookup_value(st, "HLDE");
+        uint16_t tbe   = sym_lookup_value(st, "8TBE");
+
+        punch_leader(out);
+        punch_oct6(out, hload);
+        punch_byte(out, '/');
+        uint16_t a = hload;
+        do                                   /* 8LOOP: HLOAD..HLDE-1      */
+        {
+            punch_oct6(out, st->mem[a]);
+            punch_byte(out, 015);            /* CR */
+            punch_byte(out, 012);            /* LF */
+            a = (uint16_t)(a + 1);
+        } while ((int16_t)(a - hlde) < 0);
+        punch_oct6(out, hload);
+        punch_byte(out, '!');
+        do                                   /* 8LP1: HLDE..8TBE-1        */
+        {
+            punch_word(out, st->mem[a]);
+            a = (uint16_t)(a + 1);
+        } while ((int16_t)(a - tbe) < 0);
+        punch_word(out, 0125252);            /* the sync word             */
+        return;
+    }
+
+    /* 8D1: a load block or the trailer                                    */
+    static const char *cells[3] = {"8CADR", "8DKA", "8NWD"};
+    for (int i = 0; i < 3; i++)
+    {
+        if (!sym_is_defined(st, cells[i]))
+        {
+            mac_err(st, ")8DUMP parameter cell is undefined:", cells[i]);
+            return;
+        }
+    }
+    uint16_t cadr = st->mem[sym_lookup_value(st, "8CADR")];
+    uint16_t dka  = st->mem[sym_lookup_value(st, "8DKA")];
+
+    if (cadr == 0177777)                     /* trailer                   */
+    {
+        punch_word(out, 0177777);
+        punch_word(out, dka);
+        punch_word(out, dka);                /* punched twice - 8WOUT     */
+        punch_leader(out);                   /* restores A, TSS3:210-212  */
+        return;
+    }
+
+    uint16_t nwd = st->mem[sym_lookup_value(st, "8NWD")];
+    punch_word(out, cadr);
+    punch_word(out, dka);
+    punch_word(out, nwd);
+    uint16_t chk = 0;
+    uint16_t a = cadr;
+    uint16_t cnt = 0;
+    do                                       /* 8LP2                      */
+    {
+        uint16_t w = st->mem[a];
+        punch_word(out, w);
+        chk = (uint16_t)(chk + w);
+        a = (uint16_t)(a + 1);
+        cnt = (uint16_t)(cnt + 1);
+    } while ((int16_t)(cnt - nwd) < 0);
+    punch_word(out, chk);
 }
 
 /* )WRITE SYM... - list the named user symbols and their values; symbols

@@ -261,8 +261,14 @@ void mac_close_streams(mac_state *st)
     {
         fclose(st->object);
     }
+    if (st->own_punch && st->punch != NULL)
+    {
+        fclose(st->punch);
+    }
     st->listing = NULL;
     st->object = NULL;
+    st->punch = NULL;
     st->own_listing = false;
     st->own_object = false;
+    st->own_punch = false;
 }

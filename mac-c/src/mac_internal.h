@@ -80,7 +80,7 @@ mac_sym    *sym_intern(mac_state *st, const char *name);
 void        sym_resolve_fixups(mac_state *st, mac_sym *sym, mac_fixup **head);
 mac_fixup **pending_chain_for(mac_sym *sym);
 void        pending_add(mac_sym *sym, uint16_t addr, uint16_t pc,
-                        mac_fix_kind k, uint16_t addend);
+                        mac_fix_kind k, uint16_t addend, int sign);
 void        mac_err(mac_state *st, const char *msg, const char *detail);
 void        emit(mac_state *st, uint16_t word);
 
@@ -122,6 +122,7 @@ void  cmd_9set(mac_state *st, const char *args);
 void  cmd_zero(mac_state *st, const char *args);
 void  cmd_change(mac_state *st);
 void  cmd_9move(mac_state *st, const char *args);
+void  cmd_8dump(mac_state *st);
 void  cmd_write(mac_state *st, const char *args, FILE *out);
 void  cmd_wrus(mac_state *st, FILE *out);
 void  cmd_wloc(mac_state *st, FILE *out);

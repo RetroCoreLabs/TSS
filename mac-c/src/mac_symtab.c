@@ -74,7 +74,11 @@ void sym_resolve_fixups(mac_state *st, mac_sym *sym, mac_fixup **head)
         switch (f->kind)
         {
         case MAC_FIX_FULL:
-            st->mem[f->addr] = (uint16_t)(st->mem[f->addr] + sym->value);
+            /* "added or subtracted (whichever is appropriate)" - the sign
+             * the use carried in its expression (ND-60.096.01 line 1949) */
+            st->mem[f->addr] = (uint16_t)(f->sign < 0
+                                  ? st->mem[f->addr] - sym->value
+                                  : st->mem[f->addr] + sym->value);
             break;
         case MAC_FIX_PREL8:
         {
@@ -132,13 +136,14 @@ mac_fixup **pending_chain_for(mac_sym *sym)
  * emitted word itself and pass 0 here; PREL8/ARG8 words hold opcode+mode
  * in the field being patched, so the constant must travel in the fixup.   */
 void pending_add(mac_sym *sym, uint16_t addr, uint16_t pc,
-                        mac_fix_kind k, uint16_t addend)
+                        mac_fix_kind k, uint16_t addend, int sign)
 {
     mac_fixup **head = pending_chain_for(sym);
     mac_fixup *f = (mac_fixup *)calloc(1, sizeof(mac_fixup));
     f->addr = addr;
     f->pc = pc;
     f->addend = addend;
+    f->sign = (int8_t)(sign < 0 ? -1 : 1);
     f->kind = k;
     f->next = *head;
     *head = f;

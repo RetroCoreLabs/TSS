@@ -44,6 +44,35 @@ cat > "$BUILD/ASSYS-TDUMP.SYMB" <<'STREAM'
 CDC
 N10
 )9ASSM TDUMP,"LISTT:SYMB","TSYMB:SYMB"
+%
+% Punch the disc-bootstrap INSTALL TAPE (mac -p), the way the original
+% TSBIN assembly punched its CDBIN distribution tape (src/TSS3.SYMB:232-296):
+% first the tape header - HLOAD as octal ASCII plus TBOOT/8WORD/HDKOP as
+% binary, here the CDC+N10 IOX variants from this assembly - then one load
+% block per disc region. Booting the tape runs TSS's own TBOOT, which
+% writes every disc-tagged block to the disc through HDKOP (TSS3.SYMB:126).
+%
+8FCN/ 0
+)8DUMP
+%
+8FCN/ 1
+8CADR/ DKRST
+8DKA/ 0
+8NWD/ DKRE
+)8DUMP
+%
+8FCN/ 1
+8CADR/ RDKOP
+8DKA/ 2
+8NWD/ DBOE
+)8DUMP
+%
+% Trailer: 8DKA = -1 makes TBOOT WAIT (halt) after the install
+% (TSS3.SYMB:117; the full-system tape used 7 to enter SYSSV instead).
+8FCN/ 1
+8CADR/ -1
+8DKA/ -1
+)8DUMP
 )LIST
 )9EXIT
 STREAM
@@ -55,6 +84,7 @@ echo
 
 cd "$BUILD"
 "$MAC" ASSYS-TDUMP.SYMB -b tdump.bpun -o tdump.img -e TDUMP \
+    -p cdbin-boot.bpun \
     >build.out 2>build.err
 status=$?
 echo "  exit status : $status"

@@ -81,7 +81,17 @@ make build                                (mac-c + tests + all artifacts)
 At the `@` prompt, `HELP` lists the full ~60-command catalogue and
 `WHO-IS-ON` prints `1 SYSTEM`. **[VERIFIED]** live.
 
-Quality gates at this state: mac-c tests **718 passed / 0 failed**; golden
+> **[VERIFIED 2026-07-31] The disc alone is now bootable, installed the
+> original way.** `mac`'s `)8DUMP` punches the CDBIN bootstrap tape during
+> the TDUMP build, `make prepare` boots that tape, and **TSS's own
+> `TBOOT`/`HDKOP` write the boot sectors to the disc** — the 1973
+> installation mechanism, end to end. Once a cold-start or login has run
+> (`SYSSV` saves the core image on every `--start=7` boot), `make discboot`
+> cold-boots TSS from the CDC disc with **no paper tape**, and the
+> `LOAD-SYSTEM` command — the one command that never returned — reloads
+> and comes back up. Mechanism and provenance: §6.7.
+
+Quality gates at this state: mac-c tests **732 passed / 0 failed**; golden
 oracle **679/693 exact matches (version A), 675/689 (version B)**, zero
 assembly errors; `verify_repo.sh` fully green.
 
@@ -104,7 +114,7 @@ Everything is driven by the top-level `Makefile` (run from WSL,
 **Recommended — one command, fully unattended:**
 
 ```bash
-make build      # once: mac-c + 718 tests + the TSS/MINIT artifacts
+make build      # once: mac-c + 732 tests + the TSS/MINIT artifacts
 make auto       # prepare + format + cold-start, driven over DAP; disc PERSISTS
 make login      # interactive: log in and use TSS
 ```
@@ -122,6 +132,7 @@ typed. Afterwards `make verify` shows *15 free tracks + SYSTEM*, and you `make l
 | 2 | `make format` | `4470` ⏎ , then `4670` ⏎ , then `I` ⏎ ; wait for `FINISHED` | `make verify` → *16 free tracks* |
 | 3 | `make coldstart` | nothing — wait for `NORD TSS VERSION 3.0A IS UP` then `@ENTER` | `make verify` → *15 free + SYSTEM* |
 | 4 | `make login` | at `@ENTER`: `SYSTEM` ⏎ ; at `PROJECT NUMBER P-`: `1` ⏎ ; on the *first* login, at `TYPE IN DATE (DD,MM,YYYY,HH,MM,SS):` e.g. `24,07,2026,15,30,00` ⏎ | you reach the `@` prompt |
+| 5 | `make discboot` | *(optional, after step 3 or 4)* nothing extra — cold boot **from the disc alone**, no paper tape; log in as in step 4 | banner + `@ENTER` with `--boot=cdc` (§6.7) |
 
 What every input means:
 - **MINIT**: `4470` = first user-area disc address (FSYS start), `4670` = last
@@ -315,6 +326,8 @@ cd ~/repos/nd100x/src/cpu/tools/mkptypes && cc -O2 -o mkptypes mkptypes.c
 | `--mms1` | NORD-10 Paging System I (TSS requires it; SINTRAN keeps MMS2) — §4.2 |
 | `--drum=FILE` | TSS swapping drum at IOX 540 |
 | `--cdc=FILE` | CDC system disc at IOX 500–507 |
+| `--boot=cdc` | cold boot from the CDC disc: sector 0 → core 0, start at 0 (the front-panel LOAD button). Needs a dummy `--image=` (validation quirk, §6.7) |
+| `--boot=tape` | the front-panel octal-ASCII tape load: deposits the `<addr>/ words <addr>!` leader, starts at `!`, and leaves the tape in the reader so the loaded program reads the binary remainder — what a CDBIN distribution tape needs (§6.7) |
 | `--opr=OCTAL` | preset the operator's-panel switch register read by `TRA OPR`; e.g. `--opr=131313`. F12 → **[6] Control Panel Switches** edits it live |
 | `--start=OCTAL` | override the BPUN autostart entry (e.g. `--start=7`) |
 | `--pipe` | keyboard from stdin (expect-style console automation) |
@@ -761,6 +774,86 @@ print("SYSTEM on disc:", b"\x53\x59\x53\x54\x45\x4D" in d[106*512:107*512]) # Tr
 **[VERIFIED] result:** MIB set bits **16 → 15** (`GTRK` claimed one track by
 clearing its free bit) and the name `SYSTEM` appears in the user-table
 region at physical sector 106. That is the account, on disc.
+
+### 6.7 Booting from the disc alone — `make discboot` [VERIFIED 2026-07-31]
+
+After any completed cold-start or login (i.e. once `SYSSV` has written the
+core image, §6.5 step 2), the disc boots the system with **no paper tape**:
+
+```bash
+make discboot          # nd100x --boot=cdc: sector 0 -> core 0, start at 0
+```
+
+**[VERIFIED]** live: `NORD TSS VERSION 3.0A IS UP`, login as SYSTEM, `DATE`
+answers. `LOAD-SYSTEM` from a running system exercises the same path
+(`LOADV`, `src/TSS5.SYMB:604`, reads disc page 0 to core 0 and `RCLR DP`)
+and also works: the system reloads, reprints the banner, and takes a fresh
+login.
+
+#### How the original installed its disc bootstrap — and how we do the same
+
+The 1973 bring-up is reconstructed from the source, and this repository
+reproduces it mechanism for mechanism:
+
+1. **`)8DUMP` punches the distribution tape.** `)8DUMP` is not a MAC
+   command — it is MAC's `)SYMBOL` form (ND-60.096.01 §3.2.3.9) executing
+   TSS's own assembled routine `8DUMP`, "%DUMP ONTO TSS BINARY FORMAT
+   TAPE" (`src/TSS3.SYMB:191-231`). A `TSBIN` assembly punched, in order:
+   the `HLOAD` hardware bootstrap as an octal-ASCII leader plus
+   `TBOOT`/`HDKOP` as raw binary (`8FCN/ 0`), the two boot-sector blocks
+   tagged disc addresses 0 and 2 (`src/TSS3.SYMB:284-296`), one
+   disc-tagged block per overlay (the `"TSBIN` branch of `)SOVER`,
+   `src/TSS3.SYMB:39-42`), the whole core image (`src/TSS5.SYMB:1983-1987`)
+   and a trailer whose `8DKA` word is **7** — the `SYSSV` cold-start
+   vector (`src/TSS5.SYMB:1989-1992`).
+2. **Booting that tape IS the installation.** `TBOOT` loads each block and
+   **writes every disc-tagged block to the disc itself** (`TB3, LDX HCORX;
+   LDT HDKA; JPL HDKOP`, `src/TSS3.SYMB:126`), then the trailer jumps to 7:
+   `SYSSV` saves the core image to disc `CORLD`, `INIT` starts the system.
+   The operator procedure was: MINIT-format the disc, boot the tape, done.
+
+`mac` implements `)8DUMP` **byte-exactly** (the `-p FILE` punch device;
+pinned by test [19] in `mac-c/tests/test_mac.c`), and
+`mac-c/scripts/build/build_tdump.sh` drives it exactly as
+`src/TSS3.SYMB:232-296` does — against the **unmodified** `src/TDUMP.SYMB`
+assembled with the `CDC` + `N10` marks, because TDUMP carries the NORD-10
+`IOX` variants of `HLOAD`/`TBOOT`/`HDKOP`/`DKRST`/`RDKOP`/`DBOOT` that our
+machine and the emulated CDC (channel 0500) need. The result is
+`Build/tdump/cdbin-boot.bpun` — a real CDBIN-format install tape holding
+the header, the two boot-sector blocks, and a `8DKA/-1` trailer (WAIT
+halt after installing; the full-system tape used 7 instead).
+
+**Installing = booting the tape** (`make prepare` and `make bootsector` do
+this): `nd100x --boot=tape` performs the front-panel tape load — deposits
+the octal-ASCII leader, starts at its `!` address, and leaves the tape
+mounted in the reader so `HLOAD` reads on — after which **TSS's own code
+writes the boot sectors**: the CDC trace shows `HDKOP`'s two writes land on
+physical sectors 0 and 4, through the routine's own `DKADR` arithmetic.
+No host program touches the disc image.
+
+**The boot chain from disc** (`--boot=cdc` = the LOAD button: sector 0 →
+core 0, start at 0): the boot sector executes position-independently
+(`JMP *+2; CORLD / SAT 2; LDX (RDKOP; JPL RDKOP; JMP I (DBOOT`), reads
+disc page 2 to `RDKOP`'s assembled home 040441 and jumps there. `DBOOT`
+reads the coreload disc page out of **core word 1** (`LDA I (1` — the
+`CORLD` word the boot sector supplies), reloads core `0`–`037777` in 64
+passes from disc pages `060`–`0157`, and enters `INIT` via `JMP I (301`.
+
+**Why the TDUMP variant and not the TSS3 one.** The corpus holds the
+disc-restart routine twice. `src/TSS3.SYMB:244-274` is `"CDC NMACF`
+(NORD-1 `IOT`, channel 0144) and is assembled at 030416 — *inside* the
+range `DBOOT` reloads, so on pass 50 it overwrites its own executing page.
+`src/TDUMP.SYMB:264-327` carries the `"CDC N10` `IOX` variant, and TDUMP
+is assembled at `40000/` (`src/TDUMP.SYMB:20`), **above** `MSTRT=040000`,
+outside the reload range — it survives its own reload by design and works
+against any system image on the disc.
+
+**nd100x notes:** `--boot=tape` is the front-panel octal-ASCII tape load
+(added for this flow; the `--boot=bpun` path parses the ASCII part as
+metadata only and cannot load a CDBIN tape). `--boot=cdc` requires a dummy
+`--image=` argument (the argument validation was never taught about the
+CDC boot type; the file is ignored) — the `make discboot` recipe passes
+the CDC image path.
 
 ---
 

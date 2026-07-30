@@ -32,7 +32,9 @@ its findings are absorbed into `PROJECT-DESCRIPTION.md`.
 
 For a guided architecture tour, see [`../ppt/Intro to TSS.pdf`](../ppt/).
 
-**No dated handoff files.** Session handoffs went stale faster than they were
-read and accumulated retracted conclusions; their live content is in
-`OPEN-QUESTIONS.md` and their evidence in the documents above. The history is
-in `git log`.
+**Handoffs.** [`HANDOFF-2026-07-30.md`](HANDOFF-2026-07-30.md) records the
+state at the end of that session, including work in the nd100x emulator
+repository. Handoffs are a snapshot and go stale: the *live* list of what is
+unanswered is always [`OPEN-QUESTIONS.md`](OPEN-QUESTIONS.md), and the
+evidence lives in the subject documents above. When a handoff and a subject
+document disagree, the subject document wins.

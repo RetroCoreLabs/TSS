@@ -82,8 +82,15 @@ drum: $(MAC)
 minit: $(MAC)
 	./scripts/build/build_minit.sh
 
+# TDUMP (CDC+N10) -> ../Build/tdump/: the TSS dumper assembly AND the CDBIN
+# bootstrap-install tape (cdbin-boot.bpun), punched by )8DUMP the way the
+# original TSBIN assembly punched its distribution tape.  Booting that tape
+# installs the disc bootstrap; see ../docs/TSS-BRINGUP.md sec 6.7.
+tdump: $(MAC)
+	./scripts/build/build_tdump.sh
+
 # Everything that mac-c produces from the sources.
-artifacts: tss drum minit
+artifacts: tss drum minit tdump
 
 # The full monty: tool + tests + every artifact.
 all: tools test artifacts

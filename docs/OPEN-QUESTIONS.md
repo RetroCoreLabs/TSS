@@ -175,7 +175,7 @@ the accounting file. Re-test in the other order.
 Several long-running items were closed by **single-variable experiments on a
 running machine** after months of source reasoning failed. The recurring
 failure mode, recorded in `TSS-FLOAT-FORMAT.md` §7 and
-`MAC-ASSEMBLER.md` §6.9: a correct measurement gets dismissed because it
+`MAC-ASSEMBLER.md` §6.10: a correct measurement gets dismissed because it
 contradicts what the source says the code should do — while the *emitted code
 does not match the source*. Two oracles (718 assertions, the golden dumps)
 were fully satisfied by a binary whose clock arithmetic was inverted, because

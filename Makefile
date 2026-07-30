@@ -27,6 +27,7 @@
 TSS_BPUN   := Build/drum/tss-drum.bpun
 TSS_CDC    := Build/drum/tss-cdc.img
 MINIT_BPUN := Build/minit/minit.bpun
+CDBIN_TAPE := Build/tdump/cdbin-boot.bpun
 
 # Disposable working area for the bring-up disc images (created by `prepare`).
 WORK := Build/bringup
@@ -60,7 +61,10 @@ help: ## list all targets (this text)
 	@echo "The full bring-up, in order (interactive stages marked *):"
 	@echo "    make build          make prepare        make format   *"
 	@echo "    make verify         make coldstart *    make verify"
-	@echo "    make login     *"
+	@echo "    make login     *    make discboot  *"
+	@echo ""
+	@echo "After any completed coldstart or login, the disc alone is bootable:"
+	@echo "    make discboot   boots from the CDC disc with NO paper tape."
 	@echo ""
 	@awk 'BEGIN {FS = ":.*##"} \
 	     /^##@/      { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } \
@@ -76,10 +80,10 @@ help: ## list all targets (this text)
 ##@ Build and test (delegates to mac-c/Makefile)
 # ---------------------------------------------------------------------------
 
-build: ## build mac-c + run tests + build all TSS artifacts (tss/drum/minit)
+build: ## build mac-c + run tests + build all TSS artifacts (tss/drum/minit/tdump)
 	$(MAKE) -C mac-c all
 
-test: ## run the mac-c unit-test suite (695 assertions, must be 0 failures)
+test: ## run the mac-c unit-test suite (732 assertions, must be 0 failures)
 	$(MAKE) -C mac-c test
 
 golden: ## rebuild the golden ASSYSA/ASSYSB streams and score vs the 1978 oracle
@@ -103,18 +107,37 @@ need-nd:
 $(TSS_BPUN) $(TSS_CDC) $(MINIT_BPUN):
 	@echo "ERROR: missing $@ — run 'make build' first." >&2; exit 1
 
+# The CDBIN bootstrap-install tape, punched by mac's )8DUMP from the
+# unmodified TDUMP.SYMB (CDC+N10 marks) exactly as the original TSBIN
+# assembly punched its distribution tape. Committed, regenerable any time.
+$(CDBIN_TAPE):
+	cd mac-c && ./scripts/build/build_tdump.sh
+
 # The CDC image is padded to 4 MB (8192 sectors) because the emulated CDC
 # device does NOT grow on writes, and the TSS user area (FSYS = NCR 4470
 # octal) maps to a high physical sector; padding appends zeros only, so the
 # overlays written by the build are untouched.  The drum is a blank 1 MB.
-prepare: $(TSS_BPUN) $(TSS_CDC) $(MINIT_BPUN) ## STEP 1: fresh padded disc set in Build/bringup/
+#
+# The disc bootstrap is installed THE ORIGINAL WAY: mac's )8DUMP punches the
+# CDBIN install tape during the TDUMP build (exactly what the TSBIN assembly
+# punched in 1973, src/TSS3.SYMB:232-296), and booting that tape runs TSS's
+# own HLOAD -> TBOOT -> HDKOP, which writes the boot sectors to the disc
+# itself.  TBOOT's trailer (8DKA = -1) ends in a WAIT halt; --max-instr
+# bounds the run so the recipe always returns (the writes are write-through).
+prepare: $(TSS_BPUN) $(TSS_CDC) $(MINIT_BPUN) $(CDBIN_TAPE) need-nd ## STEP 1: fresh padded disc set in Build/bringup/
 	mkdir -p $(WORK)
 	cp $(TSS_BPUN) $(BPUN)
 	cp $(TSS_CDC)  $(CDC)
 	truncate -s 4M $(CDC)
 	head -c 1048576 /dev/zero > $(DRUM)
+	$(ND) --boot=tape --image=$(CDBIN_TAPE) --cdc=$(CDC) --max-instr=2000000
 	@echo ""
-	@echo "Fresh disc set in $(WORK).  Next: make format"
+	@echo "Fresh disc set in $(WORK) (bootstrap installed from the CDBIN tape)."
+	@echo "Next: make format"
+
+bootsector: $(CDBIN_TAPE) need-nd ## (re)install the disc bootstrap by BOOTING the CDBIN tape against Build/bringup/cdc.img
+	@test -f $(CDC) || { echo "Run 'make prepare' first." >&2; exit 1; }
+	$(ND) --boot=tape --image=$(CDBIN_TAPE) --cdc=$(CDC) --max-instr=2000000
 
 format: need-nd ## STEP 2 (interactive): MINIT format — type 4470, 4670, I; Ctrl-C at FINISHED
 	@test -f $(CDC) || { echo "Run 'make prepare' first." >&2; exit 1; }
@@ -131,6 +154,18 @@ login: need-nd ## STEP 4 (interactive): normal boot; type SYSTEM, then 1 — you
 	@echo ">>> Normal boot. At @ENTER type: SYSTEM <Enter>, at PROJECT NUMBER: 1 <Enter>."
 	@echo ">>> First login also asks TYPE IN DATE (DD,MM,YYYY,HH,MM,SS). Then: @ — try HELP."
 	$(ND) --boot=bpun --image=$(BPUN) --cdc=$(CDC) --drum=$(DRUM) --start=7
+
+# --boot=cdc reads physical sector 0 into core 0 and starts at 0, exactly what
+# the front-panel LOAD button did.  Needs the bootstrap sectors (installed by
+# the CDBIN tape in make prepare / make bootsector) AND a system image on the
+# disc — SYSSV writes that image on every --start=7 boot, so any completed
+# coldstart or login leaves the disc bootable.  The --image argument is a
+# dummy: nd100x's argument validation demands one for --boot=cdc but the CDC
+# boot path never reads it.
+discboot: need-nd ## STEP 5 (interactive): cold boot from the DISC ALONE — no paper tape
+	@test -f $(CDC) || { echo "Run steps 1-3 first (prepare/format/coldstart)." >&2; exit 1; }
+	@echo ">>> Cold boot from disc (no tape image). At @ENTER log in as usual."
+	$(ND) --boot=cdc --image=$(CDC) --cdc=$(CDC) --drum=$(DRUM)
 
 auto: prepare need-nd ## ONE-COMMAND bring-up: prepare + format + cold-start, fully unattended (DAP-driven, disc PERSISTS). Then: make login
 	@echo ">>> Automated bring-up: format + cold-start, driven over DAP and stopped"
@@ -168,6 +203,11 @@ dap-login: need-nd ## STEP 4 under the DAP debugger
 	$(ND) --boot=bpun --image=$(BPUN) --cdc=$(CDC) --drum=$(DRUM) --start=7 \
 	      --debugger --port=$(DAP_PORT)
 
+dap-discboot: need-nd ## STEP 5 under the DAP debugger
+	@test -f $(CDC) || { echo "Run steps 1-3 first (prepare/format/coldstart)." >&2; exit 1; }
+	$(ND) --boot=cdc --image=$(CDC) --cdc=$(CDC) --drum=$(DRUM) \
+	      --debugger --port=$(DAP_PORT)
+
 # The bringu[p] bracket keeps pgrep from matching its own sh -c command line.
 stop: ## SIGINT the bring-up emulator (= Ctrl-C: flushes the CDC image) and wait for exit
 	@PID=$$(pgrep -f "nd100x.*Build/bringu[p]" | head -1); \
@@ -186,5 +226,6 @@ status: ## show artifact presence, disc state, and whether an emulator is runnin
 	@pgrep -af "nd100x.*Build/bringu[p]" || echo "emulator      : not running"
 	@[ -f $(CDC) ] && python3 bringup/verify-disc.py || true
 
-.PHONY: help build test golden verify-repo need-nd prepare format coldstart login \
-        verify check-encoding clean-bringup dap-format dap-coldstart dap-login stop status
+.PHONY: help build test golden verify-repo need-nd prepare bootsector format \
+        coldstart login discboot verify check-encoding clean-bringup \
+        dap-format dap-coldstart dap-login dap-discboot stop status

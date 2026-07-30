@@ -10,9 +10,10 @@ make help          # lists every target with a one-line description
 **Fastest — one unattended command** (does format + cold-start, disc persists):
 
 ```bash
-make build         # once: mac-c + 718 tests + all TSS artifacts
+make build         # once: mac-c + 732 tests + all TSS artifacts
 make auto          # prepare + format + cold-start, driven over DAP, no typing
 make login         # then log in interactively
+make discboot      # from now on: cold boot from the DISC ALONE (no paper tape)
 ```
 
 Or the same thing by hand (interactive stages marked `*`):
@@ -26,6 +27,9 @@ make coldstart     # STEP 3*: creates user SYSTEM; wait for @ENTER
 make verify        #   -> expect: 15 free + SYSTEM
 make login         # STEP 4*: at @ENTER type SYSTEM ⏎, project number 1 ⏎,
                    #   first login asks TYPE IN DATE — then you are at the @ prompt
+make discboot      # STEP 5*: cold boot from the disc alone — no paper tape.
+                   #   Works after any completed coldstart/login (SYSSV has
+                   #   saved the core image); log in as in step 4
 ```
 
 > **Persistence [fixed 2026-07-24]:** the CDC and drum devices in nd100x are now
@@ -92,6 +96,8 @@ Connect a DAP client to `127.0.0.1:1777`, enable console capture on
 | cold-start never shows `@ENTER` | started at ISTRT, not 7 | the make targets pass `--start=7`; check overrides |
 | `make verify` shows 16 free after coldstart | SINIT never ran | boot with `--opr=131313` at addr 7 (`make coldstart` does) |
 | login loops silently after the project number | stale `mac-c` | run `make build`, `make prepare`, redo steps; `make check-encoding` must say FIXED |
+| `make discboot` is silent / dead | no core image on the disc yet (SYSSV has never run) | run `make coldstart` or `make login` once first |
+| `make discboot` executes garbage at once | boot sectors missing (disc predates `make prepare`'s tape install) | `make bootsector` — boots the CDBIN tape, TSS's own TBOOT/HDKOP write sectors 0 and 4 |
 | disc changes lost after a run | emulator not stopped with SIGINT | always Ctrl-C / `make stop` |
 
 Override the emulator path or DAP port: `make login ND=/path/to/nd100x DAP_PORT=1780`.

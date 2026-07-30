@@ -88,10 +88,44 @@ through `0301`. No front-panel intervention is involved.
 `RCLR DP` transfers control to whatever is there. That is the whole defect:
 the command is correct and the disc is unprepared.
 
-**The fix is to write the boot sector**, not to change any code — establish
-what `DKRST`/`CORLD`/`DBOOT` expect at pages 0 and 2 and at `core[1]`, and
-have the bring-up write it. Deciding whether that belongs in MINIT, in a
-build variant, or in a separate bring-up step is the first question.
+**Investigated 2026-07-30. The mechanism is proven; the archived bootstrap
+cannot drive this machine.** What was established, each by measurement:
+
+1. The producer exists: `src/TSS3.SYMB:284-292`, under `"CDBIN`, emits
+   `8CADR/DKRST 8DKA/0` and `8CADR/RDKOP 8DKA/2` - the boot sector and its
+   helper. It is guarded by `"TSBIN`, FALSE in both archived builds
+   (`src/TSS1.SYMB:47`).
+2. `SYSSV` (`src/TSS1.SYMB:4108`) already writes 64 pages of core to disc from
+   `CORLD=60` via `XDISK`. The system image is on the disc; `DBOOT` reads back
+   exactly that range. Only the boot sector was missing.
+3. Writing `DKRST` (54 words) to logical disc 0 and `RDKOP`/`DBOOT` (67 words)
+   to logical disc 2, mapped through `cdc_dkadr` (physical sectors 0 and 4),
+   **works**: after `LOAD-SYSTEM`, `core[0..7]` reads
+   `171002 054003 134004 125002 030424 030504`, exactly `DKRST`, with
+   `P=000006 T=000002 X=030424 L=000003` - `LOADV` read page 0 and `RCLR DP`
+   executed it. Both sectors were zero beforehand.
+4. It then **spins forever** at `RDKOP`'s `IOT SKA DISC; JMP *-1`. The
+   bootstrap is `"CDC NMACF` code that talks NORD-1 `IOT` to disc channel
+   `DISC=DCHN+44`. `DISC` is defined only in the `NN10` branch, so an `N10`
+   build assembles `IOT SKA 0`; an `NN10` build assembles device `0144`.
+   **There is no NORD-10 `IOX` variant of `DKRST`/`RDKOP` in the corpus.**
+   Our running system is the DRUM+N10 build, whose disc lives at `IOX 500-507`.
+5. nd100x's CDC controller supports only thumbwheel 0 -> address `0500`
+   (`src/devices/cdc/deviceCDC.c:573-587`), so it cannot be moved to `0144`.
+
+**Consequence - the goal splits in two:**
+
+- **Making `LOAD-SYSTEM` work is achievable.** `LOADV` runs on the live
+  machine and reads sector 0 itself, so it needs no emulator support - only a
+  boot sector that drives the disc with `IOX`. That code does not exist in the
+  archive and would have to be written, which makes it a `derived/` artifact,
+  not a restoration.
+- **A tape-free cold boot is NOT achievable in nd100x today.** Its boot types
+  are `BP, BPUN, AOUT, PROG, FLOPPY, SMD, SCSI`; `boot_type_for_ctrl`
+  (`src/frontend/nd100x/nd100x.c:102-110`) maps only SMD, FLOPPY and SCSI.
+  There is no CDC boot path. On real hardware the LOAD button and microcode
+  read sector 0; the emulator has no equivalent for this controller. Booting
+  will need `--boot=bpun` until nd100x gains one.
 
 See also `TSS-COMMAND-VALIDATION.md` PART III §2 and
 `TSS-PSEUDOCODE.md` §3.9.

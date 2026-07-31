@@ -7,20 +7,12 @@ cd the repo root
 make help          # lists every target with a one-line description
 ```
 
-**Fastest — one unattended command** (does format + cold-start, disc persists):
+The stages, in order (interactive stages marked `*`):
 
 ```bash
 make build         # once: mac-c + 732 tests + all TSS artifacts
-make auto          # prepare + format + cold-start, driven over DAP, no typing
-make login         # then log in interactively
-make discboot      # from now on: cold boot from the DISC ALONE (no paper tape)
-```
-
-Or the same thing by hand (interactive stages marked `*`):
-
-```bash
-make build
-make prepare       # STEP 1: fresh padded disc set in Build/bringup/
+make prepare       # STEP 1: fresh padded disc set in Build/bringup/;
+                   #   booting the CDBIN tape installs the disc bootstrap
 make format        # STEP 2*: MINIT — type 4470 ⏎  4670 ⏎  I ⏎ ; wait for FINISHED
 make verify        #   -> expect: 16 free tracks
 make coldstart     # STEP 3*: creates user SYSTEM; wait for @ENTER
@@ -32,11 +24,9 @@ make discboot      # STEP 5*: cold boot from the disc alone — no paper tape.
                    #   saved the core image); log in as in step 4
 ```
 
-> **Persistence [fixed 2026-07-24]:** the CDC and drum devices in nd100x are now
-> **write-through** (each sector is written to the image file immediately), so the
-> manual `make format` / `make coldstart` above persist correctly when stopped
-> with **Ctrl-C**. Requires the patched nd100x; on an unpatched build use
-> `make auto` (DAP-driven, clean terminate) for the persisting steps. Full detail:
+> **Persistence:** the CDC and drum devices in nd100x are **write-through**
+> (each sector is written to the image file immediately), so the interactive
+> stages persist correctly when stopped with **Ctrl-C**. Full detail:
 > [`../docs/TSS-BRINGUP.md`](../docs/TSS-BRINGUP.md) §1.4.
 
 `make dap-format` / `make dap-coldstart` / `make dap-login` run the stages under
@@ -47,10 +37,8 @@ you are in.
 
 | file | purpose |
 |---|---|
-| `dap_bringup.py` | **`make auto`'s engine** — a minimal DAP client that launches nd100x under the debugger, auto-answers the MINIT format prompts, runs cold-start, and stops each phase with a clean terminate (so the CDC disc is written back). |
-| `pty_drive.py` | generic PTY console driver (expect/send over nd100x's console). Useful for foreground scripting, but note SIGINT does not persist the CDC — prefer `dap_bringup.py` for anything that must persist. |
-| `verify-disc.py` | reads `Build/bringup/cdc.img` (or a path argument): MIB free-track count, SYSTEM present, and which step to run next |
-| `check-robj-encoding.py` | byte-checks a built BPUN/image for the fixed-vs-broken ROBJ encoding — catches the stale-`mac-c` trap (`make test` does not relink `mac-c`) |
+| `verify-disc.sh` | reads `Build/bringup/cdc.img` (or a path argument): MIB free-track count, SYSTEM present, and which step to run next |
+| `check-robj-encoding.sh` | byte-checks a built BPUN/image for the fixed-vs-broken ROBJ encoding — catches the stale-`mac-c` trap (`make test` does not relink `mac-c`) |
 
 ### Emulator configuration
 

@@ -1026,8 +1026,8 @@ time, so the nd100x CDC device stays a dumb linear-by-physical-sector store
 
 ### 5.6 The 31-overlay layout table
 
-Overlay numbers and OVDK are build-independent (numbers verified from
-`reference/ASYMB.SYMB` via `tools/analysis/overlay_layout.py`). Sectors are octal
+Overlay numbers and OVDK are build-independent (numbers verified against
+the symbol values in `reference/ASYMB.SYMB`). Sectors are octal
 256-word logical sector numbers on the CDC disc; each overlay occupies the
 two consecutive sectors `sec0, sec1` and loads at `ROVER`.
 
@@ -1082,9 +1082,6 @@ Total 31 overlays (0..36 octal = 0..30 dec), logical sectors 160..255.
 5. Copy verbatim — no relocation (matches `)9MOVE` and the reader loading
    straight into `ROVER`).
 6. Overlays go on the CDC disc (channel 500 / 100), never the drum (540).
-7. `tools/analysis/overlay_layout.py` regenerates the overlay→sector table from a
-   `)LIST` dump for diffing.
-
 Not determined from source: the runtime value of `DKBAS` (`DKBAS,0`,
 `TSS1.SYMB:171`; the NCR/SDISK paths add it to the block address, the CDC
 overlay path does not use it); the exact MACM mechanism that transferred

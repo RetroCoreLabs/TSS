@@ -26,15 +26,14 @@ directory before doing anything.
 | `build/` | **all** generated output: objects, `mac`, `test_mac`. Disposable. |
 | `scripts/build/` | the artifact builds — `build_tss_assysa.sh`, `build_tss_drum.sh`, `build_minit.sh`, `run_tss.sh` |
 | `scripts/verify/` | oracle scoring and repo checks — `verify_repo.sh`, `check_coverage.sh`, `compare_asymb.sh`, `first_divergence.sh`, `cmp_syms.sh` |
-| `scripts/extract/` | regenerate `src/mac_permsym.c` from a real MAC/MACM binary |
-| `scripts/attic/` | the probes that localised each historical divergence, kept as the reproduction path for claims the docs state as fact. Not part of any build. |
+| `scripts/attic/` | `diff_cvs_vs_original.sh` and `check_rename_gaps.sh`, which reproduce the `.ORG`-vs-`.SYMB` source analysis (see `../archive/README.md`). Not part of any build. |
 
 Note the two `src/` directories are different things: `mac-c/src/` is the
 assembler's own C source, `../src/` is the TSS MAC corpus it assembles.
 
 ## Current state — measured, not claimed
 
-**Unit tests: 718 passed, 0 failed.** `./scripts/verify/check_coverage.sh` reports
+**Unit tests: 732 passed, 0 failed.** `./scripts/verify/check_coverage.sh` reports
 *no uncovered public functions or implemented commands*.
 
 Instruction coverage is exhaustive rather than sampled:
@@ -263,7 +262,7 @@ covered by tests.
 | `scripts/build/run_tss.sh` | assemble the TSS corpus as ASSYSA does |
 | `scripts/verify/check_coverage.sh` | audits that every public function and command is tested |
 | `scripts/verify/compare_asymb.sh`, `first_divergence.sh`, `cmp_syms.sh` | golden-dump reconciliation |
-| `scripts/attic/probe_*.sh`, `check_symlen.sh`, `find_hash.sh`, `bisect_hash.sh` | diagnostics used to localise divergences |
+| `scripts/attic/diff_cvs_vs_original.sh`, `check_rename_gaps.sh` | reproduce the `.ORG`-vs-`.SYMB` source analysis |
 
 Additional rules established while completing the command set:
 

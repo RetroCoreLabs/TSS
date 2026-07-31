@@ -88,7 +88,7 @@ The user lifecycle is sound: `CREATE-USER` → `CREATE-FRIEND` →
 `INIT-ACCOUNTING`, `DEFINE-VERSION`, `MODE`, `RESET` and `PAUSE` all behave.
 
 `DISK-SPACE` reports `15 TRACKS (30K WORDS) LEFT OUT OF 4096` — an exact
-independent match for `bringup/verify-disc.py`'s reading of the MIB. Disc
+independent match for `bringup/verify-disc.sh`'s reading of the MIB. Disc
 accounting is sound even though time accounting is not.
 
 **`PAUSE` was predicted from source and confirmed live:** a bare CR escapes
@@ -225,7 +225,7 @@ whether reality matches it.
 - [ ] 8. `LIST-USERS` — IN `LIST-USERS` — EXPECT: user numbers + names; only `SYSTEM` on a fresh disc
 - [ ] 9. `LIST-TRACKS` — IN `LIST-TRACKS` — EXPECT: `<n> TRACKS LEFT`
 - [ ] 10. `TIME-USED` — IN `TIME-USED` — EXPECT: `TIME USED IS <t> OUT OF <limit>`
-- [ ] 11. `DISK-SPACE` — IN `DISK-SPACE` — EXPECT: `<n> TRACKS (<k>K WORDS) LEFT OUT OF <total>`; cross-check against `verify-disc.py`'s 15 free tracks
+- [ ] 11. `DISK-SPACE` — IN `DISK-SPACE` — EXPECT: `<n> TRACKS (<k>K WORDS) LEFT OUT OF <total>`; cross-check against `verify-disc.sh`'s 15 free tracks
 - [ ] 12. `LIST-OBJECTS` — IN `LIST-OBJECTS` — EXPECT: object table: entry no., owner, file name, attribute words
 - [ ] 13. `LIST-FRIENDS` — IN `LIST-FRIENDS` — EXPECT: friends of SYSTEM; empty on a fresh disc
 - [ ] 14. `RESPONSE-TIME` — IN `RESPONSE-TIME` — EXPECT: `AVERAGE RESPONSE TIME IS <n.n> SECONDS OVER A PERIOD OF <t>`
@@ -890,7 +890,7 @@ directly, or single-step level 5 under DAP from the `MST PID` in `CRMEM`.
 ## The open contradiction (SUPERSEDED — see above)
 
 `DISK-SPACE` reports **15 free tracks out of 4096**, and
-`bringup/verify-disc.py` independently confirms 15 free in the MIB — yet
+`bringup/verify-disc.sh` independently confirms 15 free in the MIB — yet
 **every allocation fails**. So either cold-start (`SINIT`) leaves the
 per-user quota pool empty while the disc itself has space, or `GTRK` and the
 MIB disagree about what "free" means. Resolving that one question would close
@@ -2168,7 +2168,7 @@ Bring-up chain, in order, all from the repo root:
 | build | `make build` | mac-c + **708 assertions, 0 failures**; TSS, DRUM, MINIT and TDUMP artifacts |
 | encoding guard | `make check-encoding` | `Build/drum/tss-drum.bpun: FIXED` |
 | wipe | `make clean-bringup` | `Build/bringup/` removed |
-| bring-up | `make auto` | MINIT format + cold-start, unattended over DAP |
+| bring-up | `make prepare` + `make format` + `make coldstart` | MINIT format + cold-start (interactive; disc persists on Ctrl-C) |
 | verify | `make verify` | **15 free tracks**, `SYSTEM` present in `USTBL` |
 | quota | `TRANSFER SYSTEM←SYSTEM 20` | `20 TRACKS LEFT` (the D3 bootstrap step) |
 
@@ -2334,7 +2334,7 @@ All from the repo root:
 | build | `make build` | mac-c + **718 assertions, 0 failures**; TSS, DRUM, MINIT artifacts; **0** assembly errors |
 | encoding guard | `make check-encoding` | `Build/drum/tss-drum.bpun: FIXED`, `Build/bringup/tss.bpun: FIXED` |
 | wipe | `make clean-bringup` | `Build/bringup/` removed |
-| bring-up | `make auto` | MINIT format + cold-start, unattended over DAP |
+| bring-up | `make prepare` + `make format` + `make coldstart` | MINIT format + cold-start (interactive; disc persists on Ctrl-C) |
 | verify | `make verify` | **15 free tracks**, `SYSTEM` present in `USTBL` |
 | quota | `TRANSFER SYSTEM<-SYSTEM 20` | `20 TRACKS LEFT`, `DISK-SPACE` 15 of 4096 |
 
@@ -2419,7 +2419,7 @@ of whatever sits under this one.
 
 Three experiments, each isolating one variable, in the order run.
 
-**1. Is the input moving?** (`klok_probe.py`) `KLOK` at `000016`/`000017`
+**1. Is the input moving?** (DAP memory reads of `KLOK`) `KLOK` at `000016`/`000017`
 advances steadily at ~350 ticks/s and never goes backwards. Over 134 seconds
 the elapsed count reached **6736 ticks**, which at the nominal 50 Hz is
 2 min 14 s — so `DATE` should have read `1202:14`. It read `1200:00`.

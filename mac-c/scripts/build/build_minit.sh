@@ -78,16 +78,5 @@ fi
 
 # Range + start-vector check (MACIMG header = 'MACIMG' + base + count).
 if [ -e minit.img ]; then
-python3 - <<'PY'
-import struct
-d = open('minit.img', 'rb').read()
-if d[:6] != b'MACIMG':
-    print("  (image has no MACIMG header - cannot range-check)")
-else:
-    base, count = struct.unpack('>HH', d[6:10])
-    words = [struct.unpack('>H', d[10+2*i:12+2*i])[0] for i in range(count)]
-    top = base + count - 1
-    nz = sum(1 for x in words if x)
-    print(f"  image range: {base:06o}-{top:06o}  ({count} words, {nz} non-zero, {100*nz//count if count else 0}%)")
-PY
+    "$HERE/scripts/verify/macimg_info.sh" minit.img
 fi

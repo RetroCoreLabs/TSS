@@ -78,26 +78,5 @@ fi
 
 # Range + boot vector check (the MACIMG header is 'MACIMG' + base + count).
 if [ -e tss-drum.img ]; then
-python3 - <<'PY'
-import struct
-d = open('tss-drum.img', 'rb').read()
-if d[:6] != b'MACIMG':
-    print("  (image has no MACIMG header - cannot range-check)")
-else:
-    base, count = struct.unpack('>HH', d[6:10])
-    words = [struct.unpack('>H', d[10+2*i:12+2*i])[0] for i in range(count)]
-    def at(a):
-        i = a - base
-        return words[i] if 0 <= i < count else None
-    top = base + count - 1
-    nz = sum(1 for x in words if x)
-    print(f"  image range: {base:06o}-{top:06o}  ({count} words, {nz} non-zero, {100*nz//count}%)")
-    v = at(7)
-    # location 7 is TSS's boot vector: LDT *+3; JMP I *+1; SYSSV; CORLD.
-    # LDT *+3 assembles to 050003; a correct image must have it at word 7.
-    if v is not None:
-        print(f"  loc 7 boot vector: {v:06o}  ({'OK = LDT *+3' if v==0o50003 else 'UNEXPECTED'})")
-    else:
-        print("  loc 7 not present in image")
-PY
+    "$HERE/scripts/verify/macimg_info.sh" tss-drum.img --check-loc7
 fi

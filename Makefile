@@ -4,9 +4,9 @@
 #   Run from WSL (the nd100x emulator and the POSIX tools live there):
 #       make help          (run from the repo root)
 #
-# This Makefile replaces the former bringup/*.sh wrappers; the concrete
-# emulator command lines live in the recipes below.  The two real tools
-# (bringup/verify-disc.py, bringup/check-robj-encoding.py) remain scripts.
+# The concrete emulator command lines live in the recipes below.  The two
+# real tools (bringup/verify-disc.sh, bringup/check-robj-encoding.sh) are
+# POSIX shell scripts.
 #
 # The interactive stages (format / coldstart / login) run the emulator in
 # the FOREGROUND on your terminal: you type into TSS's console and you stop
@@ -167,17 +167,11 @@ discboot: need-nd ## STEP 5 (interactive): cold boot from the DISC ALONE — no 
 	@echo ">>> Cold boot from disc (no tape image). At @ENTER log in as usual."
 	$(ND) --boot=cdc --image=$(CDC) --cdc=$(CDC) --drum=$(DRUM)
 
-auto: prepare need-nd ## ONE-COMMAND bring-up: prepare + format + cold-start, fully unattended (DAP-driven, disc PERSISTS). Then: make login
-	@echo ">>> Automated bring-up: format + cold-start, driven over DAP and stopped"
-	@echo ">>> with a CLEAN debugger-terminate so the CDC disc is actually written back."
-	python3 bringup/dap_bringup.py $(CURDIR) --nd $(ND)
-	@python3 bringup/verify-disc.py
-
 verify: ## check the bring-up disc: MIB free tracks + SYSTEM user present
-	python3 bringup/verify-disc.py
+	./bringup/verify-disc.sh
 
 check-encoding: ## assert the built/working BPUNs carry the FIXED ROBJ encoding (stale-mac-c trap)
-	@python3 bringup/check-robj-encoding.py $(TSS_BPUN) $(wildcard $(BPUN))
+	@./bringup/check-robj-encoding.sh $(TSS_BPUN) $(wildcard $(BPUN))
 
 clean-bringup: ## delete the disposable bring-up disc set (Build/bringup/)
 	rm -rf $(WORK)
@@ -224,8 +218,12 @@ status: ## show artifact presence, disc state, and whether an emulator is runnin
 	    if [ -f $$f ]; then echo "present       : $$f"; else echo "MISSING       : $$f"; fi; \
 	done
 	@pgrep -af "nd100x.*Build/bringu[p]" || echo "emulator      : not running"
-	@[ -f $(CDC) ] && python3 bringup/verify-disc.py || true
+	@[ -f $(CDC) ] && ./bringup/verify-disc.sh || true
 
 .PHONY: help build test golden verify-repo need-nd prepare bootsector format \
         coldstart login discboot verify check-encoding clean-bringup \
         dap-format dap-coldstart dap-login dap-discboot stop status
+
+# Note: the former `make auto` (an unattended DAP-driven bring-up) was
+# removed; the manual stages above persist correctly on Ctrl-C since
+# nd100x's CDC/drum devices became write-through.

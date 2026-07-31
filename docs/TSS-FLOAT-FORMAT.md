@@ -76,7 +76,7 @@ BEFORE   DATE IS 25 JULY 2026   1200:00   (x3, frozen)
 AFTER    28 -> 29 -> 30 -> 31 JULY -> 1 AUGUST -> 2 AUGUST
 ```
 
-Probe: `k1patch.py`. The hour/minute/second fields stay frozen because a
+Probe: a DAP memory patch of `K1`. The hour/minute/second fields stay frozen because a
 48-bit `K1` needs three words where two were reserved, so the patch
 necessarily clobbers `K2`'s word 0. The day field alone is the discriminator.
 

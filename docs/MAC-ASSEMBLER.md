@@ -645,7 +645,7 @@ project number.
 - **Fix:** `mac_fixup.addend` (`mac-c/src/mac.h:126`) carries the expression's
   constant part; PREL8 patches `(sym+addend)-pc`, ARG8 `(sym+addend)&0377`.
 - **Pinning test:** `test_mac.c` [15], which reproduces the exact ROBJ
-  shape. `bringup/check-robj-encoding.py` additionally byte-checks a built
+  shape. `bringup/check-robj-encoding.sh` additionally byte-checks a built
   artifact for the fixed-vs-broken ROBJ pattern.
 - **Verified result:** full bring-up + login on the fixed image:
   `@ENTER` → `SYSTEM` → project number → date prompt → **`@` command
@@ -867,8 +867,8 @@ was wrong — in §6.7 the measurement was right and the binary was not.
    the macro-body address inside MAC's own memory image — not reproducible
    and not to be faked. Remember §6.7: this oracle proves addresses/counts
    only.
-2. **The unit-test suite** — `make test`: **718 passed, 0 failed**
-   **[VERIFIED by running it, 2026-07-23]**. Sections [1]–[15]; [1]–[1d]
+2. **The unit-test suite** — `make test`: **732 passed, 0 failed**
+   **[VERIFIED by running it, 2026-07-30]**. Sections [1]–[19]; [1]–[1d]
    are the exhaustive encoding tests, [12] the overlay-snapshot guard,
    [14] undefined-operand + CLD, [15] the addend rule.
    `./scripts/verify/check_coverage.sh` asserts every public function and implemented `)`
@@ -878,8 +878,7 @@ was wrong — in §6.7 the measurement was right and the binary was not.
    boot → login to the `@` prompt) exercises encodings no static oracle
    covers. See [`TSS-BRINGUP.md`](TSS-BRINGUP.md).
 4. **Divergence localisation** — `./scripts/verify/first_divergence.sh` (first symbol whose
-   value differs, in definition order), `probe_*.sh`, `bisect_hash.sh`,
-   `find_hash.sh`; `MACTRACE=1` prints which line ended each source stream
+   value differs, in definition order); `MACTRACE=1` prints which line ended each source stream
    and the conditional state on exit (the tool for "the build silently
    stopped early"). `./scripts/verify/verify_repo.sh` runs everything at once.
 

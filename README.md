@@ -58,7 +58,7 @@ Each has its own README with the detail.
 | [`src/`](src/README.md) | the one clean, assemblable copy of the source |
 | [`reference/`](reference/README.md) | **the golden oracle** — the symbol dumps and listings the original assembler produced, used to prove any rebuild correct |
 | [`derived/`](derived/README.md) | files this project made: the extracted drum driver, and build variants including a NORD-10 + drum configuration |
-| [`mac-c/`](mac-c/README.md) | a MAC assembler in C — 718 unit tests, runs the 1973 build scripts |
+| [`mac-c/`](mac-c/README.md) | a MAC assembler in C — 732 unit tests, runs the 1973 build scripts |
 | [`Build/`](Build/README.md) | **output only**, disposable — everything the assembler produces |
 | [`bringup/`](bringup/README.md) | bring-up validation tools (the bring-up itself is `make help` at the root) |
 | [`docs/`](docs/README.md) | the documents above |
@@ -69,10 +69,15 @@ Each has its own README with the detail.
 Two ways in: **download a ready-made disc set**, or **build everything from
 source**.
 
-### A. Just run it
+### A. Download the release kit
 
-Every tagged release ships a bootable disc set built by CI from these
-sources — see [Releases](https://github.com/HackerCorpLabs/TSS/releases).
+Every tagged release ships the built system, the format and bootstrap
+tapes, and the disc media — see
+[Releases](https://github.com/HackerCorpLabs/TSS/releases). Unpack it, then
+either **jump start** with the ready-made `cdc-jumpstart.img` (copy it over
+`cdc.img`) or follow the archive's README through the one-time bring-up
+(bootstrap tape → MINIT format → cold start, about two minutes — the same
+steps a 1973 operator performed). Then:
 
 ```bash
 tar xzf nord-tss-3.0-*.tar.gz && cd nord-tss-3.0-*
@@ -80,8 +85,8 @@ tar xzf nord-tss-3.0-*.tar.gz && cd nord-tss-3.0-*
 ```
 
 Log in as **SYSTEM**, project **1**, no password. `HELP` lists all 60
-commands. The archive carries its own quick-start guide
-([`dist/QUICKSTART.md`](dist/QUICKSTART.md) in this repo).
+commands. The bring-up and usage guide is
+[`dist/QUICKSTART.md`](dist/QUICKSTART.md) in this repo.
 
 You still need the emulator — it is a separate project:
 
@@ -100,20 +105,21 @@ cmake --build build -j
 
 ### B. Build it from source
 
-Needs a POSIX toolchain and `python3`; on Windows use WSL.
+Needs a POSIX toolchain; on Windows use WSL.
 
 ```bash
 git clone https://github.com/HackerCorpLabs/TSS.git && cd TSS
-make build            # assembler + 718 tests + TSS, DRUM and MINIT artifacts
-make auto             # MINIT format + cold start -> a disc with user SYSTEM
+make build            # assembler + 732 tests + TSS, DRUM and MINIT artifacts
+make prepare          # fresh disc set; the CDBIN tape installs the bootstrap
+make format           # MINIT format (type 4470, 4670, I)
+make coldstart        # cold start -> a disc with user SYSTEM
 make verify           # free tracks + SYSTEM present
 make login            # boot and log in
 ```
 
-`make help` lists every target. `make auto` drives the bring-up over the DAP
-debugger and needs `nd100x` — point at it with `ND=/path/to/nd100x` or set
-`ND100X`. The whole procedure, including doing it by hand at the operator
-panel, is in [`docs/TSS-BRINGUP.md`](docs/TSS-BRINGUP.md).
+`make help` lists every target; the emulator is found via `ND=/path/to/nd100x`
+or the `ND100X` environment variable. The whole procedure, including doing it
+by hand at the operator panel, is in [`docs/TSS-BRINGUP.md`](docs/TSS-BRINGUP.md).
 
 To check the rebuild against the 1978 original:
 
@@ -175,9 +181,8 @@ environment variables. Set only the ones a given task needs:
 | variable | points at | used by |
 |---|---|---|
 | `ND100X` or `ND` | the `nd100x` emulator **binary** | `Makefile` (bring-up targets), the probe scripts |
-| `ND100X_SRC` | the `nd100x` **source tree** | `bringup/patch-nd100x.py`, device-analysis docs |
-| `ND_BPUN_DIR` | directory holding `MAC.BPUN`, `MACM-*.BPUN`, `FMAC-*.BPUN` | `mac-c/scripts/extract/`, `docs/MAC-ASSEMBLER.md` |
-| `ND_ROOT` | the wider ND software archive (`BPUN/`, `c3/`, `S/`) | `mac-c/scripts/attic/identify_float_variant.sh` |
+| `ND100X_SRC` | the `nd100x` **source tree** | device-analysis docs |
+| `ND_BPUN_DIR` | directory holding `MAC.BPUN`, `MACM-*.BPUN`, `FMAC-*.BPUN` | `docs/MAC-ASSEMBLER.md` |
 | `NDINSIGHT` | the NDInsight reference-manual collection | the manual citations throughout `docs/` |
 | `ND110COMPILE` | the ND110Compile tree holding `uCode/` | the microcode citations in `docs/TSS-FLOAT-FORMAT.md` |
 

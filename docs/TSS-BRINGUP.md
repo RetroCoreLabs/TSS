@@ -111,20 +111,11 @@ assembly errors; `verify_repo.sh` fully green.
 Everything is driven by the top-level `Makefile` (run from WSL,
 `make help` from the repo root lists every target).
 
-**Recommended — one command, fully unattended:**
-
 ```bash
 make build      # once: mac-c + 732 tests + the TSS/MINIT artifacts
-make auto       # prepare + format + cold-start, driven over DAP; disc PERSISTS
-make login      # interactive: log in and use TSS
 ```
 
-`make auto` runs the format and cold-start under the DAP debugger, auto-answers
-the MINIT prompts, and stops each phase with a **clean debugger-terminate** so the
-CDC disc is reliably written back (see the persistence note below). Nothing is
-typed. Afterwards `make verify` shows *15 free tracks + SYSTEM*, and you `make login`.
-
-**Manual steps (interactive) — every input spelled out:**
+**The steps (interactive) — every input spelled out:**
 
 | step | command | exactly what you type / wait for | verify |
 |---|---|---|---|
@@ -159,8 +150,9 @@ What every input means:
 > calls `exit(0)` and skips that path, so it *lost* format/cold-start writes —
 > while SMD (SINTRAN) and floppy, which write straight through to their image
 > `FILE*`, were never affected. The write-through patch removes the difference.
-> **This requires the patched nd100x.** On an unpatched build, use **`make auto`**
-> (DAP-driven, clean terminate) for the steps that must persist. `make login`
+> **This requires the patched nd100x.** On an unpatched build, drive the
+> persisting steps under the DAP debugger (`make dap-format` / `make
+> dap-coldstart`) and stop them with a clean debugger-terminate. `make login`
 > needs no persistence either way — it only reads the disc.
 
 ---
@@ -208,7 +200,7 @@ failure mode that cost a full debug cycle (the fixed code tested green while
 the emulator ran an image built by the old binary). Verify an artifact with:
 
 ```bash
-python3 bringup/check-robj-encoding.py Build/bringup/tss.bpun   # must print FIXED
+./bringup/check-robj-encoding.sh Build/bringup/tss.bpun   # must print FIXED
 ```
 
 which byte-checks the built image for the fixed-vs-broken `ROBJ`
@@ -301,14 +293,12 @@ cold-start vector (§6.1).
 
 ### 3.1 Which copy, and how to build it
 
-**The authoritative nd100x checkout is the WSL-native one:**
-`~/repos/nd100x` (= `$ND100X_SRC`). A second copy at
-`$ND100X_SRC` **diverges** (`config.c`, `nd100x.c` differ) —
-build and use the WSL copy, which carries the CDC/OPR/MMS1 work. Do not
-modify nd100x without explicit approval (project rule).
+**The authoritative nd100x checkout is `$ND100X_SRC`** — build and use that
+copy, which carries the CDC/OPR/MMS1 work. Do not modify nd100x without
+explicit approval (project rule).
 
 ```bash
-cd ~/repos/nd100x/build && cmake --build . -j4 && ctest
+cd "$ND100X_SRC"/build && cmake --build . -j4 && ctest
 ```
 
 **mkptypes gotcha [VERIFIED]:** `tools/mkptypes/mkptypes` is a committed
@@ -316,7 +306,7 @@ Windows PE; a WSL build fails with "Exec format error", and CMake does not
 rebuild it because the PE is newer than the source. Fix:
 
 ```bash
-cd ~/repos/nd100x/src/cpu/tools/mkptypes && cc -O2 -o mkptypes mkptypes.c
+cd "$ND100X_SRC"/src/cpu/tools/mkptypes && cc -O2 -o mkptypes mkptypes.c
 ```
 
 ### 3.2 Features added to nd100x for TSS
@@ -382,10 +372,7 @@ nd100x --mms1 --boot=bpun --image=tss.bpun --cdc=cdc.img --drum=drum.img \
   `disconnect{terminateDebuggee}` flushes CDC/drum; SIGINT would lose them.)
 
 `make dap-format` / `make dap-coldstart` / `make dap-login` launches each stage
-pre-configured on port 1777. For a fully-scripted, self-terminating run of the
-whole format + cold-start (the reliable persist path), use **`make auto`**, which
-drives `bringup/dap_bringup.py` (a minimal DAP client that auto-answers the
-prompts and terminates cleanly).
+pre-configured on port 1777 for scripted control with any DAP client.
 
 ---
 
@@ -762,13 +749,12 @@ prints on the console.
 ### 6.6 Verifying SYSTEM on disc [VERIFIED]
 
 Stop the emulator with SIGINT (flushes the surface), then inspect the image
-— `bringup/verify-disc.py` automates this; by hand:
+— `bringup/verify-disc.sh` automates this; by hand:
 
-```python
-d = open("cdc.img","rb").read(); b = 104*512
-mib = d[b:b+512]
-print("MIB set bits:", sum(bin(x).count("1") for x in mib))                 # 15  (was 16)
-print("SYSTEM on disc:", b"\x53\x59\x53\x54\x45\x4D" in d[106*512:107*512]) # True
+```bash
+# MIB free-track bits (sector 104) and the SYSTEM name in USTBL (sector 106)
+./bringup/verify-disc.sh Build/bringup/cdc.img   # free tracks=15, SYSTEM FOUND
+dd if=cdc.img bs=512 skip=106 count=1 2>/dev/null | grep -c SYSTEM   # 1
 ```
 
 **[VERIFIED] result:** MIB set bits **16 → 15** (`GTRK` claimed one track by
@@ -925,7 +911,7 @@ were invisible to the golden dumps because word counts were unchanged: the
 out of range" into "empty object", and sent LOGON's `()SCRATCH` directory
 enumeration into an endless busy-loop after the project number. Both are
 fixed and regression-pinned (tests [7] and [15]);
-`bringup/check-robj-encoding.py` byte-checks any built image for the fixed
+`bringup/check-robj-encoding.sh` byte-checks any built image for the fixed
 pattern. Full defect records: [`MAC-ASSEMBLER.md`](MAC-ASSEMBLER.md).
 
 ---
@@ -936,8 +922,8 @@ pattern. Full defect records: [`MAC-ASSEMBLER.md`](MAC-ASSEMBLER.md).
 
 | tool | where | what it does |
 |---|---|---|
-| `verify-disc.py` | `bringup/` | reads `Build/bringup/cdc.img` (or a given path); reports the MIB free-track count and whether SYSTEM is in the user table, and says which bring-up step to run next |
-| `check-robj-encoding.py` | `bringup/` | byte-checks a built BPUN/image for the fixed vs broken ROBJ forward-reference pattern — **must print FIXED** (stale-assembler detector, §2.2) |
+| `verify-disc.sh` | `bringup/` | reads `Build/bringup/cdc.img` (or a given path); reports the MIB free-track count and whether SYSTEM is in the user table, and says which bring-up step to run next |
+| `check-robj-encoding.sh` | `bringup/` | byte-checks a built BPUN/image for the fixed vs broken ROBJ forward-reference pattern — **must print FIXED** (stale-assembler detector, §2.2) |
 | `make stop` | top-level `Makefile` | SIGINTs the bring-up emulator — the safe stop that flushes the CDC surface |
 | `make dap-format` / `dap-coldstart` / `dap-login` | top-level `Makefile` | launches a bring-up stage under the DAP debugger on port 1777 |
 | `verify_repo.sh` | `mac-c/` | everything at once: layout, build, tests, coverage, both TSS builds, oracle scores, markdown links |
@@ -1009,8 +995,8 @@ Disc addresses (NCR): `MIB/DKBIT` `50` · `USTBL` ≈ `51` · overlays `160`+ ·
 | MINIT prints `DISK ERROR` on every track | CDC image too small (device does not grow) | re-run `make prepare` (pads to 8192 sectors) |
 | cold-start never shows `@ENTER` | started at ISTRT, not 7 | ensure `--start=7` (the scripts set it) |
 | no console echo at all | wrong console/terminal | the TSS console is terminal 192 / the local console; check `--start=7`; not reachable via `--telnet` |
-| `verify-disc.py` shows 16 free after step 3 | SINIT never ran | you booted without `--opr=131313` or not at addr 7 |
-| login loops silently after the project number | stale `mac-c` (`make test` does NOT relink it) | run plain `make` in `mac-c/`, rebuild images, re-run steps 1–3; `check-robj-encoding.py` must say FIXED |
+| `verify-disc.sh` shows 16 free after step 3 | SINIT never ran | you booted without `--opr=131313` or not at addr 7 |
+| login loops silently after the project number | stale `mac-c` (`make test` does NOT relink it) | run plain `make` in `mac-c/`, rebuild images, re-run steps 1–3; `check-robj-encoding.sh` must say FIXED |
 | boot hangs in `DWAIT`, CDC status `062024` | wrong CDC op-decode model (compare instead of read) | the device must decode the op at control-word bits 11–12 (§4.3) |
 | WSL nd100x build fails "Exec format error" | stale Windows-PE `mkptypes` | rebuild it: `cc -O2 -o mkptypes mkptypes.c` (§3.1) |
 | disc changes lost after a run | emulator not stopped with SIGINT | always Ctrl-C / `make stop` — that flushes the CDC surface |

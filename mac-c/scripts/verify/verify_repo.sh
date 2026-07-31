@@ -4,7 +4,7 @@
 cd "$(dirname "$0")/../../.." || exit 1   # repo root, from this script
 
 echo "=== layout ==="
-for d in archive src reference derived Build mac-c tools bringup docs ppt; do
+for d in archive src reference derived Build mac-c bringup docs ppt; do
     printf "  %-10s %3s files  %s\n" "$d" \
         "$(ls -1 "$d" 2>/dev/null | wc -l)" \
         "$([ -e "$d/README.md" ] && echo 'README ok' || echo 'NO README')"

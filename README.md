@@ -73,7 +73,7 @@ source**.
 
 Every tagged release ships the built system, the format and bootstrap
 tapes, and the disc media — see
-[Releases](https://github.com/HackerCorpLabs/TSS/releases). Unpack it, then
+[Releases](https://github.com/RetroCoreLabs/TSS/releases). Unpack it, then
 either **jump start** with the ready-made `cdc-jumpstart.img` (copy it over
 `cdc.img`) or follow the archive's README through the one-time bring-up
 (bootstrap tape → MINIT format → cold start, about two minutes — the same
@@ -91,7 +91,7 @@ commands. The bring-up and usage guide is
 You still need the emulator — it is a separate project:
 
 ```bash
-git clone https://github.com/HackerCorpLabs/nd100x.git
+git clone https://github.com/RetroCoreLabs/nd100x.git
 cd nd100x
 sudo apt install build-essential cmake libcjson-dev    # Debian/Ubuntu
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
@@ -108,7 +108,7 @@ cmake --build build -j
 Needs a POSIX toolchain; on Windows use WSL.
 
 ```bash
-git clone https://github.com/HackerCorpLabs/TSS.git && cd TSS
+git clone https://github.com/RetroCoreLabs/TSS.git && cd TSS
 make build            # assembler + 732 tests + TSS, DRUM and MINIT artifacts
 make prepare          # fresh disc set; the CDBIN tape installs the bootstrap
 make format           # MINIT format (type 4470, 4670, I)

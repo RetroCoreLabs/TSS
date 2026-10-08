@@ -34,8 +34,9 @@ Guide* (ND-60.050.06, June 1976) and *SINTRAN III Monitor Calls*
   `INBT`, `OUTBT`, `ECHOM`, `BRKM`, `RDISK`, `WDISK`, `RPAG`/`RPAGE`,
   `WPAG`/`WPAGE`), `13`-`14` (`CIBUF`, `COBUF`), `32` `MSG`, `35` `IOUT`,
   `64`-`67` (`ERMSG`, `QERMS`, `ISIZE`, `OSIZE`) and `76` `SETBS`. Where the
-  arguments were checked, they sit in the same registers. `OPEN` keeps its
-  arguments and access codes 0-3 but moved from 42 to 50.
+  arguments were checked, they sit in the same registers. TSS 3.0 even
+  implements two SINTRAN III calls at SINTRAN III's numbers, under SINTRAN III
+  names in its source: `OPEN` at 50 and `CLOCK` at 113.
 - **Commands.** 24 of the 60 TSS commands exist under the same name in
   SINTRAN III, for example `WHO-IS-ON`, `CREATE-FRIEND`, `PLACE-BINARY` and
   `INIT-ACCOUNTING`. About 13 more are renamed equivalents: `ALLOCATE`
@@ -46,8 +47,16 @@ Guide* (ND-60.050.06, June 1976) and *SINTRAN III Monitor Calls*
   default file types, friends, owner/friend/public access, and the same
   login sequence: ESC, `ENTER`, password, `PROJECT NUMBER`.
 
-No document found states that SINTRAN III was derived from TSS, so that is
-an inference from the evidence above, not a recorded fact. The comparison,
+CERN documents from the time confirm it from the users' side. In February
+1975 a CERN paper on choosing the service computer's operating system says
+"all subsystems made for NORD-TSS are directly transferable to Sintran III as
+background programs, because the monitor calls are similar. The command
+monitor is also very similar to the one in NORD-TSS", and that Norsk Data
+itself no longer used TSS but had adopted SINTRAN III. CERN had run TSS since
+1973, by 1975 with eleven terminals. Tor Olav Steine, a former Norsk Data employee, says in his 2020 history of
+the company that SINTRAN III was built from SI's virtual memory project, "Bo
+Lewendal's TSS", floating-point operations and SINTRAN II, mainly by Trygve
+Matre. No source says part by part what came from TSS. The comparison,
 with a citation for every match, is in
 [`docs/TSS-AND-SINTRAN.md`](docs/TSS-AND-SINTRAN.md), together with the history of
 the two systems and a source grade for every statement.

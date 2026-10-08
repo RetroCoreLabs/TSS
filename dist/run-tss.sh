@@ -22,4 +22,7 @@ echo "Log in as SYSTEM, project 1, no password."
 echo "Date prompt format: DD,MM,YYYY,HH,MM,SS"
 echo
 # --mms=1 is required and cannot live in the config file (see tss.cfg).
-exec "$ND" --config=tss.cfg --mms=1
+# --rtc=wall makes the clock interrupt fire every 20 ms of real time, so DATE
+# keeps real time. nd100x defaults to wall since 2026-10-08; the flag is here
+# for older builds, whose "ticks" default ran the TSS clock about 7x too fast.
+exec "$ND" --config=tss.cfg --mms=1 --rtc=wall

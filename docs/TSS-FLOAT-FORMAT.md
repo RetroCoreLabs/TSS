@@ -314,5 +314,8 @@ assembles with zero errors. On a fresh scratch disc set built from it (MINIT
 format, cold start, disc boot): login date 1917:58, `DATE` one command later
 1917:59, after 70 s of wall-clock time 1925:37, with `TIME-USED` reporting
 `OUT OF 7 MINS 40 SECS` in the same session. The time of day now moves in
-step with TSS's own elapsed counter. The ratio of TSS time to wall-clock
-time is the emulator's clock-tick rate and was not investigated here.
+step with TSS's own elapsed counter. That run was about 6.5 times faster than real
+time (458 s of `DATE` in about 70 s) because nd100x then defaulted to `--rtc=ticks` (one clock interrupt per
+10550 instructions). With `--rtc=wall` (one interrupt per 20 ms of host
+time, the nd100x default since 2026-10-08) 60 s of wall-clock time moved
+`DATE` by exactly 1 min 0 s and `TIME-USED` read `OUT OF 1 MINS 0 SECS`.

@@ -2461,6 +2461,13 @@ interrupt and moves the fault downstream, into `TBANG`.
 team described. It is not a defect and is not relevant here — only the
 *monotonic advance* matters.)
 
+> **[NOTE 2026-10-09]** The two figures above disagree: 6736 ticks in 134 s
+> is 50.3 ticks/s, not ~350. Which one was measured on which nd100x
+> configuration is not recorded. Since 2026-10-08 nd100x defaults to
+> `--rtc=wall`, one interrupt per 20 ms of host time, so a new run should see
+> 50/s; `--rtc=ticks` (one per 10550 instructions) gave about 6.5 times that
+> on an unthrottled host (`TSS-FLOAT-FORMAT.md` section 8).
+
 **2. Locate `K1` — by search, not by arithmetic.** Reading `042701` out of
 memory near `RDATE` put `K1` at **`022650`**. Arithmetic off `RDATE=022700`
 minus eight words predicts `022670` — **wrong by 16 words**, because a
@@ -2560,3 +2567,50 @@ seconds can run for years with a wrong day counter. **No evidence currently
 distinguishes these.** Settling it needs a primary source on the ND-100
 `LDF`/`STF` word count per FPP option, which is the next thing to read rather
 than reason about.
+
+---
+
+# PART IX. SWEEP OF THE FIXED BUILD AGAINST A CONTROL, 2026-10-09
+
+**Question.** The 2026-10-08 fixes (`CLKFX` 48-bit clock constants in
+`src/TSS2.SYMB`, the `SETX` table in `src/TSS3.SYMB`) move every address
+after `TBANG` by four words. Does anything else change?
+
+**Method: one variable.** Two systems, both `TEL10 DRUM N10`, built by mac
+from the same sources except for the fixes:
+
+| system | difference |
+|---|---|
+| fixed | current `src/`, `CLKFX` set (`Build/drum/tss-drum.bpun`) |
+| control | `CLKFX` not set, `src/TSS2.SYMB` and `src/TSS3.SYMB` from before commit `e680f5a`. `RDATE` lands 4 words lower, as predicted |
+
+Each got a fresh disc set the same way (CDBIN bootstrap tape, MINIT
+`4470`/`4670`/`I`, cold start), then the same session: login with date
+`25,07,2026,12,00,00`, 94 input lines: phases 1-4 of the plan in section 3
+(corrected forms: `MEMORY 0`, `LIST-TRACKS SYSTEM`, `OPEN-FILE
+"SCRATCH:DATA",WX` after a 20-track `TRANSFER`), all seven register letters
+of `SET-REGISTER`, `PAUSE` with an empty password, and `LOGOUT`. nd100x with
+`--mms=1 --rtc=wall`. A second short session on each disc exercised
+`MEMORY 40000 44000`, `SET-REGISTER 40000 12345`, `EXAMINE 40000`.
+
+**Result.** The transcripts are identical except in exactly two places, both
+the intended fixes:
+
+| command | control | fixed |
+|---|---|---|
+| `STATUS` after `SET-REGISTER A 1234`, `X 777`, `T 55`, `D 4444`, `L 3333`, `B 4321`, `P 2000` | `STS = 44`, all registers 0 | `STS = 0`, `D = 4444`, `P = 2000`, `B = 4321`, `L = 3333`, `A = 1234`, `T = 55`, `X = 777` |
+| `DATE` 23 s and 33 s into the session | `1200:00`, `0830:00` (frozen) | `1200:23`, `0830:33` (advancing) |
+
+The memory session was identical on both: two pages assigned and listed
+`READ/WRITE`, `SET-REGISTER 40000 12345` read back as `12345`, and
+`SET-REGISTER 1000 12345` (outside the user's memory) answered `?`.
+
+**Behaviour seen on both systems, so not caused by the fixes:**
+`WHERE-IS TELETYPE` prints nothing (as in PART III); `DELETE-MEMORY`
+ignores its argument and keeps prompting `CORE ADDRESS OF BLOCK:`;
+`PLACE-BINARY` re-prompts `FILE NAME:` when given `TAPE-READER` (open
+question 2); `ALLOCATE`, `DUMP`, `MAKE-REENTRANT`, `SAVE-CORE`, `GET-CORE`
+and `RBLOAD` with a non-existent file answer `NO SUCH FILE`.
+
+**Not covered:** the phase-5 commands that end or replace the session
+(`LOAD-BINARY`, `RECOVER`, `DEFINE-VERSION`, `LOAD-SYSTEM`, `MODE`).

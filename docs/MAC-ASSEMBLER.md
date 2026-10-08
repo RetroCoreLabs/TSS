@@ -425,6 +425,14 @@ the one-page architecture summary the defect record (§6) builds on.
   the `;` splitter, and the `/`, `,` and `<` scans. `#` plus *two*
   characters is one word `(a<<8)|b`, and the second character is frequently
   a blank, `;`, `'` or `<`. Use `skip_char_const()`; do not hand-roll it.
+- **A trailing blank can be the constant.** `SAT ## ` (TSS2:2507) loads the
+  code of a blank, so trimming trailing whitespace before parsing destroys it.
+- **`*N` means `*+N`** (`JMP *3`).
+- **`)LINE` is an ordinary command** and is skipped inside a false
+  conditional region like any other. TSS5:1981 is a `)LINE` inside the
+  `"TSBIN` region; honouring it unconditionally ended TSS5 early, left the
+  conditional switched off, and silently swallowed the final `)LIST`, so the
+  ASSYSA object stream came out empty.
 - **Streams** follow MAC: source / list / object. `)LIST` writes to the
   **object** stream (that is how `)9ASSM TSS5,LIST5,ASYMB:SYMB` + `)LIST`
   produces the archived dump); reports go to the list stream; `0` selects
@@ -569,8 +577,7 @@ exhaustive instruction testing:
 - **Fix + fallout:** blanks became term separators; fixing it dropped the
   undefined-symbol count from 315 to 30 and immediately exposed two
   follow-on bugs (whitespace falling into the `@` shift branch; `#ab`
-  constants breaking the scanners — see `../mac-c/README.md` "Bugs the
-  exhaustive instruction tests exposed").
+  constants breaking the scanners — see the rules list in section 5).
 - **Pinning tests:** `test_mac.c` [1b]–[1d] assert the **encoding** of every
   memory-reference opcode × all 8 modes, every conditional jump, every
   argument instruction, and the summed register/IO forms — precisely so this

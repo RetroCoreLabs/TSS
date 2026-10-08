@@ -99,40 +99,6 @@ Excluding those, **679 of 680 reproducible symbols match exactly (99.85%)**.
    (SINTRAN monitor entry names listed in `MCTBL`), but the count has not
    been audited symbol by symbol.
 
-## Bugs the exhaustive instruction tests exposed
-
-Address-only comparison against the golden dump had been hiding wrong
-*code generation*, because the word **count** stayed correct:
-
-1. **`eval_expr` skipped blanks instead of treating them as term
-   separators**, so `COPY SA DT` fused into one bogus symbol `COPYSADT`
-   and emitted `000000`. Every multi-term register instruction in the
-   corpus was wrong. (ND-60.096.01 §2.5: elements are "separated by a
-   single space, a plus sign or a minus sign".) Fixing it dropped the
-   undefined-symbol count from **315 to 30**.
-2. Once blanks separated terms, whitespace fell into the `@`
-   shift-operator branch and swallowed the following term — guarded.
-3. `#ab` is a character **pair**, not `##`+char. `SINQ, #SY; #ST; #EM`
-   (TSS2:843, confirmed against the original 8-bit bytes) needs the
-   general rule; `##c` is the same rule with `a='#'`.
-4. A `#ab` whose second character is a blank, `;` or `<` broke the
-   comment scanner, the statement splitter and the interval command
-   (`SAA ##<` in TSS3:1247 was being read as `SAA ## < ...`).
-5. Trailing-whitespace trimming destroyed the blank in `SAT ## `
-   (TSS2:2507), where the blank *is* the constant.
-6. `*N` (e.g. `JMP *3`) was unimplemented — it is shorthand for `*+N`.
-7. **`)LINE` was being honoured inside a false conditional region.**
-   TSS5:1980 opens `"TSBIN` and TSS5:1981 is a `)LINE` belonging to the
-   binary-tape build only. Executing it unconditionally ended TSS5 early
-   *and* left the mark conditional switched off, which then silently
-   swallowed the `)LIST` at the end of ASSYSA — the object stream came out
-   empty with no error reported. `)LINE` is an ordinary command and must be
-   skipped like any other when the region is false. Found only by running
-   the real build script; feeding files in order had hidden it.
-
-`MACTRACE=1` in the environment prints which line ended each stream and the
-conditional state on exit — that is what localised bug 7.
-
 ## What is implemented
 
 Statements: labels `NAME,`; assignment `NAME=EXPR`; location set `EXPR/`

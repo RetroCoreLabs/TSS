@@ -49,9 +49,8 @@ Guide* (ND-60.050.06, June 1976) and *SINTRAN III Monitor Calls*
 No document found states that SINTRAN III was derived from TSS, so that is
 an inference from the evidence above, not a recorded fact. The comparison,
 with a citation for every match, is in
-[`docs/TSS-AND-SINTRAN.md`](docs/TSS-AND-SINTRAN.md). The history of the two systems,
-with a source grade for every statement, is in
-[`docs/TSS-AND-SINTRAN-HISTORY.md`](docs/TSS-AND-SINTRAN-HISTORY.md).
+[`docs/TSS-AND-SINTRAN.md`](docs/TSS-AND-SINTRAN.md), together with the history of
+the two systems and a source grade for every statement.
 
 > **New here?** Read [`ppt/Intro to TSS.pdf`](ppt/) for the architecture,
 > then [`docs/PROJECT-DESCRIPTION.md`](docs/PROJECT-DESCRIPTION.md) for the

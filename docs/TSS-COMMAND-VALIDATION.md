@@ -506,7 +506,7 @@ in `src/TSS3.SYMB`:
 297: "
 ```
 
-Our builds set `CDC MACF DIAB K14 TEL4` (+ `DRUM N10` for the drum variant):
+Our builds set `CDC MACF DIAB K14 TEL4` (the drum variant: `TEL10` + `NTY=12` since 2026-10-08, plus `DRUM N10`; the `TEL` mark only changes the teletype count, not this analysis):
 
 1. `"CDC NMACF` is **FALSE**, because `MACF` *is* set — so `DKRST`, `RDKOP`
    and `DBOOT` are **never assembled**. The bootstrap code is not in the

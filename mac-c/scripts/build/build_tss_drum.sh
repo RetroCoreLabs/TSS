@@ -33,9 +33,26 @@ for n in 1 2 3 4 5; do
     cp "$ROOT/src/TSS$n.SYMB" "$BUILD/TSS$n.SYMB"
 done
 
-# The DRUM+N10 command stream, CRLF stripped, minus nothing else - it already
-# carries its own marks and symbol definitions.
-tr -d '\r' < "$INPUT" > "$BUILD/ASSYS-DRUM.SYMB"
+# The DRUM+N10 command stream, CRLF stripped. It carries its own marks and
+# symbol definitions; the only thing rewritten here is the teletype count.
+#
+# TEL=<n> (default 10) selects the TELn mark (src/TSS1.SYMB:127-146 maps
+# TEL4/6/10/12/.../24 to NTTY) and sets NTY, the number of non-modem
+# terminals, to the same value. NTY must equal NTTY on nd100x: the level-12
+# and level-10 ident dispatch (TSS1 LEXT) maps ident 44+k to TTY5+k only
+# while k < NTY-4, and nd100x's TERMINAL 5-10 answer idents 44-51.
+# TEL=4 reproduces the original single-user (console only) build.
+TEL=${TEL:-10}
+case "$TEL" in
+    4|6|10|12|14|16|18|20|22|24) ;;
+    *) echo "build_tss_drum.sh: TEL=$TEL is not a TSS mark (4 6 10 12 ... 24)" >&2; exit 1 ;;
+esac
+NTY_OCT=$(printf '%o' "$TEL")
+tr -d '\r' < "$INPUT" \
+    | sed -e "s/^CDC MACF DIAB K14 TEL10 DRUM N10 CLKFX\$/CDC MACF DIAB K14 TEL$TEL DRUM N10 CLKFX/" \
+          -e "s/^NTY=12;/NTY=$NTY_OCT;/" \
+    > "$BUILD/ASSYS-DRUM.SYMB"
+echo "=== teletypes: TEL=$TEL (mark TEL$TEL, NTY=$NTY_OCT octal) ==="
 
 echo "=== DRUM+N10 command stream being executed ==="
 cat "$BUILD/ASSYS-DRUM.SYMB"

@@ -85,7 +85,7 @@ The builds of record and their marks **[VERIFIED]**:
 |---|---|---|
 | Golden A (`ASYMB.SYMB`) | `CDC MACF DIAB K14 TEL4` | `src/ASSYSA.SYMB:4` |
 | Golden B (`BSYMB.SYMB`) | `CDC MACF DEBUG DIAB K14 TEL4` | `src/ASSYSB.SYMB:4` |
-| DRUM/N10 (the runnable build) | `CDC MACF DIAB K14 TEL4 DRUM N10` | `derived/ASSYS-DRUM-N10-MAC-INPUT.SYMB:13` |
+| DRUM/N10 (the runnable build) | `CDC MACF DIAB K14 TEL10 DRUM N10` + `NTY=12` | `derived/ASSYS-DRUM-N10-MAC-INPUT.SYMB:22-23` (`TEL4` until 2026-10-08; `make build TEL=4` restores it) |
 
 Both golden builds are **NN10** (NORD-1) and compile the drum **out**; the
 runnable build adds `DRUM N10`. `CDC` selects the CDC 9427 cartridge disc

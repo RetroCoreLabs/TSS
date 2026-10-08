@@ -277,6 +277,28 @@ golden dumps were made.
   probe) assembles NORD-1 `IOT` words unguarded, even in the N10 build. No
   runtime impact observed on nd100x to date, but it is a latent NORD-1 relic.
 - The drum driver's own header calls it a "1. APPROXIMATION" (NJL, 17/4/73).
+- **Teletype count: `TEL10` is the default since 2026-10-08** (it was `TEL4`).
+  `src/TSS1.SYMB:127-146` maps the `TELn` marks to `NTTY` (`TEL4` -> 4,
+  `TEL6` -> 6, `TEL10` -> 12 octal, ... `TEL24` -> 30 octal). The command
+  stream line 22 carries `TEL10`; `mac-c/scripts/build/build_tss_drum.sh`
+  rewrites it from `TEL=<n>` (top-level `make build TEL=4` gives the original
+  single-user build; `TEL ?= 10` in both Makefiles). **[VERIFIED]** the TEL10
+  symbol dump `Build/drum/DSYMB.SYMB` has `NTTY=000012`, `NTY=000012`; the image
+  still spans `000000-076777` with loc 7 = `050003`.
+- **`NTY=12` is set in the command stream as well** (line 23). `NTY` = "number
+  of non-modem terminals" (`src/TSS1.SYMB:58`), defaulting to 4
+  (`src/TSS1.SYMB:154-156`). The level-12 and level-10 ident dispatch
+  (`LEXT`, `src/TSS1.SYMB:1447-1454` and `:1907-1914`) maps ident `44+k` to
+  teletype `5+k` **only while `k < NTY-4`**, and idents `60..` to teletypes
+  `NTY+1..`. nd100x's TERMINAL 5-8 answer idents 044-047 and TERMINAL 9-16
+  idents 050-057 (`src/devices/terminal/device_terminal.c:43-58` in nd100x),
+  so with `NTY=4` every keystroke on them lands in `LNONE` (the `NER12`
+  counter). `NTY = NTTY` makes idents 044-051 reach TTY5-TTY10, whose device
+  addresses `TTY5=340 .. TTY8=370, TTY9=1300, TTY10=1310`
+  (`src/TSS1.SYMB:816-825`, the `"N10` table) are exactly nd100x's
+  TERMINAL 5-10. **[VERIFIED]** with `--log=term:debug`: the level-6 scanner
+  polls `0342/0352/0362/0372/01302/01312` and writes control 4 to the matching
+  `+3` registers every scan.
 
 ### 2.6 The memory-image model — why location 7 matters
 
@@ -866,6 +888,73 @@ Prompt notes:
 - SYSTEM is **passwordless**, so there is no `PASSWORD` prompt (§7.2).
 - `AMBIGUOUS FILENAME` comes from LOGON's attempt to open the `()SCRATCH`
   file, which does not exist yet on a fresh disc; login continues.
+
+### 7.1a More than one user: TERMINAL 5-10 over telnet [VERIFIED 2026-10-08]
+
+The runnable build is `TEL10` (section 2.5): TTY1 (console) plus TTY5-TTY10.
+On nd100x those are TERMINAL 5-8 (IOX 0340-0370, idents 044-047) and
+TERMINAL 9-10 (IOX 01300-01310, idents 050-051); TTY2-TTY4 (IOX 0310-0330)
+cannot work because nd100x's terminals there answer idents 0121-0123 and the
+level-12 dispatch only routes idents 5, 6, 7 to them. Three measured facts:
+
+- **A dead teletype wakes on ESC (033) and nothing else.** The level-6
+  scanner (`src/TSS1.SYMB` `LEV6`, N10 branch) writes control 4 to each dead
+  line, polls its status register, reads the character when one is ready and
+  compares `AND (177; SUB (33; JAF L2` - only ESC clears the usage word so the
+  scheduler starts the process; the process then prints the sign-on and
+  `@ENTER`. Space and `X` were tried first and were silently dropped.
+- **`NTY` must equal `NTTY`** or idents 044-057 go to `LNONE` (section 2.5).
+- **nd100x drum control word.** The first process switch (TTY1 -> TTY8)
+  writes TTY1's context block (core `RBLOK`=016604, 2048 words) to the drum.
+  `XDRUM` (`src/TSS1.SYMB:3858-3866`) puts the function code in control-word
+  bits 11-12 (`SAA 3; AND DTREG; SHA ZIN 13`, 13 octal = 11), address bits
+  16-17 in bits 5-6, plus 7. nd100x decoded the function from bits 13-14
+  (`device_drum.h` `DRUM_CTRL_FUNC`, marked PROVISIONAL), so control 004007
+  (WRITE) ran as a READ and DMA-copied the blank drum over core
+  016604-022603, wiping `ISTK`..`CKMEM` (022223-022603); the swapper then
+  jumped into zeros and the whole system hung. Found with a physical write
+  watchpoint on 022223 (hit at PC 011571, the word after XDRUM's `IOX 545`;
+  `DAREG` afterwards = 022604 = 016604+04000). Fixed in nd100x on 2026-10-08
+  (`DRUM_CTRL_FUNC(c) = ((c) >> 11) & 03`, binary built 18:25:48). The
+  single-user TEL4 build never swapped a process out, so it never showed.
+
+The repeatable proof is `make test-multiuser` (`bringup/test_multiuser.sh`):
+it boots a scratch copy of `dist/cdc-jumpstart.img.gz` with
+`--boot=cdc --mms=1 --telnet=9077`, logs in on the console, connects to
+`Terminal 39` (nd100x names telnet terminals by logical device number;
+39 = TERMINAL 8 = TSS TTY8, from the start-up line
+`Terminal 39 created (TERMINAL 8/ TET9, ident 47, address 370)`), sends ESC,
+logs in as SYSTEM, and requires `WHO-IS-ON` to list TTY 1 and TTY 8. Exit 0/1;
+the emulator ends on its own at `--max-instr`. Transcript of the verified run
+(TERMINAL 8 side):
+
+```
+Connected to Terminal 39
+
+NORD TSS VERSION 3.0A IS UP
+8 OCTOBER 2026   1826:30
+
+@ENTER SYSTEM
+PROJECT NUMBER P-1AMBIGUOUS FILENAME
+
+@WHO-IS-ON
+ 1   SYSTEM
+ 8   SYSTEM
+@LIST-USERS
+  1   SYSTEM
+@LOGOUT
+8 OCTOBER 2026   1826:30
+TIME USED IS 0 SECS
+OUT OF 4 SECS
+```
+
+and on the console, after the telnet login: `@WHO-IS-ON` / ` 1   SYSTEM` /
+` 8   SYSTEM`. The scripted single-user stages are `make format-auto`,
+`make coldstart-auto`, `make login-auto` (all `bringup/tss_console.sh`, POSIX
+sh + awk: it runs nd100x under util-linux `script` for the pty, answers each
+prompt as it appears in the transcript, and sends the documented Ctrl-C
+through the pty at `FINISHED` / `@ENTER`), and `make bringup-auto` runs
+prepare + format + coldstart + verify unattended.
 
 ### 7.2 How authentication works [VERIFIED]
 

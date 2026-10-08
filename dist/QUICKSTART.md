@@ -20,7 +20,8 @@ write to it.
 | `minit.bpun` | MINIT, the standalone disc-format program, as a paper tape |
 | `cdbin-boot.bpun` | the CDBIN distribution tape: booting it makes TSS's own bootstrap loader write the disc boot sectors |
 | `cdc.img` | the CDC cartridge disc — carries the system overlays, **not yet formatted** |
-| `cdc-jumpstart.img` | the same disc **after** the bring-up: bootstrap installed, formatted, cold-started, user `SYSTEM` created |
+| `cdc-jumpstart.img` | the same disc **after** the bring-up: bootstrap installed, formatted, cold-started, user `SYSTEM` created (10-teletype `TEL10` system, see section 5) |
+| `cdc-jumpstart-tel4.img` | the earlier single-user (`TEL4`, console only) jump-start disc |
 | `drum.img` | the NORD-10 swapping drum (IOX 540), blank; filled in by the running system |
 | `tss.cfg` | the validated nd100x configuration for normal boots |
 | `run-tss.sh` | starts nd100x with the settings TSS needs |
@@ -155,6 +156,34 @@ NUMBER OF TRACKS: 20
 
 Then `OPEN-FILE "MYFILE",WX` works. The quotes are a delimiter **pair** —
 `OPEN-FILE "MYFILE,WX` gives `BAD FILENAME`.
+
+## 5. More than one user (terminals)
+
+The shipped build is assembled for **10 teletypes** (`TEL10`). On nd100x the
+usable ones are:
+
+| TSS teletype | nd100x terminal | IOX | ident |
+|---|---|---|---|
+| TTY1 | console (the nd100x window / pty) | 0300 | 1 |
+| TTY5 .. TTY8 | TERMINAL 5 .. 8 | 0340 .. 0370 | 044 .. 047 |
+| TTY9, TTY10 | TERMINAL 9, 10 | 01300, 01310 | 050, 051 |
+
+**TTY2-TTY4 are unusable on nd100x**: TSS expects them at IOX 0310-0330 with
+idents 5, 6, 7, but nd100x's terminals at those addresses answer idents
+0121-0123, which TSS's level-12 dispatch sends to `LNONE`.
+
+An extra teletype is **dead** until **ESC** (033 octal) is typed on it; the
+level-6 scanner then starts its process and it prints `@ENTER`. Any other
+character typed on a dead teletype is read and dropped.
+
+To reach TERMINAL 5-10 from outside the emulator window use nd100x's telnet
+server: `nd100x --config=tss.cfg --mms=1 --telnet=9077`, then
+`telnet localhost 9077`, pick a terminal from the menu (nd100x names them by
+logical device number: `Terminal 39` is TERMINAL 8, `Terminal 48` is
+TERMINAL 9, `Terminal 49` is TERMINAL 10 - the start-up log line
+`Terminal 39 created (TERMINAL 8/ TET9, ident 47, address 370)` gives the
+mapping), press ESC, log in as in section 4, and `WHO-IS-ON` lists both lines.
+`cdc-jumpstart-tel4.img.gz` is the previous single-user (`TEL4`) disc.
 
 ## Known limitations
 

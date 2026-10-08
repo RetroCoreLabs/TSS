@@ -40,6 +40,15 @@ DRUM := $(WORK)/drum.img
 # `make dap-login DAP_PORT=1780` if needed.
 DAP_PORT ?= 1777
 
+# Teletype count of the runnable (DRUM/N10) build: the TSS "TELn" mark.
+# 10 = console + TTY5-TTY10 (nd100x TERMINAL 5-10, telnet-able); 4 = the
+# original single-user build (console only on nd100x).  `make build TEL=4`.
+TEL ?= 10
+
+# Telnet port for the multi-user test (not 9000, the nd100x default, so a
+# second emulator on this machine does not collide).
+TELNET_PORT ?= 9077
+
 # Locate the nd100x emulator binary. nd100x lives OUTSIDE this repo, so it is
 # found via $HOME or the ND100X environment variable - never a hard-coded path.
 # Override with `make login ND=/path/to/nd100x`.
@@ -66,6 +75,10 @@ help: ## list all targets (this text)
 	@echo "After any completed coldstart or login, the disc alone is bootable:"
 	@echo "    make discboot   boots from the CDC disc with NO paper tape."
 	@echo ""
+	@echo "Unattended (bringup/tss_console.sh drives the console on a pty via script(1)):"
+	@echo "    make bringup-auto      prepare + format + coldstart + verify"
+	@echo "    make test-multiuser    console + TERMINAL 8 (telnet) logins, WHO-IS-ON shows both"
+	@echo ""
 	@awk 'BEGIN {FS = ":.*##"} \
 	     /^##@/      { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } \
 	     /^[a-zA-Z0-9_-]+:.*##/ { printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2 }' \
@@ -80,8 +93,8 @@ help: ## list all targets (this text)
 ##@ Build and test (delegates to mac-c/Makefile)
 # ---------------------------------------------------------------------------
 
-build: ## build mac-c + run tests + build all TSS artifacts (tss/drum/minit/tdump)
-	$(MAKE) -C mac-c all
+build: ## build mac-c + run tests + build all TSS artifacts (tss/drum/minit/tdump); TEL=10|4
+	$(MAKE) -C mac-c all TEL=$(TEL)
 
 test: ## run the mac-c unit-test suite (732 assertions, must be 0 failures)
 	$(MAKE) -C mac-c test
@@ -170,6 +183,31 @@ discboot: need-nd ## STEP 5 (interactive): cold boot from the DISC ALONE — no 
 verify: ## check the bring-up disc: MIB free tracks + SYSTEM user present
 	./bringup/verify-disc.sh
 
+# ---------------------------------------------------------------------------
+##@ Scripted bring-up and tests (bringup/tss_console.sh drives the console on a pty via script(1))
+# ---------------------------------------------------------------------------
+
+format-auto: need-nd ## STEP 2 scripted: MINIT 4470 / 4670 / I, Ctrl-C at FINISHED
+	@test -f $(CDC) || { echo "Run 'make prepare' first." >&2; exit 1; }
+	./bringup/tss_console.sh format --nd $(ND)
+
+coldstart-auto: need-nd ## STEP 3 scripted: OPR=131313 cold start, Ctrl-C at @ENTER
+	@test -f $(CDC) || { echo "Run 'make prepare' and 'make format' first." >&2; exit 1; }
+	./bringup/tss_console.sh coldstart --nd $(ND)
+
+login-auto: need-nd ## STEP 4/5 scripted: disc boot, log in as SYSTEM, WHO-IS-ON/LIST-USERS/DATE
+	@test -f $(CDC) || { echo "Run steps 1-3 first (prepare/format/coldstart)." >&2; exit 1; }
+	./bringup/tss_console.sh login --nd $(ND)
+
+bringup-auto: prepare format-auto coldstart-auto verify ## STEPS 1-3 unattended, then verify
+
+test-multiuser: need-nd ## boot a SCRATCH copy of the jump-start disc, log in on console + TERMINAL 8 (telnet), check WHO-IS-ON
+	./bringup/test_multiuser.sh --nd $(ND) --port $(TELNET_PORT) --image $(MULTIUSER_IMAGE)
+
+# The multi-user test boots dist/cdc-jumpstart.img.gz by default; point it at
+# the working disc with `make test-multiuser MULTIUSER_IMAGE=Build/bringup/cdc.img`.
+MULTIUSER_IMAGE ?= dist/cdc-jumpstart.img.gz
+
 check-encoding: ## assert the built/working BPUNs carry the FIXED ROBJ encoding (stale-mac-c trap)
 	@./bringup/check-robj-encoding.sh $(TSS_BPUN) $(wildcard $(BPUN))
 
@@ -222,6 +260,7 @@ status: ## show artifact presence, disc state, and whether an emulator is runnin
 
 .PHONY: help build test golden verify-repo need-nd prepare bootsector format \
         coldstart login discboot verify check-encoding clean-bringup \
+        format-auto coldstart-auto login-auto bringup-auto test-multiuser \
         dap-format dap-coldstart dap-login dap-discboot stop status
 
 # Note: the former `make auto` (an unattended DAP-driven bring-up) was

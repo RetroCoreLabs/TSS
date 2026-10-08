@@ -44,10 +44,14 @@ under SINTRAN.
 
 `ASSYS-DRUM-N10-MAC-INPUT.SYMB` additionally sets the `DRUM` and `N10`
 marks and drops the `INTDS`/`INTEN` pre-definitions, because under `N10`
-the source defines those itself as `IOF`/`ION`. Since 2026-10-08 it also sets
-the `CLKFX` mark, which assembles `TBANG`'s clock constants as 48-bit floats
-(`../docs/TSS-FLOAT-FORMAT.md` §8); the golden inputs must not set it. It is
-**untested against
+the source defines those itself as `IOF`/`ION`. Since 2026-10-08 its mark
+line says `TEL10` instead of `TEL4` (10 teletypes, `NTTY=12` octal) and it
+defines `NTY=12` (number of non-modem terminals = `NTTY`, so the level-12
+ident dispatch accepts nd100x's TERMINAL 5-10, idents 044-051);
+`mac-c/scripts/build/build_tss_drum.sh` rewrites both from `TEL=<n>`. Since
+2026-10-08 it also sets the `CLKFX` mark, which assembles `TBANG`'s clock
+constants as 48-bit floats (`../docs/TSS-FLOAT-FORMAT.md` §8); the golden
+inputs must not set it. It is **untested against
 hardware** — the drum driver is a first approximation, and the Diablo probe
 in the `LEV6` scanner assembles NORD-1 `IOT` opcodes even in an N10 build.
 

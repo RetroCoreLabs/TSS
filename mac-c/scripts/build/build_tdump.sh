@@ -21,7 +21,7 @@ cd "$(dirname "$0")/../.." || exit 1
 # at TDUMP.SYMB:264-327 is compiled in - that block is "CDC-only and is what
 # writes the bootable disc pages.
 #
-# Output goes under Build/tdump/ (disposable, like Build/minit/).
+# Output goes under Build/tdump/ (tracked binaries, like Build/minit/).
 set -u
 
 HERE=$(cd "$(dirname "$0")/../.." && pwd)

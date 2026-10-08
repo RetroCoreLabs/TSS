@@ -35,7 +35,7 @@ nd100x ND-100 emulator. Two facts drive everything:
    `"NN10` select NORD-10 vs NORD-1 code throughout.
 
 Layout: `archive/` originals (never edit) → `src/` clean source → `reference/`
-golden oracle → `Build/` output (disposable) → `mac-c/` the assembler →
+golden oracle → `Build/` built binaries (tracked) → `mac-c/` the assembler →
 top-level `Makefile` (the bring-up driver; `make help`) → `bringup/` the
 validation tools.
 

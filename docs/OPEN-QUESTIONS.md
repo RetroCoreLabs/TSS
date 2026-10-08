@@ -66,6 +66,20 @@ unchanged.
 
 ---
 
+## 7. Forward `,X` references: P-relative in mac-c, X-relative in the manual
+
+The MAC manual (ND-60.096.01, page 54 chart) subtracts the X location
+counter from a `,X` operand. For a forward reference mac-c instead emits a
+bare opcode and patches it P-relative (`MAC_FIX_PREL8`). The results differ:
+with the X counter at 0 the manual's rule leaves the low 8 bits of the
+target address in the displacement, mac-c leaves target minus P. The only plain
+`,X` symbol reference in the corpus was `LDA SSXT,X` in `SETX`
+(`src/TSS3.SYMB`), removed by the 2026-10-08 fix, so no current build is
+affected. What the real 1978 MAC emitted for this case is unknown; settling
+it needs a forward `,X` reference assembled on MAC.BPUN under emulation.
+
+---
+
 ## Method note — why this list is short
 
 Several long-running items were closed by **single-variable experiments on a

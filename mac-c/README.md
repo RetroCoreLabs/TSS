@@ -17,6 +17,15 @@ Everything generated lands in `build/`; `make clean` removes that directory.
 The scripts may be run from anywhere — each restores `mac-c/` as its working
 directory before doing anything.
 
+`make test` builds `build/test_mac` but does not relink `build/mac`; run plain
+`make` before any `build_tss_*.sh`. There is no single-test runner:
+`tests/test_mac.c` is one binary with numbered sections (`[1]`, `[1b]`, ...
+`[19]`). To run one section, comment out the others in `main()` or add a
+temporary early `return`.
+
+Helper scripts in this repository are POSIX shell and awk only. The
+repository is python-free by decision; do not add python scripts.
+
 ## Layout
 
 | path | what it holds |

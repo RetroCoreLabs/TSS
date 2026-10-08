@@ -425,6 +425,11 @@ the one-page architecture summary the defect record (§6) builds on.
   the `;` splitter, and the `/`, `,` and `<` scans. `#` plus *two*
   characters is one word `(a<<8)|b`, and the second character is frequently
   a blank, `;`, `'` or `<`. Use `skip_char_const()`; do not hand-roll it.
+- **Only mode 4 `,X` is X-relative.** Mode 6 `,I ,X` is `((P)+D)+(X)`: `D`
+  locates the indirect pointer word relative to `P` and `X` is added after
+  the fetch, so `D` is P-relative. Testing the X bit alone miscompiled the
+  swapper (section 6.7). Forward references hide this class, so test
+  backward references.
 - **A trailing blank can be the constant.** `SAT ## ` (TSS2:2507) loads the
   code of a blank, so trimming trailing whitespace before parsing destroys it.
 - **`*N` means `*+N`** (`JMP *3`).

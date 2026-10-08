@@ -44,7 +44,10 @@ under SINTRAN.
 
 `ASSYS-DRUM-N10-MAC-INPUT.SYMB` additionally sets the `DRUM` and `N10`
 marks and drops the `INTDS`/`INTEN` pre-definitions, because under `N10`
-the source defines those itself as `IOF`/`ION`. It is **untested against
+the source defines those itself as `IOF`/`ION`. Since 2026-10-08 it also sets
+the `CLKFX` mark, which assembles `TBANG`'s clock constants as 48-bit floats
+(`../docs/TSS-FLOAT-FORMAT.md` §8); the golden inputs must not set it. It is
+**untested against
 hardware** — the drum driver is a first approximation, and the Diablo probe
 in the `LEV6` scanner assembles NORD-1 `IOT` opcodes even in an N10 build.
 

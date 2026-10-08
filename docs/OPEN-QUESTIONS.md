@@ -43,15 +43,6 @@ disagree. Worth a source dive; likely the same root cause as the above.
 TDUMP as a real user program under a live TSS remains the fully-original
 route, and is blocked on exactly this item.)
 
-## 3. `SET-REGISTER` targets the wrong register
-
-`SET-REGISTER X 777` leaves `X = 0`; `SET-REGISTER A 1234` left `A = 0` and set
-`STS = 234`. No error reported. Reproduced again on the post-fix sweep.
-
-An earlier root cause for this was **retracted** — see
-`docs/TSS-COMMAND-VALIDATION.md` PART III §4. Not
-re-investigated since. Treat the retracted analysis as untrusted.
-
 ## 4. `ASSYSA.SYMB` line 2 (`100`) and the `*:` line
 
 Unknown. Probably documented command or console conventions rather than
@@ -69,7 +60,9 @@ TSS is a 48-bit floating-point program whose `TBANG` clock constants were
 assembled in the 32-bit format, so the archived system's time of day could
 not advance on real hardware either (`TSS-FLOAT-FORMAT.md` settles the
 format question). What remains is historical: how the wrong constants got
-there and whether anyone noticed in period.
+there and whether anyone noticed in period. A verified fix exists since 2026-10-08
+(the `CLKFX` mark, `TSS-FLOAT-FORMAT.md` §8); the historical question is
+unchanged.
 
 ---
 

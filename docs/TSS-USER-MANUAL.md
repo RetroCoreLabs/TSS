@@ -220,6 +220,15 @@ before writing. `src/TSS3.SYMB:351`
 > `SET-REGISTER X 777` left `X = 0`. No error is reported. Do not rely on
 > this command.
 
+> **[FIXED IN SOURCE 2026-10-08]** Root cause: the NORD-10 path read its
+> register table with `LDA SSXT,X`, an `(X)+D` instruction whose 8-bit
+> displacement cannot hold the table address, so the `IRW` was built with
+> register field 0 and wrote STS. The table also lacked the STS slot, so
+> `B` read past its end. `src/TSS3.SYMB` now reaches the table through a
+> pointer word and holds complete `IRW` words. Verified on nd100x
+> 2026-10-08: `A 1234`, `X 777`, `B 4321`, `T 55` all read back in `STATUS`,
+> `STS` untouched. Details: `TSS-COMMAND-VALIDATION.md` PART III section 4.
+
 #### EXAMINE
 Examines core: with one address, prints that location's contents (octal); with a
 second address, prints the whole range. `src/TSS4.SYMB:1218`

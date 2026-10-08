@@ -38,6 +38,8 @@ you are in.
 | file | purpose |
 |---|---|
 | `verify-disc.sh` | reads `Build/bringup/cdc.img` (or a path argument): MIB free-track count, SYSTEM present, and which step to run next |
+| `tss_console.sh` | drives nd100x + TSS on a pty (util-linux `script`, POSIX sh + awk): `format` (MINIT 4470/4670/I, Ctrl-C at FINISHED), `coldstart` (OPR=131313, Ctrl-C at @ENTER), `login` (disc boot, SYSTEM login, a few commands). Answers each prompt as it shows up in the transcript; every stage carries a `--max-instr` bound. `make format-auto` / `coldstart-auto` / `login-auto` / `bringup-auto` |
+| `test_multiuser.sh` | the multi-user proof (sources `tss_console.sh` for the console side, `nc` for telnet): scratch copy of the jump-start disc, `--mms=1 --telnet`, console login + ESC/login on TERMINAL 8 over telnet, `WHO-IS-ON` on both terminals must list TTY 1 and TTY 8. `make test-multiuser` (exit 0/1) |
 | `check-robj-encoding.sh` | byte-checks a built BPUN/image for the fixed-vs-broken ROBJ encoding — catches the stale-`mac-c` trap (`make test` does not relink `mac-c`) |
 
 ### Emulator configuration

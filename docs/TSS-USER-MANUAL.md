@@ -19,6 +19,15 @@ you log in you talk to the **command processor**, whose prompt is `@`.
 
 ## 2. Getting to the `@` prompt (logging in)
 
+The console (TTY1) prints its sign-on at boot. Every other teletype is
+**dead** until **ESC** (033 octal) is typed on it - the level-6 scanner
+(`src/TSS1.SYMB` `LEV6`) reads one character per scan from a dead line and
+starts the process only for ESC (`AND (177; SUB (33; JAF L2`); anything else
+is dropped. **[VERIFIED 2026-10-08]** on nd100x TERMINAL 8 over telnet.
+The shipped build has 10 teletypes (`TEL10`): on nd100x the console and
+TERMINAL 5-10 (= TSS TTY5-TTY10) work; TTY2-TTY4 do not (nd100x's terminals
+at IOX 0310-0330 answer idents 0121-0123, not the 5-7 TSS dispatches on).
+
 Each terminal prints its sign-on and waits:
 
 ```

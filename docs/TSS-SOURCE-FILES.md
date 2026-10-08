@@ -80,7 +80,7 @@ Every `.SYMB`/`.ORG` file, by directory. Sizes are from the working tree.
 |---|---:|---|
 | `ASSYSA-MAC-INPUT.SYMB` | 26 | `ASSYSA` adapted to `mac-c` invocation |
 | `ASSYSB-MAC-INPUT.SYMB` | 24 | ditto for version B |
-| `ASSYS-DRUM-N10-MAC-INPUT.SYMB` | 27 | adds the `DRUM`+`N10` marks to compile the drum driver in |
+| `ASSYS-DRUM-N10-MAC-INPUT.SYMB` | 37 | adds the `DRUM`+`N10` marks to compile the drum driver in; `TEL10` + `NTY=12` for 10 teletypes (rewritten by `build_tss_drum.sh` from `TEL=<n>`) |
 | `DRUM-DRIVER.SYMB` | 189 | the extracted `XDRUM` driver, for study |
 
 ---
@@ -732,7 +732,7 @@ Not historical. Created by this project, and labelled as such inside the files.
 |---|---|
 | `ASSYSA-MAC-INPUT.SYMB` | `ASSYSA` adapted to `mac-c`'s invocation conventions |
 | `ASSYSB-MAC-INPUT.SYMB` | ditto for B |
-| `ASSYS-DRUM-N10-MAC-INPUT.SYMB` | adds `DRUM`+`N10` so the `XDRUM` swapping-drum driver (device `IOX 540`, NORD-10 only) is compiled **in**. It is compiled **out** of both archived builds. |
+| `ASSYS-DRUM-N10-MAC-INPUT.SYMB` | adds `DRUM`+`N10` so the `XDRUM` swapping-drum driver (device `IOX 540`, NORD-10 only) is compiled **in**. It is compiled **out** of both archived builds. Since 2026-10-08 it also carries `TEL10` (10 teletypes) and `NTY=12` (all of them non-modem, so nd100x's TERMINAL 5-10 idents 044-051 reach TTY5-TTY10); `make build TEL=4` restores the single-user build. |
 | `DRUM-DRIVER.SYMB` | the extracted `XDRUM` driver in isolation, for study |
 
 ---

@@ -73,8 +73,11 @@ tss: $(MAC)
 	./scripts/build/build_tss_assysa.sh
 
 # NORD-10 + swapping-drum variant -> ../Build/drum/tss-drum.bpun (+ CDC image).
+# TEL selects the teletype count (TSS mark TELn): 10 = console + TTY5-TTY10
+# usable on nd100x; 4 = the original single-user build.
+TEL ?= 10
 drum: $(MAC)
-	./scripts/build/build_tss_drum.sh
+	TEL=$(TEL) ./scripts/build/build_tss_drum.sh
 
 # Standalone MINIT disc formatter -> ../Build/minit/minit.bpun.  Must exist
 # before a bare-disc bring-up (it writes the MIB free-track bitmap that

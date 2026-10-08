@@ -14,7 +14,7 @@ algorithms documented in structured pseudo-code beside the code.
 |---|---|
 | **5** | source parts, TSS1–TSS5 |
 | **81** | monitor calls in `MCTBL` |
-| **24** | teletypes maximum |
+| **24** | teletypes maximum (the shipped build is assembled for **10**: the console plus TTY5-TTY10 = nd100x TERMINAL 5-10; TTY2-TTY4 cannot be used on nd100x because its terminals at IOX 0310-0330 answer idents 0121-0123, not the 5-7 TSS dispatches on) |
 | **8 × 2K** | pages per process, at `40000₈` |
 
 The NORD-10 device drivers — including the swapping drum — were written by
@@ -164,8 +164,12 @@ cd mac-c
 - **How do you get to a login prompt from a bare disc?** Format the disc with
   the standalone `MINIT` program, cold-boot with the operator switches at
   `131313₈` (runs `SINIT`, which creates user **SYSTEM**, passwordless), then
-  boot normally — every terminal prints `@ENTER`; log in as `SYSTEM` and you
-  reach the `@` command prompt. Full procedure:
+  boot normally — the console prints `@ENTER`; log in as `SYSTEM` and you
+  reach the `@` command prompt. The other teletypes start **dead**: the
+  level-6 scanner wakes one when **ESC** (033) is typed on it, and only then
+  it prints `@ENTER` (`src/TSS1.SYMB` `LEV6`: `AND (177; SUB (33; JAF L2`).
+  On nd100x, start with `--telnet=PORT`, connect, pick `Terminal 39`
+  (= TERMINAL 8 = TSS TTY8), press ESC. Full procedure:
   [`docs/TSS-BRINGUP.md`](docs/TSS-BRINGUP.md).
 
 ## External resources — set these, never hard-code them

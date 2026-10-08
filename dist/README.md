@@ -11,7 +11,8 @@ the documented bring-up, committed so releases can ship a ready system.
 | `tss.cfg` | the validated nd100x configuration — boot type, image, CDC and drum paths |
 | `run-tss.sh` | starts nd100x with `--mms=1`, which the config file cannot express |
 | `QUICKSTART.md` | becomes the `README.md` inside the release archive: install the emulator, jump start or the one-time bring-up (bootstrap tape → MINIT format → cold start), run, log in, known limitations |
-| `cdc-jumpstart.img.gz` | a disc that has already been through the bring-up (bootstrap installed, MINIT-formatted, cold-started, `SYSTEM` created, verified to boot from disc alone) — made locally with exactly the commands the QUICKSTART documents |
+| `cdc-jumpstart.img.gz` | a disc that has already been through the bring-up (bootstrap installed, MINIT-formatted, cold-started, `SYSTEM` created, verified to boot from disc alone) — made locally with exactly the commands the QUICKSTART documents; since 2026-10-08 built from the `TEL10` (10-teletype) system (`make bringup-auto`) |
+| `cdc-jumpstart-tel4.img.gz` | the previous jump-start disc, built from the single-user `TEL4` system (`make build TEL=4`) |
 
 The release archive also contains `tss.bpun`, `minit.bpun`,
 `cdbin-boot.bpun` (all built by `make build`), plus `cdc.img` (the built

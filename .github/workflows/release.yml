@@ -52,6 +52,7 @@ jobs:
           cp Build/drum/tss-cdc.img        "$OUT/cdc.img"
           truncate -s 4M                   "$OUT/cdc.img"
           gunzip -c dist/cdc-jumpstart.img.gz > "$OUT/cdc-jumpstart.img"
+          gunzip -c dist/cdc-jumpstart-tel4.img.gz > "$OUT/cdc-jumpstart-tel4.img"
           head -c 1048576 /dev/zero      > "$OUT/drum.img"
           cp dist/tss.cfg dist/run-tss.sh  "$OUT/"
           cp dist/QUICKSTART.md            "$OUT/README.md"

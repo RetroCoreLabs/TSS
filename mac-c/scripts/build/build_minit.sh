@@ -20,7 +20,7 @@ cd "$(dirname "$0")/../.." || exit 1
 # We set N10 (bare-symbol line, exactly as ASSYS-DRUM sets "... DRUM N10")
 # so the NORD-10 IOX path is compiled in and the NORD-1 path is killed.
 #
-# Output goes under Build/minit/ (disposable, like Build/drum/).
+# Output goes under Build/minit/ (tracked binaries, like Build/drum/).
 set -u
 
 HERE=$(cd "$(dirname "$0")/../.." && pwd)

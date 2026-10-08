@@ -546,6 +546,36 @@ cleared memory and stops. Not a TSS defect.
 
 ## 4. `SET-REGISTER` / `STATUS` — RETRACTED AND REVISED
 
+> **[RESOLVED 2026-10-08 — root cause found, fix applied in source]**
+> The `"N10` block of `SETX` (`src/TSS3.SYMB:388`) read its translation table
+> with `LDA SSXT,X`. That is addressing mode 4, `(X)+D`: the hardware adds X
+> to an 8-bit displacement, and the MAC manual (page 54 chart) makes a `,X`
+> operand relative to the X location counter, which is 0. An 8-bit field
+> cannot hold SSXT's address. `mac-c` emitted `046012` for this word
+> (verified in `Build/drum/tss-cdc.img`, overlay 0, word 0237): displacement
+> 012, so `SET-REGISTER A` (X=3) loaded page-0 word 015 and `SET-REGISTER X`
+> (X=1) loaded word 013, both zero. `0 OR IRW 10` is an `IRW` with register
+> field 0, and ND-06.014.2A page 174 says register field 0 writes A bits 0-7
+> into the status register of that level. That is exactly `STS = 234` from
+> `SET-REGISTER A 1234`. What the 1978 MAC would have emitted for a forward
+> `,X` reference is not known (`mac-c` patches it P-relative); either way the
+> instruction cannot reach the table. The NORD-1 path uses the correct
+> `LDA (RBLOK; RADD DA SX` idiom. The second, independent bug noted below
+> stands: the table had no STS slot at index 6, so `B` (index 7) read past
+> its end.
+>
+> Both are confined to the `"N10` conditional, which the golden ASSYSA/ASSYSB
+> builds (`CDC MACF DIAB K14 TEL4`, no `N10`) skip: this code was never
+> assembled in 1978. Fix in `src/TSS3.SYMB`: `LDA I SSXTP,X; STA ADR,B`
+> through a pointer word `SSXTP, SSXT` (mode 6, the TSS1 swapper idiom pinned
+> by test [17]) and an 8-entry table of ready-made `IRW 10 <reg>` words, so
+> the `ORA` and the `(IRW 10` literal go away and the overlay keeps its word
+> count. **Verified on nd100x 2026-10-08** (fresh scratch disc set from the
+> rebuilt `tss-drum.bpun`/`tss-cdc.img`, MINIT format, cold start, disc
+> boot): `SET-REGISTER A 1234`, `X 777`, `B 4321`, `T 55` read back as
+> `A = 1234`, `X = 777`, `B = 4321`, `T = 55` in `STATUS`, with `STS = 0`
+> throughout. Both earlier explanations below stay retracted.
+
 > **[RETRACTION 2026-07-25]** This section previously claimed the `"N10`
 > variant drives the **live** CPU registers instead of a saved block. **That
 > is wrong.** `IRR`/`IRW` bits 3-6 are a **program level** field

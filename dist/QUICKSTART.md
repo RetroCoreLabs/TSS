@@ -158,14 +158,25 @@ Then `OPEN-FILE "MYFILE",WX` works. The quotes are a delimiter **pair** —
 
 ## Known limitations
 
-These are faithfully reproduced from the original — not emulator problems:
+Two defects of the 1973 source were found and fixed in the repository on
+2026-10-08. A kit built from source before that date still has them. Both
+fixes were verified on nd100x the same day: `DATE` advances in step with
+`TIME-USED`, and `SET-REGISTER A 1234` / `X 777` / `B 4321` / `T 55` all read
+back correctly in `STATUS` with `STS` untouched.
 
-- **The time of day does not advance.** `DATE` returns whatever was last set.
-  TSS is a 48-bit floating-point program whose clock constants were assembled
-  in the 32-bit format, so every division underflows to zero. This is a defect
-  in the **1978 original**: the archived build has the same constants.
-- **`SET-REGISTER` sets the wrong register.** Under investigation.
-- Elapsed-time accounting (`TIME-USED`, `LOGOUT`) *does* work.
+- **The time of day did not advance.** `DATE` returned whatever was last set.
+  TSS is a 48-bit floating-point program, but the four clock constants in
+  `TBANG` (`src/TSS2.SYMB`) were assembled in the 2-word 32-bit format, so
+  every division came out zero. The archived 1978 build has the same
+  constants, so this is a defect in the original. Fixed under the `CLKFX`
+  mark, which the NORD-10 build input sets; the golden NORD-1 builds keep the
+  original words. See `docs/TSS-FLOAT-FORMAT.md` section 8.
+- **`SET-REGISTER` set the wrong register.** The NORD-10 path of `SETX`
+  (`src/TSS3.SYMB`) indexed its register table with an addressing mode whose
+  8-bit displacement cannot reach the table, so the write landed in the
+  status register. Fixed in place; the 1978 builds never assembled this path.
+  See `docs/TSS-COMMAND-VALIDATION.md` PART III section 4.
+- Elapsed-time accounting (`TIME-USED`, `LOGOUT`) always worked.
 
 Everything else — the user lifecycle, file system, memory assignment,
 accounting, `PAUSE`/`CONTINUE`, device reservation — has been exercised

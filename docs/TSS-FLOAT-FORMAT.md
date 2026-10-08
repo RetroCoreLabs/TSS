@@ -284,3 +284,35 @@ Recorded because the pattern is the point, not the individual errors.
 
 Every retracted entry was reasoned from source or from a correlation. The one
 that held was a single-variable experiment on a running machine.
+
+## 8. The fix (2026-10-08)
+
+`src/TSS2.SYMB` now carries both encodings of `K1`-`K4`, selected by a new
+library mark `CLKFX`:
+
+| mark | K1 | K2 | K3 | K4 |
+|---|---|---|---|---|
+| `CLKFX` set | `040027 101726 0` | `040022 127710 0` | `040014 135600 0` | `040006 144000 0` |
+| not set (original) | `[4.32E6` | `[1.8E5` | `[3000` | `[50` |
+
+The 48-bit words are the format §3b describes: word 0 is the exponent biased
+`040000`, words 1-2 the 32-bit mantissa with the leading 1 explicit. `K3`'s
+words are the ones the §3a experiment patched into memory.
+
+Only `derived/ASSYS-DRUM-N10-MAC-INPUT.SYMB` sets the mark. The golden
+`ASSYSA`/`ASSYSB` inputs do not, so the oracle builds still assemble the
+original 8 words. Under `CLKFX` the constants take 12 words, so every symbol
+after `TBANG=022611` moves by 4; nothing in the source is known to depend on
+those addresses, but that is inferred, not proven. An 8-word layout that
+keeps every address (each constant's third word doubling as the next
+constant's exponent word) was considered and rejected: it makes `K1` read
+4320032, a drift of 32 ticks per day.
+
+**Verified on nd100x 2026-10-08.** The golden builds are unchanged (732
+tests, 679/693 and 675/689, zero assembly errors) and the `CLKFX` build
+assembles with zero errors. On a fresh scratch disc set built from it (MINIT
+format, cold start, disc boot): login date 1917:58, `DATE` one command later
+1917:59, after 70 s of wall-clock time 1925:37, with `TIME-USED` reporting
+`OUT OF 7 MINS 40 SECS` in the same session. The time of day now moves in
+step with TSS's own elapsed counter. The ratio of TSS time to wall-clock
+time is the emulator's clock-tick rate and was not investigated here.

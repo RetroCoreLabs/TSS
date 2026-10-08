@@ -20,6 +20,39 @@ algorithms documented in structured pseudo-code beside the code.
 The NORD-10 device drivers — including the swapping drum — were written by
 **Nils Jakob Langeland** in spring 1973.
 
+## TSS and SINTRAN III
+
+TSS 3.0 is dated 1973 by its own source (the NORD-10 drivers are signed
+17/4/73 and 28/5/73). SINTRAN III, Norsk Data's later operating system,
+carries much of the same design. Compared against the *SINTRAN III Users
+Guide* (ND-60.050.06, June 1976) and *SINTRAN III Monitor Calls*
+(ND-860228):
+
+- **Monitor calls.** Both use `MON n` (`161000` plus an 8-bit call number)
+  dispatched through a table. 18 of the 81 TSS call-table entries have the
+  same number and the same name in SINTRAN III: octal `0`-`10` (`LEAVE`,
+  `INBT`, `OUTBT`, `ECHOM`, `BRKM`, `RDISK`, `WDISK`, `RPAG`/`RPAGE`,
+  `WPAG`/`WPAGE`), `13`-`14` (`CIBUF`, `COBUF`), `32` `MSG`, `35` `IOUT`,
+  `64`-`67` (`ERMSG`, `QERMS`, `ISIZE`, `OSIZE`) and `76` `SETBS`. Where the
+  arguments were checked, they sit in the same registers. `OPEN` keeps its
+  arguments and access codes 0-3 but moved from 42 to 50.
+- **Commands.** 24 of the 60 TSS commands exist under the same name in
+  SINTRAN III, for example `WHO-IS-ON`, `CREATE-FRIEND`, `PLACE-BINARY` and
+  `INIT-ACCOUNTING`. About 13 more are renamed equivalents: `ALLOCATE`
+  became `ALLOCATE-FILE` with the same arguments, counted in pages instead
+  of tracks.
+- **Files and users.** The same `(USER)NAME:TYPE` file names, the same rule
+  that a name in quotation marks creates a new file, six of the seven TSS
+  default file types, friends, owner/friend/public access, and the same
+  login sequence: ESC, `ENTER`, password, `PROJECT NUMBER`.
+
+No document found states that SINTRAN III was derived from TSS, so that is
+an inference from the evidence above, not a recorded fact. The comparison,
+with a citation for every match, is in
+[`docs/TSS-AND-SINTRAN.md`](docs/TSS-AND-SINTRAN.md). The history of the two systems,
+with a source grade for every statement, is in
+[`docs/TSS-AND-SINTRAN-HISTORY.md`](docs/TSS-AND-SINTRAN-HISTORY.md).
+
 > **New here?** Read [`ppt/Intro to TSS.pdf`](ppt/) for the architecture,
 > then [`docs/PROJECT-DESCRIPTION.md`](docs/PROJECT-DESCRIPTION.md) for the
 > provenance, authorship and rebuild status.
@@ -105,7 +138,8 @@ cmake --build build -j
 
 ### B. Build it from source
 
-Needs a POSIX toolchain; on Windows use WSL.
+Needs a POSIX toolchain; on Windows use WSL. Every helper script is POSIX
+shell or awk: the repository is python-free by decision.
 
 ```bash
 git clone https://github.com/RetroCoreLabs/TSS.git && cd TSS

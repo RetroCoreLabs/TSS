@@ -278,7 +278,7 @@ END {
     echo "  - Home: README.md"
     section() { echo "  - $1:"; shift; for p in "$@"; do [ -f "$D/$p" ] && echo "      - $p"; done; }
     section "Getting started" dist/QUICKSTART.md docs/TSS-BRINGUP.md docs/TSS-USER-MANUAL.md
-    section "History" docs/TSS-AND-SINTRAN.md docs/PROJECT-DESCRIPTION.md \
+    section "History" docs/TSS-AND-SINTRAN.md docs/TSS-PROGRAMS.md docs/PROJECT-DESCRIPTION.md \
         docs/ND-60.039.01_Reference_Manual_for_the_NORD_Timesharing_System_16_February_1973.md
     section "How TSS works" docs/TSS-ARCHITECTURE.md docs/TSS-PSEUDOCODE.md docs/TSS-SOURCE-FILES.md docs/TSS-FLOAT-FORMAT.md
     section "Testing" docs/TSS-COMMAND-VALIDATION.md docs/OPEN-QUESTIONS.md

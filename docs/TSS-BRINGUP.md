@@ -342,6 +342,7 @@ cd "$ND100X_SRC"/src/cpu/tools/mkptypes && cc -O2 -o mkptypes mkptypes.c
 | `--boot=tape` | the front-panel octal-ASCII tape load: deposits the `<addr>/ words <addr>!` leader, starts at `!`, and leaves the tape in the reader so the loaded program reads the binary remainder — what a CDBIN distribution tape needs (§6.7) |
 | `--opr=OCTAL` | preset the operator's-panel switch register read by `TRA OPR`; e.g. `--opr=131313`. F12 → **[6] Control Panel Switches** edits it live |
 | `--start=OCTAL` | override the BPUN autostart entry (e.g. `--start=7`) |
+| `--rtc=wall` | one clock interrupt per 20 ms of host time, so `DATE` keeps real time. The default from nd100x 1.0.15 on; older builds defaulted to `ticks` (one pulse per 10550 instructions), which ran the TSS clock about 7x too fast. `dist/run-tss.sh` passes it for those builds |
 | `--pipe` | keyboard from stdin (expect-style console automation) |
 | `--trace` | per-instruction disassembly to stderr (register values are the state at instruction **fetch**) |
 | `--debugger --port=N` | DAP debug server (project convention: port **1777**) |
@@ -1105,13 +1106,16 @@ Working images go to `Build/bringup/` (disposable; re-created by step 1).
 
 ## 9. Known issues
 
-Exactly **one** open bug:
+No known open bugs.
 
-- **DATE garble (cosmetic, untriaged).** After the first-login date entry,
-  the `DATE` command prints garbled fields — observed
-  `DATE IS 139 JULY 2026   159210:48`. Date conversion/formatting in the
-  DATE path; does not affect login, commands, or the file system. Not yet
-  investigated.
+- **DATE garble — no longer seen.** An earlier build printed garbled fields
+  after the first-login date entry (observed
+  `DATE IS 139 JULY 2026   159210:48`). On 2026-10-09 the `v2026.10`
+  release disc on nd100x 1.0.15 printed `DATE IS 9 OCTOBER 2026   1200:14`
+  fourteen seconds after the date `09,10,2026,12,00,00` was entered. The
+  clock constants in `TBANG` (`src/TSS2.SYMB`) were fixed on 2026-10-08
+  (`CLKFX` mark, `docs/TSS-FLOAT-FORMAT.md` section 8); whether that fix is
+  what cured the garble was not established.
 
 Not bugs (by design / correct for this corpus):
 

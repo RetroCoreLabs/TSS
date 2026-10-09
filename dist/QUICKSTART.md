@@ -48,8 +48,10 @@ or by hand:
 nd100x --config=tss.cfg --mms=1
 ```
 
-**`--mms=1` is required.** nd100x accepts `mms` only on the command line, not
-in the config file. TSS is 1973 code that programs the MMU the
+**`--mms=1` is required.** `run-tss.sh` passes it on the command line.
+nd100x 1.0.15 and later also accept `mms = 1` under `[machine]` in the
+config file; older builds reject that key, so `tss.cfg` leaves it out.
+TSS is 1973 code that programs the MMU the
 Paging-System-I way; with the default MMS2 the machine starts and then hangs
 in the overlay loader.
 

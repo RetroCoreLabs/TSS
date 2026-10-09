@@ -118,13 +118,11 @@ source**.
 
 ### A. Download the release kit
 
-Every tagged release ships the built system, the format and bootstrap
-tapes, and the disc media — see
-[Releases](https://github.com/RetroCoreLabs/TSS/releases). Unpack it, then
-either **jump start** with the ready-made `cdc-jumpstart.img` (copy it over
-`cdc.img`) or follow the archive's README through the one-time bring-up
-(bootstrap tape → MINIT format → cold start, about two minutes — the same
-steps a 1973 operator performed). Then:
+Every tagged release ships a ready-to-boot CDC disc (`cdc.img`: bootstrap
+installed, formatted, cold-started, user `SYSTEM` created), a blank
+swapping drum, `tss.cfg` and `run-tss.sh` — see
+[Releases](https://github.com/RetroCoreLabs/TSS/releases). TSS boots
+straight from the disc:
 
 ```bash
 tar xzf nord-tss-3.0-*.tar.gz && cd nord-tss-3.0-*
@@ -132,7 +130,7 @@ tar xzf nord-tss-3.0-*.tar.gz && cd nord-tss-3.0-*
 ```
 
 Log in as **SYSTEM**, project **1**, no password. `HELP` lists all 60
-commands. The bring-up and usage guide is
+commands. The usage guide is
 [`dist/QUICKSTART.md`](dist/QUICKSTART.md) in this repo.
 
 You still need the emulator — it is a separate project:

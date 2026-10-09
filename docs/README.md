@@ -25,6 +25,7 @@
 | [`OPEN-QUESTIONS.md`](OPEN-QUESTIONS.md) | **the live list** — every unanswered question, what is known, and what would settle it. Answered items leave this file for the document that owns the subject. |
 | [`TSS-FLOAT-FORMAT.md`](TSS-FLOAT-FORMAT.md) | the one question big enough for its own document: was TSS built for a 32-bit or a 48-bit FPP? Its own source answers both ways, and the time of day cannot advance as a result. Includes the history of wrong answers. |
 | [`TSS-AND-SINTRAN.md`](TSS-AND-SINTRAN.md) | NORD TSS and SINTRAN III: the history (the Taimyr SINTRAN, Bo Lewendal and NORD TSS, the 1973 CERN contract, CERN's own 1973-1975 notes on running TSS and choosing SINTRAN III, SINTRAN III replacing SINTRAN II and TSS) with timeline and lineage diagrams and working links to every CERN document, then the evidence of shared design: the monitor-call convention and 18 identical calls, 24 identical command names, the file-name grammar, friends and login. Every statement graded by source |
+| [`TSS-PROGRAMS.md`](TSS-PROGRAMS.md) | the programs that ran under TSS: the twelve subsystems of the 1973 manual (QED, MAC, FTN4, BASIC, MAIL, CHESS ...) plus RUNOFF, how they were started, and what survives of each |
 
 ---
 

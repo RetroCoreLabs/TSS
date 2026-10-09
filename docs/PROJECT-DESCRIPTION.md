@@ -99,6 +99,7 @@ modern restorer, distinguishable by style:
 | hand | what | evidence |
 |---|---|---|
 | **Bo Lewendal** | the base system — scheduler, paging, file system, monitor calls, command processor | credited in the TSS1 header; dense `;`-packed lines, `)FILL`+`)PCL` scoping, ALGOL-style pseudo-code comments |
+| **Torolf Paulsen** | co-proposed TSS with Lewendal on 14 June 1971; the double-precision normalise `NORM` | the memo "FRA : BL, TEP" and Lewendal 2014 ("my coworker Torolf Paulsen and I proposed"); `%DUE TO T.E. PAULSEN` at TSS2 line 2244 |
 | **NJL = Nils Jakob Langeland** | the 1973 NORD-10 device drivers — `XDRUM` (drum, signed 17/4/73) and `IOXLIB` (NORD-10 I/O, signed 28/5/73) | signed and dated in the source; one instruction per line, letter-spaced banners, formal CALLING SEQUENCE / RETURN INFORMATION contracts |
 | the `"N10` patch hand | ~120 conditional blocks porting the machine layer | written in Lewendal's compact style, so the porter is **[ASSUMPTION]** either Lewendal or someone matching him |
 | an imported table | card-code conversion table, `% REVISED 1971.08.04` | TSS1 line 1685; yyyy.mm.dd date unlike NJL's dd/mm/yy — **[ASSUMPTION]** imported from an existing source; oldest date in the archive |
@@ -161,7 +162,11 @@ surgical 1–5 line substitutions written in **Lewendal's compact style**,
 not NJL's driver style — e.g. the whole N10 `INIT`, the `IRW`/`IRR`
 context patches, the `VERDR` Versatec driver. **[ASSUMPTION]** either
 Lewendal did the core N10 port himself, or the porter deliberately matched
-his style; the archive cannot distinguish. XDRUM's "1. approximation"
+his style; the archive cannot distinguish. Lewendal's own 2014 account
+favours the first: the NORD-10 "included hardware to better support
+timesharing among users", and "I kept improving the software to take
+advantage of the Nord-10 hardware". He left Norsk Data on 1 January 1974, so
+N10 work after that date was not his. See `TSS-AND-SINTRAN.md`. XDRUM's "1. approximation"
 remark shows the port was still in progress in April 1973.
 
 ### Quick fingerprint guide
@@ -421,7 +426,13 @@ The exact build/boot/login procedure is in
 
 | date | milestone |
 |---|---|
+| 3 March 1971 | Bo Lewendal joins Norsk Data |
+| 14 June 1971 | Lewendal and Torolf Paulsen propose a timesharing system for the NORD-1 |
+| July 1971 | Lewendal writes the first working TSS during the company vacation |
+| September 1972 | Lewendal's article "TIMESHARING: What, Why and Whiter?" in *ND-Nytt* |
+| 16 February 1973 | *Reference Manual for the NORD Timesharing System*, ND-60.039.01 |
 | 1973 | Lewendal's TSS 3.0; NJL's NORD-10 drivers (Apr–May) |
+| 1 January 1974 | Lewendal leaves Norsk Data |
 | 1978 | the archived SYSA/SYSB builds (the golden symbol dumps) |
 | (modern) | "CVS" restoration pass: parity strip, `STR`→`XTR`/`LSS`→`XSS` build-script patches |
 | 2026-07-19 | archive analysed; authorship and provenance established; `.ORG` vs `.SYMB` decoded |

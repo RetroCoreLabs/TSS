@@ -1,7 +1,8 @@
 # NORD Time Sharing System 3.0
 
 **A complete, standalone timesharing operating system for the Norsk Data
-NORD-1 and NORD-10, written by Bo Lewendal in 1973.** It owns the machine —
+NORD-1 and NORD-10, written by Bo Lewendal: first working in summer 1971,
+version 3.0 from 1973.** It owns the machine —
 it is not a program running under SINTRAN.
 
 Every terminal is a process with its own 8-page virtual memory, swapped
@@ -56,7 +57,12 @@ itself no longer used TSS but had adopted SINTRAN III. CERN had run TSS since
 1973, by 1975 with eleven terminals. Tor Olav Steine, a former Norsk Data employee, says in his 2020 history of
 the company that SINTRAN III was built from SI's virtual memory project, "Bo
 Lewendal's TSS", floating-point operations and SINTRAN II, mainly by Trygve
-Matre. No source says part by part what came from TSS. The comparison,
+Matre. No source says part by part what came from TSS. The 1973 manuals
+show the call interface's two parents: 15 of the 18 shared calls are already
+in TSS's own February 1973 manual, and SINTRAN III's real-time calls carry
+SINTRAN II's names. Lewendal's own account (*IEEE Annals*, 2014) and his
+original TSS manual, which is in [`docs/`](docs/README.md), are among the
+sources. The comparison,
 with a citation for every match, is in
 [`docs/TSS-AND-SINTRAN.md`](docs/TSS-AND-SINTRAN.md), together with the history of
 the two systems and a source grade for every statement.

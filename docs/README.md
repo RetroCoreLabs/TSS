@@ -31,4 +31,19 @@
 `TSS-Style-Authorship.pdf` is imported archive material (authorship analysis);
 its findings are absorbed into `PROJECT-DESCRIPTION.md`.
 
+[`ND-60.039.01_Reference_Manual_for_the_NORD_Timesharing_System_16_February_1973_ocr.pdf`](ND-60.039.01_Reference_Manual_for_the_NORD_Timesharing_System_16_February_1973_ocr.pdf)
+is the original TSS manual: *Reference Manual for the NORD Timesharing
+System*, ND-60.039.01, by Bo Lewendal, 16 February 1973, a scan with an OCR
+text layer (from <http://heim.bitraf.no/tingo/files/nd/>). It documents the
+utility commands and the monitor-call list as they stood then;
+`TSS-AND-SINTRAN.md` uses it to date which calls TSS had first.
+A Markdown transcription of the same manual is next to it:
+[`ND-60.039.01_Reference_Manual_for_the_NORD_Timesharing_System_16_February_1973.md`](ND-60.039.01_Reference_Manual_for_the_NORD_Timesharing_System_16_February_1973.md).
+
+[`lewendal-final.pdf`](lewendal-final.pdf) is Bo Lewendal's own account,
+"My Corner of the Time-Sharing Innovation World", *IEEE Annals of the
+History of Computing*, vol. 36, no. 4, October-December 2014, pp. 97-101,
+DOI 10.1109/MAHC.2014.57, © IEEE, as hosted by David Walden at
+<https://walden-family.com/norway/lewendal-final.pdf>.
+
 For a guided architecture tour, see [`../ppt/Intro to TSS.pdf`](../ppt/).

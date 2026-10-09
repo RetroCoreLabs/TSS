@@ -88,53 +88,85 @@ Then `OPEN-FILE "MYFILE",WX` works. The quotes are a delimiter **pair** —
 The shipped build is assembled for **10 teletypes** (`TEL10`). On nd100x the
 usable ones are:
 
-| TSS teletype | nd100x terminal | IOX | ident |
-|---|---|---|---|
-| TTY1 | console (the nd100x window / pty) | 0300 | 1 |
-| TTY5 .. TTY8 | TERMINAL 5 .. 8 | 0340 .. 0370 | 044 .. 047 |
-| TTY9, TTY10 | TERMINAL 9, 10 | 01300, 01310 | 050, 051 |
+| TSS teletype | nd100x terminal | nd100x screen name | IOX | ident | reachable at start |
+|---|---|---|---|---|---|
+| TTY1 | console (the nd100x window / pty) | `Console` | 0300 | 1 | locally |
+| TTY5, TTY6, TTY7 | TERMINAL 5, 6, 7 | `Terminal 36`, `37`, `38` | 0340, 0350, 0360 | 044, 045, 046 | locally, F12 virtual screen |
+| TTY8 | TERMINAL 8 | `Terminal 39` | 0370 | 047 | telnet |
+| TTY9, TTY10 | TERMINAL 9, 10 | `Terminal 48`, `49` | 01300, 01310 | 050, 051 | telnet |
+
+nd100x names each terminal by its logical device number, as in the third
+column. Run nd100x with `--verbose` to see the mapping in the start-up log,
+for example `Terminal 39 created (TERMINAL 8/ TET9, ident 47, address 370)`.
 
 **TTY2-TTY4 are unusable on nd100x**: TSS expects them at IOX 0310-0330 with
 idents 5, 6, 7, but nd100x's terminals at those addresses answer idents
 0121-0123, which TSS's level-12 dispatch sends to `LNONE`.
 
 An extra teletype is **dead** until **ESC** (033 octal) is typed on it; the
-level-6 scanner then starts its process and it prints `@ENTER`. Any other
-character typed on a dead teletype is read and dropped.
+level-6 scanner then starts its process and it prints the banner and
+`@ENTER`. Any other character typed on a dead teletype is read and dropped.
+Log in as in section 3.
 
-To reach TERMINAL 5-10 from outside the emulator window use nd100x's telnet
-server: `nd100x --config=tss.cfg --mms=1 --telnet=9077`, then
-`telnet localhost 9077`, pick a terminal from the menu (nd100x names them by
-logical device number: `Terminal 39` is TERMINAL 8, `Terminal 48` is
-TERMINAL 9, `Terminal 49` is TERMINAL 10 - the start-up log line
-`Terminal 39 created (TERMINAL 8/ TET9, ident 47, address 370)` gives the
-mapping), press ESC, log in as in section 3, and `WHO-IS-ON` lists both lines.
+### F12: the virtual screens
+
+Press **F12** in the nd100x window for the nd100x menu, then **2** for the
+Virtual Screen Selector:
+
+```
+=== Virtual Screens (telnet port 9077) ===
+  [1] Console                  *
+  [2] Terminal 36              [Virtual]
+  [3] Terminal 37              [Virtual]
+  [4] Terminal 38              [Virtual]
+  [5] Terminal 39              [Inactive]
+  [6] Terminal 48              [Inactive]
+  [7] Terminal 49              [Inactive]
+  [8] Terminal 50              [Inactive]
+  [9] Line Printer             (output only)
+  [a] Paper Tape Punch         (output only)
+  [b] Log                      (output only)
+  [R] Release terminal (virtual->inactive, or disconnect telnet)
+  [P] Pending connections (live view)
+```
+
+`*` marks the screen shown in the window. `[Virtual]` screens belong to the
+nd100x window; `[Inactive]` screens are free for a telnet client.
+
+- **Use TTY5-TTY7 in the nd100x window:** press the screen's number (`2` for
+  `Terminal 36` = TTY5), then ESC to wake it. Go back with F12, 2, 1.
+- **Hand TTY5-TTY7 to telnet:** press **R**, then the screen's number. The
+  screen turns `[Inactive]` and appears in the telnet menu. The console and
+  the screen currently shown cannot be released. Switching back to a
+  released screen takes it back from telnet.
+- **R** on a screen that has a telnet client disconnects that client.
+
+### Telnet
+
+Start nd100x with its telnet server:
+
+```bash
+nd100x --config=tss.cfg --mms=1 --telnet=9077
+```
+
+then `telnet localhost 9077`. The menu lists the `[Inactive]` terminals; at
+start that is `Terminal 39`, `48`, `49` and `50` (TTY8, TTY9, TTY10, and
+TERMINAL 11, which is not in the table above). Type the menu number, press ESC, log in
+as in section 3. `WHO-IS-ON` then lists both lines, for example `1 SYSTEM`
+and `8 SYSTEM`.
 
 ## Known limitations
 
-Two defects of the 1973 source were found and fixed in the repository on
-2026-10-08. A kit built from source before that date still has them. Both
-fixes were verified on nd100x the same day: `DATE` advances in step with
-`TIME-USED`, and `SET-REGISTER A 1234` / `X 777` / `B 4321` / `T 55` all read
-back correctly in `STATUS` with `STS` untouched.
+No open defects are known. TTY2-TTY4 cannot be used on nd100x (section 4).
 
-- **The time of day did not advance.** `DATE` returned whatever was last set.
-  TSS is a 48-bit floating-point program, but the four clock constants in
-  `TBANG` (`src/TSS2.SYMB`) were assembled in the 2-word 32-bit format, so
-  every division came out zero. The archived 1978 build has the same
-  constants, so this is a defect in the original. Fixed under the `CLKFX`
-  mark, which the NORD-10 build input sets; the golden NORD-1 builds keep the
-  original words. See `docs/TSS-FLOAT-FORMAT.md` section 8.
-- **`SET-REGISTER` set the wrong register.** The NORD-10 path of `SETX`
-  (`src/TSS3.SYMB`) indexed its register table with an addressing mode whose
-  8-bit displacement cannot reach the table, so the write landed in the
-  status register. Fixed in place; the 1978 builds never assembled this path.
-  See `docs/TSS-COMMAND-VALIDATION.md` PART III section 4.
-- Elapsed-time accounting (`TIME-USED`, `LOGOUT`) always worked.
+Two defects in the 1973 source were fixed before this release: the time of
+day did not advance, and `SET-REGISTER` wrote the wrong register. The
+details are in the source repository, `docs/TSS-FLOAT-FORMAT.md` section 8
+and `docs/TSS-COMMAND-VALIDATION.md` PART III section 4.
 
-Everything else — the user lifecycle, file system, memory assignment,
-accounting, `PAUSE`/`CONTINUE`, device reservation — has been exercised
-command by command against a running machine.
+The user lifecycle, file system, memory assignment, accounting,
+`PAUSE`/`CONTINUE` and device reservation have been exercised command by
+command against a running machine.
 
 ## More
 

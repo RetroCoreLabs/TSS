@@ -17,6 +17,12 @@ NORD-1 / NORD-10 (Bo Lewendal, 1973). It owns the machine. Every teletype is a
 process with its own 8-page virtual memory, swapped between core and disk. After
 you log in you talk to the **command processor**, whose prompt is `@`.
 
+The original manual by the author, *Reference Manual for the NORD
+Timesharing System* (ND-60.039.01), is in this folder as
+[`ND-60.039.01_Reference_Manual_for_the_NORD_Timesharing_System_16_February_1973_ocr.pdf`](ND-60.039.01_Reference_Manual_for_the_NORD_Timesharing_System_16_February_1973_ocr.pdf).
+This manual describes the system as it was rebuilt and tested; where the two
+differ, this one records what the running system does.
+
 ## 2. Getting to the `@` prompt (logging in)
 
 The console (TTY1) prints its sign-on at boot. Every other teletype is

@@ -3,47 +3,12 @@
 **This file:** `docs/TSS-AND-SINTRAN.md`
 
 How Norsk Data's first timesharing system, NORD TSS, relates to the SINTRAN
-family of operating systems: first the history (sections 2-6), then the
-technical evidence of what SINTRAN III shares with TSS 3.0 (section 7).
-Every statement carries its source and a source grade, because the sources
-differ a great deal in weight:
+family of operating systems: first the history (sections 1-5), then the
+technical evidence of what SINTRAN III shares with TSS 3.0 (section 6).
+Every statement carries its source and a source grade such as **[SRC]** or
+**[RET]**; the grades and the full source list are in section 9.
 
-| grade | meaning |
-|---|---|
-| **[SRC]** | read in the TSS 3.0 source in this repository |
-| **[MAN]** | read in a period Norsk Data manual |
-| **[PER]** | read in another period document, written at the time |
-| **[RET]** | a retrospective by a participant, written decades later |
-| **[ENC]** | an encyclopedia or wiki, with no reference given for the statement |
-| **[UNVERIFIED]** | reported by someone else, source not yet read by this project |
-
-## 1. The sources
-
-| short | source | grade |
-|---|---|---|
-| Steine | Tor Olav Steine, "The Founding, Fantastic Growth, and Fast Decline of Norsk Data AS", *History of Nordic Computing 3*, Stockholm 2010, Springer IFIP AICT vol. 350, 2011. Open copy: <https://dl.ifip.org/db/conf/hinc/hinc2010/Steine10.pdf>. Steine was "Formerly of Norsk Data AS" and thanks Bugge-Asperheim, Monrad-Krohn, Lewendal, Skår, Trøim and Walden "for early days information" | [RET] |
-| Steine 2020 | Tor Olav Steine, *Norsk Data - what went wrong?*, English edition of *Norsk Data - hva gikk galt?*, ISBN 978-82-303-4554-2, read in a pre-release English version, so no page numbers are given because they may change in the published English edition. The English text appears machine-translated (it has "SINTRAN-111" for SINTRAN III and leftover Norwegian words), so quotations keep its wording with [sic] | [RET] |
-| SNL | Store norske leksikon, article "Norsk Data", <https://snl.no/Norsk_Data> | [ENC] |
-| Wikipedia | English Wikipedia, "Sintran III" and "QED (text editor)" | [ENC] |
-| ndwiki | ndwiki.org articles NORD-TSS, SINTRAN II, SINTRAN III, NORD PL; the SINTRAN pages say they began as copies of Wikipedia (2008, 2009) | [ENC] |
-| UG | ND-60.050.06 *SINTRAN III Users Guide*, version of June 1976 | [MAN] |
-| MC | ND-860228 *SINTRAN III Monitor Calls* | [MAN] |
-| TSS 3.0 | `src/TSS1.SYMB` ... `src/TSS5.SYMB`, `src/MINIT.SYMB` | [SRC] |
-| RM | ND-60.128.5 *SINTRAN III Reference Manual* | [MAN] |
-| TBG | ND-60.132.03 *SINTRAN III Timesharing Batch Guide* | [MAN] |
-| Sagnell | B. Sagnell, *How to write reports on the NORD-TSS*, CERN LAB II-CO/GE/bS/73-29, November 1, 1973. <https://cds.cern.ch/record/66380> ([PDF](https://cds.cern.ch/record/66380/files/LABII-CO-GE-BS-73-29.pdf)) | [PER] |
-| Shering 1973 | G. Shering, *Development of the NORD-10 Interpretive System*, CERN LAB II-CO/CC/GS/73-9, January 1973. <https://cds.cern.ch/record/66360> ([PDF](https://cds.cern.ch/record/66360/files/LABII-CO-CC-GS-73-9.pdf)) | [PER] |
-| CERN Spec 73-1 | CERN Lab II, *Technical specification for the message transfer system for the SPS*, LAB II-CO/SPEC/73-1, March 1973. <https://cds.cern.ch/record/66615> ([PDF](https://cds.cern.ch/record/66615/files/LABII-CO-SPEC-73-1.pdf)) | [PER] |
-| Altaber 75-1 | J. Altaber, *Basic description of the software operating system for the computer control of the SPS*, CERN LAB II-CO/75-1, March 1975. <https://cds.cern.ch/record/66485> ([PDF](https://cds.cern.ch/record/66485/files/CERN-LABII-CO-75-1.pdf)) | [PER] |
-| Sveen 75-9 | O. Sveen, *Notes to assist in the choice of an operating system and operating modes for the service computer*, CERN Lab II-CO/CE/Int.Note/OS/75-9, 14.2.75. <https://cds.cern.ch/record/66510> ([PDF](https://cds.cern.ch/record/66510/files/LABII-CO-CE-Int-Note-OS-75-9.pdf)) | [PER] |
-| Sveen 75-13 | O. Sveen, *The Service Computer with its MTS-SINTRAN III, Users Guide*, CERN Lab II-CO/Int./Comp.Note/75-13, 21.10.75. <https://cds.cern.ch/record/66519> ([PDF](https://cds.cern.ch/record/66519/files/LABII-CO-Int-Comp-Note-75-13_1.pdf)); a French version is <https://cds.cern.ch/record/66605> | [PER] |
-| CERN notes 1973-75 | J. Altaber, *Proposal for Sintran add-on*, LAB II-CO/CC/JA/73-30, 11.5.73, <https://cds.cern.ch/record/66381>; J. Altaber, C. Gareyte, *Timing study on Sintran*, LAB II-CO/CC/CG/73-32, <https://cds.cern.ch/record/66383>; J. Altaber, *SYNTRON, a Real-time System developed from SINTRAN*, Lab II-CO/CC/Int.Note/JA/74-15, 29.3.74, <https://cds.cern.ch/record/66440>; J. Altaber, O. Sveen, *Mechanisms of Interaction between the Message Handling Software and SINTRAN III*, Lab II-CO/CE/Int.Note/OS/75-20, 22.4.75, <https://cds.cern.ch/record/66532>; O. Sveen, *Unsystematic NODAL-Datalink SINTRAN III Information*, Lab II-CO/CE/Int.Note/OS/75-45, 12.12.75, <https://cds.cern.ch/record/66555> | [PER] |
-
-The ND manuals are read as Markdown transcriptions under
-`$NDINSIGHT/Reference-Manuals/`; line numbers such as UG:1527 refer to those
-transcriptions.
-
-## 2. Timeline
+## 1. Timeline
 
 ```mermaid
 %%{init: {"gantt": {"leftPadding": 130}}}%%
@@ -55,9 +20,13 @@ gantt
     section First SINTRAN
     SINTRAN with SINTEF, SNL with no reference     :milestone, 1968-01-01, 0d
     Taimyr on board and in operation, SNL           :milestone, 1969-06-01, 0d
+    SINTRAN II Operators Guide, ND 60.044          :milestone, 1973-02-01, 0d
     section NORD TSS
     Nord TSS launched, SNL                          :milestone, 1970-01-01, 0d
+    TSS proposed by BL and TEP, memo                :milestone, 1971-06-14, 0d
     First rudimentary TSS by Lewendal, Steine       :milestone, 1971-08-01, 0d
+    Lewendal article in ND Nytt                      :milestone, 1972-09-01, 0d
+    TSS Reference Manual ND 60.039.01               :milestone, 1973-02-16, 0d
     NORD 10 drivers signed NJL, TSS source          :milestone, 1973-04-17, 0d
     CERN contract won with TSS, Steine              :milestone, 1973-06-01, 0d
     section CERN notes
@@ -77,7 +46,7 @@ a dated event, labelled with its source. A date given only as a year or a
 month is placed at its start. No lifetime bars are
 drawn, because no source gives end dates for SINTRAN II or NORD TSS.
 
-## 3. The first SINTRAN: a control system for a ship
+## 2. The first SINTRAN: a control system for a ship
 
 Norsk Data's first customer project was the bulk carrier *Taimyr*. Steine:
 "The radar was to be extended with a Nord-1 computer ... for automatic
@@ -107,7 +76,7 @@ year either.
 TSS 3.0 is written in an assembler also called MAC. Whether it is the same
 program as the Taimyr "Mac", or a descendant of it, is not established.
 
-## 4. Bo Lewendal and NORD TSS
+## 3. Bo Lewendal and NORD TSS
 
 Steine (p. 2), **[RET]**:
 
@@ -139,14 +108,95 @@ on experience from previous systems in the US." That fits the source: `NORM`
 is headed `%DUE TO T.E. PAULSEN` (`src/TSS2.SYMB:2244`). The same page says
 "the Sintran II operating system had been developed at NTNU by Trygve Matre.
 Nord TSS used the mechanisms of this operating system to switch between
-different users." That last sentence is not borne out by the TSS 3.0 source,
+different users." Lewendal's own account does not support it either: he wrote the scheduler and
+swapping himself, modelled on Project Genie and BCC.
+That last sentence is not borne out by the TSS 3.0 source,
 which owns the machine and contains no SINTRAN II, nor by Sveen 75-9, which
 calls TSS "originally a NORD-1 operating system"; it may describe an earlier
 TSS version or borrowed ideas rather than code, and is left open.
 
-Wikipedia says Lewendal also implemented the QED editor for the Nord-1 in
-1971, after working with Deutsch and Lampson at Project Genie and BCC. That
-sentence is tagged "[citation needed]" on Wikipedia itself. **[ENC]**
+The written record starts earlier than any of these accounts. An internal
+Norsk Data memo dated 14 June 1971, "FRA : BL, TEP", to the division
+leaders, subject "Time-sharing System", opens: "We suggest that there be
+made a Time-sharing system for the NORD-1 computer (NORD-1-TSS)" **[PER]**.
+It offers two ways to build the timesharing part: "The time-sharing part
+could be taken from the multi-programming system developed at SI. This
+would require hardware paging on the NORD-1", or "A simple time-sharing
+system where only one user is in core at a time is another alternative. The
+advantage of such a system is that it is simple and requires no new
+hardware." The estimate was "1 1/2 months. This assumes that TEP and BL
+would be working on it full time", and "The file system could be made from
+specifications held by BL". The memo does not mention SINTRAN.
+
+Lewendal told the story himself in 2014 **[RET]**: "I joined ND on 3 March
+1971." Before TSS, "the Nord-1, was basically set up to work with files on
+paper tape", and "The Nord-1 also supported a real-time operating system
+called SINTRAN that was mostly used for process control applications." His
+first programs for it were a string package, "an implementation of the QED
+text editor that I had used in Berkeley" and "a copy of the Runoff system
+from the 940 system". Then: "On 14 June 1971, my coworker Torolf Paulsen and
+I proposed that ND create a time-sharing system for its Nord-1 machine", so
+BL and TEP are Lewendal and Torolf Paulsen, the Paulsen the TSS source
+credits in `NORM`. He wrote a more detailed "Proposal for a Simple
+Timesharing System" on 5 July 1971, then worked through the company's
+July vacation: "I implemented a disk-based file system with QED interfaced
+to it. Then I wrote a basic time-sharing system with commands to access the
+paper tape punch and reader and the file system and a round-robin
+time-slice scheduler using software swapping among users. This system was
+working when the rest of the people in the company came back from
+vacation." On its origins: "mostly I used those systems [Project Genie and
+BCC] as a model and just decided what made sense to implement for the
+Nord-1." For the NORD-10 he "participated in some of the design decisions
+for this machine, and it included hardware to better support timesharing
+among users", and he kept improving TSS to use it. He left Norsk Data on 1
+January 1974 (Lewendal 2014). The systems sold to Norwegian technical schools were
+"often to run a Basic system implemented by another ND employee (Jørgen
+Håberg)".
+
+So TSS took the memo's second option, the one CERN still saw in 1975: a
+system where "only one user could be in core at any time" (Sveen 75-9,
+section 5). Lewendal's two hand-drawn sheets "NORD-1 Timesharing System"
+(July 1971, cited by him) show it: a resident part of about 12K holding the
+I/O processor, scheduler, swapper, context block and utility routines, with
+the user program above it up to 32K. That matches Shering's "TSS takes
+about 12 K" (section 5). The second sheet, "Configuration for NORD-10 TSS",
+sketches a larger plan with several NORD-10 processors, each behind a
+"Paging Box", around up to 256K of central memory.
+
+By September 1972 Lewendal described the finished system in Norsk Data's
+newsletter, "TIMESHARING: What, Why and Whiter?" by "Bo Lewendal,
+system-programmer, ND" **[PER]**, noting that "a number of Norwegian
+technical schools have already ordered NORD Timesharing Systems". The
+reference manual followed on 16 February 1973: *Reference Manual for the
+NORD Timesharing System* by Bo Lewendal, ND-60.039.01 **[MAN]**, "typed and
+edited on a NORD Timesharing System" with formatting "done by a NORD
+typesetting program called RUNOFF". It defines the system as "a medium scale
+multi-access computational system which implements a user machine which is
+an extended subset of the NORD-1 computer", made of a Utility Command
+Processor and a Monitor Call System. It does not mention SINTRAN either.
+(Quotations from the memo and the manual checked against the page images;
+the article is quoted from its scanned text.)
+
+Rolf Skår, who recruited him, gave his own account in 2012 **[RET]**: "I
+was able to get Bo to come to Norsk Data where his first job was to transfer
+a program called QED (a very powerful and easy-to-use editor) to Nord-1. Bo
+saved the company by then single-handedly developing the Nord TSS, a time
+sharing system for a 16-bit minicomputer with up to 16 simultaneous users.
+With this system we were able to penetrate the market in Sweden with sales
+of TSS systems to the universities of Umeå and Luleå." (Skår 2012.) Lewendal's
+own account reconciles the two versions: the proposal was his and
+Paulsen's, the July 1971 implementation was his alone.
+
+Wikipedia says Lewendal implemented the QED editor for the Nord-1 in 1971,
+after working with Deutsch and Lampson at Project Genie and BCC, and tags
+that sentence "[citation needed]" **[ENC]**. Lewendal's own account confirms
+it **[RET]**: "The first pieces of software I wrote for the machine were a
+package to do string manipulation and an implementation of the QED text
+editor that I had used in Berkeley (originally created by Deutsch and Lampson
+for the 940 system). I also implemented a copy of the Runoff system from the
+940 system to be able to do my own document production and not burden the
+ND typists." (Lewendal 2014.) So both QED and RUNOFF on the NORD came from the
+Berkeley SDS 940 system.
 
 What the TSS 3.0 source itself shows **[SRC]**: its first line is
 `% NORD TIMESHARING SYSTEM  BY BO LEWENDAL` (`src/TSS1.SYMB:1`), it carries
@@ -156,7 +206,7 @@ NORD-10 drivers are signed `NJL 17/4/73` (`src/TSS1.SYMB:3763`) and
 routine credits a second person: the double-precision normalise `NORM` is
 headed `%DUE TO T.E. PAULSEN` (`src/TSS2.SYMB:2244`).
 
-## 5. CERN, 1973
+## 4. CERN, 1973
 
 Steine (pp. 2-3), **[RET]**:
 
@@ -172,6 +222,26 @@ Steine (pp. 2-3), **[RET]**:
 
 This is Steine's rendering of Skår, not a quotation set in quote marks, and
 "the first time-sharing system in any minicomputer" is Steine's own claim.
+
+Lewendal adds **[RET]**: "when ND was bidding on a contract to provide 24
+computers to CERN in Geneva, people from CERN visited ND and I demonstrated
+our time-sharing system. After ND won the CERN procurement, Rolf Skår, Trygve
+Matre (the creator of the SINTRAN operating system), and I drove to Geneva
+carrying the parts of the first system installation in our cars." Once in
+Geneva, "we had three weeks to get the system put together and working,
+which we did." He later
+wrote the NODAL interpreter for CERN (Lewendal 2014).
+
+Skår himself, in 2012 **[RET]**: "The CERN contract Norsk Data won in
+December 1972 was the difference between bankruptcy and success. ... For
+their project, CERN had decided to use the PDP-11 and had already purchased
+two PDP-11s." He took CERN's three decision makers to the Institute for
+Atomic Energy in Halden, where "we demonstrated two important applications:
+how computers were used in the control of a nuclear experimental reactor,
+and the TSS operating system for software development" (Skår 2012). The
+dates fit together as steps: the Finance Committee vote of 19 September
+1972 (Steine 2020), the contract won in December 1972 (Skår), and the order
+placed in January 1973 (CERN Spec 73-1).
 
 Steine's 2020 book gives the decision itself **[RET]**: CERN's delegation
 was shown only the software, on one terminal in an office; the
@@ -195,12 +265,13 @@ key briefly" and shows `NORD-TSS 3.0 IS UP`, `ENTER`, `PASSWORD`, `PROJECT
 NUMBER P-`, then `@QED` and `QED 1.10`. To save a new file it types
 `W "FIRST"`, because "Since the file is new, the system demands that we put
 quotes around the name". So TSS 3.0, the QED editor and the quote rule of
-section 7.3 were all in use at CERN by November 1973. The note also says RUNOFF
+section 6.3 were all in use at CERN by November 1973. The note also says RUNOFF
 "was written in order to simplify the preparation of computer documents in
-English at Norsk Data Elektronikk". (Quotations checked against the page images; the
+English at Norsk Data Elektronikk". That is Lewendal's copy of the 940 Runoff
+(section 3). (Quotations checked against the page images; the
 PDF's OCR text layer misreads the date as 1972.)
 
-## 6. Two systems, then one
+## 5. Two systems, then one
 
 Before SINTRAN III, Norsk Data offered two separate systems: SINTRAN II for
 real-time work and NORD TSS for timesharing. English Wikipedia: "Sintran III
@@ -225,6 +296,13 @@ SINTRAN III", and "The credit for the development of SINTRAN III is
 primarily to be attributed to ... Trygve Matre". This is a
 participant's retrospective written about 45 years later; it names the
 ingredients but not which parts of TSS were taken over.
+
+Norsk Data's *NORD-10 Design Goals* (catalogue number TSS-02, undated on its
+pages; Lewendal cites it as his own, 1973) lists both side by side
+**[MAN]**: "Several operating systems are available including the general
+purpose NORD Timesharing System which can run any mix of programs in
+interactive mode, the SINTRAN III real-time multiprogramming operating
+system, and the NORD-DPS batch operating system."
 
 In January 1973 CERN described the two systems Norsk Data offered, in
 Shering's plan for the SPS control computers **[PER]**:
@@ -360,18 +438,18 @@ flowchart LR
 | D | TSS 3.0 is written in MAC | the TSS source |
 | E | SINTRAN III succeeded SINTRAN II | Wikipedia, no reference |
 | F | SINTRAN III succeeded NORD TSS | Sveen 75-9 (1975): "Since Sintran III has become available, ND no longer use NORD-TSS as their own time-sharing system"; also Wikipedia |
-| G | SINTRAN III was built on, among other things, TSS (section 6), and shares its call interface, commands and file model (section 7) | Steine 2020 for the build; the TSS source and the manuals for the shared design |
+| G | SINTRAN III was built on, among other things, TSS (section 5), and shares its call interface, commands and file model (section 6) | Steine 2020 for the build; the TSS source and the manuals for the shared design |
 
 Blue: the SINTRAN line before SINTRAN III. Amber: NORD TSS. Teal: SINTRAN
 III. Purple: outside influence. Indigo: the MAC assembler. Solid arrows are
 stated by a source; dashed arrows are an inference or an open question.
 
-## 7. What SINTRAN III kept from TSS
+## 6. What SINTRAN III kept from TSS
 
 TSS 3.0 compared with the 1976 SINTRAN III manuals at three levels:
 monitor calls, commands, and files and users. **[SRC]** **[MAN]**
 
-### 7.1 Monitor calls
+### 6.1 Monitor calls
 
 **Calling convention: the same.**
 
@@ -410,6 +488,22 @@ and the same name in the numeric list of MC:
 | 67 | `OSIZE` | `OSIZE` | not checked |
 | 76 | `SETBS` | `SETBS` | T = file, A = block size - same |
 
+**Which of these TSS had first.** The February 1973 TSS manual dates them
+**[MAN]**. Of the 18 calls above, 15 are already in it with the same number
+and name: 0-10, 13, 14, 32, 35, 64 and 65 (checked on the page images for
+3, 4, 5, 32, 35, 64 and 65; found by name in the scanned text for the
+rest). The other three are not: the manual marks 66 and 67 "not used", and
+its list ends at 72, so 76 `SETBS` came later. The low call numbers were
+therefore TSS's before SINTRAN III existed, and SINTRAN III kept them.
+
+**SINTRAN III's real-time calls carry SINTRAN II's names.** The SINTRAN II
+Operator's Guide (ND-60.044, February 1973, revised August 1973) says "Most
+of the monitor subroutines may be executed as operator commands" and lists
+`RT`, `SET`, `ABSET`, `INTV`, `ABORT`, `CONCT`, `DSCNT`, `PRIOR`, `UPDAT` and
+`CLADJ` **[MAN]**. These are SINTRAN III's monitor calls 100, 101, 102, 103,
+105, 106, 107, 110, 111 and 112 (MC). So SINTRAN III's interface shows both
+parents: the low numbers from TSS, the real-time block from SINTRAN II.
+
 **TSS 3.0 also implements two SINTRAN III calls at SINTRAN III's numbers.**
 Beside its own `OPEN` at 42, `MCTBL` has `OPIII` at 50, headed
 `%OPIII - SINTRAN III OPEN FILE` (`src/TSS2.SYMB:1055`): X = name, A = type,
@@ -420,14 +514,16 @@ of SINTRAN III's `CLOCK` (`GetCurrentTime`, 113, MC). Both routines are in
 the archived originals `archive/TSS2.ORG` and the call table in
 `archive/TSS1.ORG`, not only in CVS's copy. So the TSS 3.0 source already
 provides part of the SINTRAN III call interface, at the numbers SINTRAN III
-uses; when and why this was added is not recorded in the source. Two more
+uses. Neither is in the February 1973 manual, which marks 50 "not used" and
+stops at 72, so both were added to TSS after that date, together with 66,
+67 and 76: the two interfaces converged from both sides. Two more
 keep their function under a different number: `REABT` 114 became 75 and
 `SETBT` 115 became 74. Call 11 has the same number but a different
 function (TSS `RCTIM`, SINTRAN `TIME`). The remaining TSS calls, mostly
 string, mail and user utilities from 15 octal upward, have no SINTRAN
 counterpart at their number.
 
-### 7.2 Commands
+### 6.2 Commands
 
 TSS has 60 commands (`src/TSS5.SYMB:1791-1801`).
 
@@ -462,7 +558,7 @@ among them `SET-REGISTER`, `EXAMINE`, `CLOCK-ON`/`CLOCK-OFF`, `LINK-TO`,
 `RBLOAD`, `BACKUP`, `DEFINE-VERSION` and `LOAD-SYSTEM`. Other SINTRAN
 manuals were not searched, so "not found" is not proof of absence.
 
-### 7.3 Files and users
+### 6.3 Files and users
 
 | | TSS 3.0 | SINTRAN III | result |
 |---|---|---|---|
@@ -482,10 +578,10 @@ appears word for word (RM:1932). `AMBIGUOUS FILENAME` / `AMBIGUOUS FILE
 NAME` and `NO SUCH FILE` / `NO SUCH FILE NAME` (TBG) differ by one word. The
 friend and user messages were not found in SINTRAN.
 
-### 7.4 What this proves, and what it does not
+### 6.4 What this proves, and what it does not
 
 **Proven** (read on both sides): the same monitor-call instruction, number
-field and table dispatch; 18 calls with the same number and name, with the
+field and table dispatch; 18 calls with the same number and name, 15 of them already in the February 1973 TSS manual; with the
 same argument registers wherever checked; two SINTRAN III calls, `OPEN` at
 50 and `CLOCK` at 113, implemented inside TSS 3.0 under SINTRAN III names; 24 identical command names; the
 same file-name grammar and quote rule; 6 of 7 default file types; the same
@@ -498,7 +594,7 @@ background programs, because the monitor calls are similar" and that "The
 command monitor is also very similar to the one in NORD-TSS" (Sveen 75-9).
 In October 1975 its SINTRAN III users' guide said the log-in procedure "is
 essentially equal to the one employed on TSS" and that a new file is named in
-quotes "just as on TSS" (Sveen 75-13). Both are in section 6. They record the
+quotes "just as on TSS" (Sveen 75-13). Both are in section 5. They record the
 similarity as users saw it in 1975, and that Norsk Data itself had moved its
 own timesharing from TSS to SINTRAN III; they do not say how SINTRAN III was
 designed.
@@ -506,7 +602,7 @@ designed.
 **Stated by a participant, decades later:** Steine's 2020 book says SINTRAN
 III was "Based on SI's virtual memory project, Bo Lewendal's TSS, floating
 comma operations and proven SINTRAN-11 [sic]", developed mainly by Trygve
-Matre (section 6) **[RET]**.
+Matre (section 5) **[RET]**.
 
 **Still inferred:** which parts. That SINTRAN III's monitor-call interface,
 command language and file model in particular came from TSS fits all the
@@ -520,7 +616,7 @@ No evidence was found for influence in the other direction,
 from SINTRAN into TSS: Steine describes TSS as Lewendal's own work for the
 Nord-1, built on his Berkeley experience.
 
-## 8. Claims checked against the CERN documents
+## 7. Claims checked against the CERN documents
 
 A ChatGPT summary made three claims about CERN documents; report numbers
 for two of them came only in a later answer. The documents were found by searching the CERN Document Server, first by
@@ -530,22 +626,63 @@ image of the PDF, not only its scanned text.
 
 | claim | result |
 |---|---|
-| A January 1973 CERN document describes TSS (about 12K, disc) for the service computer and SINTRAN (3K core-only, 4K disc) for the other computers | **verified**: Shering, LAB II-CO/CC/GS/73-9, quoted in section 6 |
-| A 1973 CERN specification asks that tasks made for NORD TSS also run under SINTRAN II | **verified**: LAB II-CO/SPEC/73-1, section 6.1, printed page 13, quoted in section 6. The document is dated March 1973, not January as the summary said |
-| A 1975 CERN document describes a NORD-10 running TSS with 11 terminals | **verified**: Altaber, LAB II-CO/75-1, March 1975, printed page 5, quoted in section 6 |
+| A January 1973 CERN document describes TSS (about 12K, disc) for the service computer and SINTRAN (3K core-only, 4K disc) for the other computers | **verified**: Shering, LAB II-CO/CC/GS/73-9, quoted in section 5 |
+| A 1973 CERN specification asks that tasks made for NORD TSS also run under SINTRAN II | **verified**: LAB II-CO/SPEC/73-1, section 6.1, printed page 13, quoted in section 5. The document is dated March 1973, not January as the summary said |
+| A 1975 CERN document describes a NORD-10 running TSS with 11 terminals | **verified**: Altaber, LAB II-CO/75-1, March 1975, printed page 5, quoted in section 5 |
 
-## 9. Leads not yet read
+## 8. Leads not yet read
 
-- ND-60.039.01, the NORD TSS reference manual.
-- "TIMESHARING: What, Why and Whiter?" (spelled so), listed by ndwiki in the
-  Norsk Data newsletter *ND-Nytt* No. 5, September 1972, and attributed to
-  Bo Lewendal on the ndwiki NORD-TSS page.
+- The rest of the "TSS related notes" bundle: after the June 1971 memo,
+  about 60 pages of design notes on Norsk Data paper, most handwritten, which
+  OCR cannot read. Pages 30-34 are Lewendal's "Proposal for a Simple
+  Timesharing System" of 5 July 1971. They need reading by eye.
 - Tor Olav Steine's books *Fenomenet Norsk Data* (1992) and *Norsk Data - hva
-  gikk galt?* (2020), which SNL lists. The English edition of the 2020 book is
-  now used above. The 1992 book is not read.
-- Bo Lewendal, "My Corner of the Time-sharing Innovation World", *IEEE
-  Annals of the History of Computing*, and four articles by Lewendal on
-  timesharing in ND's newsletter, including one titled "NORD Timesharing
-  System", all listed in Steine 2020. Lewendal's own account could
-  settle what TSS took from SINTRAN II and what SINTRAN III took from TSS.
-- *Software Nord-10 Design Goals (TSS-02)*, cited by several ndwiki pages.
+  gikk galt?* (2020), which SNL lists.
+
+## 9. Sources
+
+The sources differ a great deal in weight, so every statement above carries
+one of these grades:
+
+| grade | meaning |
+|---|---|
+| **[SRC]** | read in the TSS 3.0 source in this repository |
+| **[MAN]** | read in a period Norsk Data manual |
+| **[PER]** | read in another period document, written at the time |
+| **[RET]** | a retrospective by a participant, written decades later |
+| **[ENC]** | an encyclopedia or wiki, with no reference given for the statement |
+| **[UNVERIFIED]** | reported by someone else, source not yet read by this project |
+
+
+| short | source | grade |
+|---|---|---|
+| Steine | Tor Olav Steine, "The Founding, Fantastic Growth, and Fast Decline of Norsk Data AS", *History of Nordic Computing 3*, Stockholm 2010, Springer IFIP AICT vol. 350, 2011. Open copy: <https://dl.ifip.org/db/conf/hinc/hinc2010/Steine10.pdf>. Steine was "Formerly of Norsk Data AS" and thanks Bugge-Asperheim, Monrad-Krohn, Lewendal, Skår, Trøim and Walden "for early days information" | [RET] |
+| Steine 2020 | Tor Olav Steine, *Norsk Data - what went wrong?*, English edition of *Norsk Data - hva gikk galt?*, ISBN 978-82-303-4554-2 | [RET] |
+| Skår 2012 | Rolf Skår, interviewed by David Walden by e-mail, September 2012; shortened version in *IEEE Annals of the History of Computing*, January-March 2013, pp. 72-77; full text approved by Skår: <https://ethw.org/First-Hand:Interview_with_Rolf_Sk%C3%A5r> | [RET] |
+| SNL | Store norske leksikon, article "Norsk Data", <https://snl.no/Norsk_Data> | [ENC] |
+| Wikipedia | English Wikipedia, "Sintran III" and "QED (text editor)" | [ENC] |
+| ndwiki | ndwiki.org articles NORD-TSS, SINTRAN II, SINTRAN III, NORD PL; the SINTRAN pages say they began as copies of Wikipedia (2008, 2009) | [ENC] |
+| UG | ND-60.050.06 *SINTRAN III Users Guide*, version of June 1976 | [MAN] |
+| MC | ND-860228 *SINTRAN III Monitor Calls* | [MAN] |
+| TSS 3.0 | `src/TSS1.SYMB` ... `src/TSS5.SYMB`, `src/MINIT.SYMB` | [SRC] |
+| RM | ND-60.128.5 *SINTRAN III Reference Manual* | [MAN] |
+| TBG | ND-60.132.03 *SINTRAN III Timesharing Batch Guide* | [MAN] |
+| Sagnell | B. Sagnell, *How to write reports on the NORD-TSS*, CERN LAB II-CO/GE/bS/73-29, November 1, 1973. <https://cds.cern.ch/record/66380> ([PDF](https://cds.cern.ch/record/66380/files/LABII-CO-GE-BS-73-29.pdf)) | [PER] |
+| Shering 1973 | G. Shering, *Development of the NORD-10 Interpretive System*, CERN LAB II-CO/CC/GS/73-9, January 1973. <https://cds.cern.ch/record/66360> ([PDF](https://cds.cern.ch/record/66360/files/LABII-CO-CC-GS-73-9.pdf)) | [PER] |
+| CERN Spec 73-1 | CERN Lab II, *Technical specification for the message transfer system for the SPS*, LAB II-CO/SPEC/73-1, March 1973. <https://cds.cern.ch/record/66615> ([PDF](https://cds.cern.ch/record/66615/files/LABII-CO-SPEC-73-1.pdf)) | [PER] |
+| Altaber 75-1 | J. Altaber, *Basic description of the software operating system for the computer control of the SPS*, CERN LAB II-CO/75-1, March 1975. <https://cds.cern.ch/record/66485> ([PDF](https://cds.cern.ch/record/66485/files/CERN-LABII-CO-75-1.pdf)) | [PER] |
+| Sveen 75-9 | O. Sveen, *Notes to assist in the choice of an operating system and operating modes for the service computer*, CERN Lab II-CO/CE/Int.Note/OS/75-9, 14.2.75. <https://cds.cern.ch/record/66510> ([PDF](https://cds.cern.ch/record/66510/files/LABII-CO-CE-Int-Note-OS-75-9.pdf)) | [PER] |
+| Sveen 75-13 | O. Sveen, *The Service Computer with its MTS-SINTRAN III, Users Guide*, CERN Lab II-CO/Int./Comp.Note/75-13, 21.10.75. <https://cds.cern.ch/record/66519> ([PDF](https://cds.cern.ch/record/66519/files/LABII-CO-Int-Comp-Note-75-13_1.pdf)); a French version is <https://cds.cern.ch/record/66605> | [PER] |
+| CERN notes 1973-75 | J. Altaber, *Proposal for Sintran add-on*, LAB II-CO/CC/JA/73-30, 11.5.73, <https://cds.cern.ch/record/66381>; J. Altaber, C. Gareyte, *Timing study on Sintran*, LAB II-CO/CC/CG/73-32, <https://cds.cern.ch/record/66383>; J. Altaber, *SYNTRON, a Real-time System developed from SINTRAN*, Lab II-CO/CC/Int.Note/JA/74-15, 29.3.74, <https://cds.cern.ch/record/66440>; J. Altaber, O. Sveen, *Mechanisms of Interaction between the Message Handling Software and SINTRAN III*, Lab II-CO/CE/Int.Note/OS/75-20, 22.4.75, <https://cds.cern.ch/record/66532>; O. Sveen, *Unsystematic NODAL-Datalink SINTRAN III Information*, Lab II-CO/CE/Int.Note/OS/75-45, 12.12.75, <https://cds.cern.ch/record/66555> | [PER] |
+| Lewendal 2014 | Bo Lewendal, "My Corner of the Time-Sharing Innovation World", *IEEE Annals of the History of Computing*, vol. 36, no. 4, October-December 2014, pp. 97-101, DOI 10.1109/MAHC.2014.57; edited by David Walden, <https://walden-family.com/norway/lewendal-final.pdf> | [RET] |
+| Lewendal 1971 sketches | Bo Lewendal, "NORD-1 Timesharing System", July 1971, two hand-drawn sheets (dated and attributed in Lewendal 2014), <http://sintran.com/sintran/library/libsw/NORD-Timesharing-System.pdf> | [PER] |
+| Memo 1971 | Bo Lewendal and Torolf Paulsen ("BL, TEP"), "Time-sharing System", internal Norsk Data memo to the division leaders, 14 June 1971; pp. 1-2 of "TSS related notes", <http://sintran.com/sintran/library/libsw/TSS-related-notes.pdf> | [PER] |
+| ND-Nytt 1972 | Bo Lewendal, "TIMESHARING: What, Why and Whiter?", *ND-Nytt* No. 5, September 1972, <http://sintran.com/sintran/library/libsw/ND-Nytt-Wither-Timesharing.pdf> | [PER] |
+| TSS manual | Bo Lewendal, *Reference Manual for the NORD Timesharing System*, ND-60.039.01, 16 February 1973. Copy in this repository: [`ND-60.039.01_Reference_Manual_for_the_NORD_Timesharing_System_16_February_1973_ocr.pdf`](ND-60.039.01_Reference_Manual_for_the_NORD_Timesharing_System_16_February_1973_ocr.pdf); online: <http://heim.bitraf.no/tingo/files/nd/ND-60.039.01_Reference_Manual_for_the_NORD_Timesharing_System_16_February_1973_ocr.pdf> | [MAN] |
+| SINTRAN II OG | *SINTRAN II Operator's Guide*, ND-60.044, February 1973, revised August 1973, <http://storage.datormuseum.se/u/96935524/Datormusuem/ND10/Manuals/ND-60.044.01-SINTRAN-II-OPERATORS-GUIDE.pdf> | [MAN] |
+| Design Goals | Bo Lewendal, *NORD-10 Design Goals*, Norsk Data, catalogue number TSS-02, 1973 (author and year from Lewendal 2014), <http://norsk-data.com/library/libsw/NORD-10-Design-Goals.pdf> | [MAN] |
+
+The ND manuals are read as Markdown transcriptions under
+`$NDINSIGHT/Reference-Manuals/`; line numbers such as UG:1527 refer to those
+transcriptions.
+

@@ -1,30 +1,24 @@
-# NORD TSS 3.0 — disc set and bring-up kit
+# NORD TSS 3.0 — ready-to-boot disc set
 
 A timesharing operating system written by Bo Lewendal in 1973 for the Norsk
 Data NORD-1 / NORD-10, rebuilt from its original MAC assembler source and
 running on the nd100x emulator.
 
-This archive contains the **built system and blank media**, plus a
-ready-made disc for the impatient. Either **jump start** with the ready
-disc (§2a), or bring the disc up yourself (§2b) — the same three steps an
-operator performed in 1973: install the bootstrap from the distribution
-tape, format the disc, cold-start the system. It takes about two minutes,
-and you only do it once: the disc image keeps everything you (and TSS)
-write to it.
+This archive contains a **ready-to-boot disc**: the CDC cartridge disc has
+the bootstrap installed, is formatted and cold-started, and the user
+`SYSTEM` exists. The disc image keeps everything you (and TSS) write to it.
 
 ## What is in this archive
 
 | file | what it is |
 |---|---|
-| `tss.bpun` | the assembled system, as a BPUN paper-tape image with an autostart address |
-| `minit.bpun` | MINIT, the standalone disc-format program, as a paper tape |
-| `cdbin-boot.bpun` | the CDBIN distribution tape: booting it makes TSS's own bootstrap loader write the disc boot sectors |
-| `cdc.img` | the CDC cartridge disc — carries the system overlays, **not yet formatted** |
-| `cdc-jumpstart.img` | the same disc **after** the bring-up: bootstrap installed, formatted, cold-started, user `SYSTEM` created (10-teletype `TEL10` system, see section 5) |
-| `cdc-jumpstart-tel4.img` | the earlier single-user (`TEL4`, console only) jump-start disc |
+| `cdc.img` | the CDC cartridge disc: bootstrap installed, formatted, cold-started, user `SYSTEM` created (10-teletype `TEL10` system, see section 4) |
 | `drum.img` | the NORD-10 swapping drum (IOX 540), blank; filled in by the running system |
-| `tss.cfg` | the validated nd100x configuration for normal boots |
+| `tss.cfg` | the validated nd100x configuration: boots from the CDC disc |
 | `run-tss.sh` | starts nd100x with the settings TSS needs |
+
+Keep a copy of `cdc.img` if you want a fresh-system restore point - the
+running system writes to it.
 
 ## 1. Get the emulator
 
@@ -40,71 +34,9 @@ cmake --build build -j
 
 The binary lands in `build/` — `find build -name nd100x -type f`.
 
-## 2a. Jump start — skip the bring-up
+## 2. Run TSS
 
-The archive includes `cdc-jumpstart.img`: a disc that has already been
-through the bring-up below (bootstrap installed, MINIT-formatted, cold
-started — user `SYSTEM` exists and the disc is bootable on its own). To use
-it:
-
-```bash
-cp cdc-jumpstart.img cdc.img
-./run-tss.sh /path/to/nd100x
-```
-
-Then log in as in section 4. Do the bring-up yourself instead if you want
-the 1973 operator experience — it is three commands.
-
-## 2b. One-time bring-up: bootstrap, format, cold start
-
-Run these from the unpacked archive. `ND` is your emulator binary:
-
-```bash
-ND=/path/to/nd100x
-```
-
-**Step 1 — install the disc bootstrap.** Boot the CDBIN distribution tape.
-TSS's own tape loader (`HLOAD` → `TBOOT`) reads it and writes the boot
-sectors to the disc itself, exactly as the 1973 install did. It ends in a
-halt; the instruction bound makes the command return on its own:
-
-```bash
-$ND --boot=tape --image=cdbin-boot.bpun --cdc=cdc.img --max-instr=2000000
-```
-
-**Step 2 — format the disc.** Boot MINIT and answer its prompts. `4470` is
-the first user-storage disc address, `4670` the last (giving 16 free
-tracks), `I` means INITIALIZE. Press **Ctrl-C** when it prints `FINISHED`:
-
-```bash
-$ND --boot=bpun --image=minit.bpun --cdc=cdc.img
-```
-```
-MASS STORAGE INIT
-FIRST DISK ADDRESS (NCR): 4470
-LAST DISK ADDRESS (NCR): 4670
-INITIALIZE OR UPDATE OR REGENERATE (I OR U OR R): I
-...
-FINISHED            <- Ctrl-C here
-```
-
-**Step 3 — cold start.** The operator-panel setting `131313` makes TSS run
-`SINIT`, which initialises the file system and creates the passwordless user
-**SYSTEM**. Wait for `@ENTER` on the console, then press **Ctrl-C**:
-
-```bash
-$ND --boot=bpun --image=tss.bpun --cdc=cdc.img --drum=drum.img --opr=131313 --start=7
-```
-
-Ctrl-C is the correct stop — the emulator writes every disc sector through
-to `cdc.img` immediately, so nothing is lost.
-
-The disc is now live. Keep a copy of `cdc.img` if you want a fresh-system
-restore point.
-
-## 3. Run TSS
-
-Every normal boot from here on:
+Every boot:
 
 ```bash
 ./run-tss.sh /path/to/nd100x
@@ -121,15 +53,7 @@ in the config file. TSS is 1973 code that programs the MMU the
 Paging-System-I way; with the default MMS2 the machine starts and then hangs
 in the overlay loader.
 
-After any completed cold start or login, the disc alone is bootable — this
-is what the front-panel LOAD button did on the real machine, and what TSS's
-`LOAD-SYSTEM` command relies on:
-
-```bash
-$ND --boot=cdc --image=cdc.img --cdc=cdc.img --drum=drum.img
-```
-
-## 4. Log in
+## 3. Log in
 
 ```
 NORD TSS VERSION 3.0A IS UP
@@ -157,7 +81,7 @@ NUMBER OF TRACKS: 20
 Then `OPEN-FILE "MYFILE",WX` works. The quotes are a delimiter **pair** —
 `OPEN-FILE "MYFILE,WX` gives `BAD FILENAME`.
 
-## 5. More than one user (terminals)
+## 4. More than one user (terminals)
 
 The shipped build is assembled for **10 teletypes** (`TEL10`). On nd100x the
 usable ones are:
@@ -182,8 +106,7 @@ server: `nd100x --config=tss.cfg --mms=1 --telnet=9077`, then
 logical device number: `Terminal 39` is TERMINAL 8, `Terminal 48` is
 TERMINAL 9, `Terminal 49` is TERMINAL 10 - the start-up log line
 `Terminal 39 created (TERMINAL 8/ TET9, ident 47, address 370)` gives the
-mapping), press ESC, log in as in section 4, and `WHO-IS-ON` lists both lines.
-`cdc-jumpstart-tel4.img.gz` is the previous single-user (`TEL4`) disc.
+mapping), press ESC, log in as in section 3, and `WHO-IS-ON` lists both lines.
 
 ## Known limitations
 

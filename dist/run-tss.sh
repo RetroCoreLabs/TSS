@@ -14,7 +14,7 @@ if [ -z "$ND" ] || [ ! -x "$ND" ]; then
     exit 1
 fi
 
-for f in tss.bpun cdc.img drum.img tss.cfg; do
+for f in cdc.img drum.img tss.cfg; do
     [ -f "$f" ] || { echo "missing $f - run this from the unpacked release" >&2; exit 1; }
 done
 

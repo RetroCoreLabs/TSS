@@ -1,11 +1,11 @@
 name: release
 
-# Build the TSS artifacts and attach the bring-up kit to a GitHub release.
-# Runs on any tag like v1.0, v2026.07, ...
+# Build the TSS artifacts and attach the ready-to-boot disc set to a GitHub
+# release. Runs on any tag like v1.0, v2026.07, ...
 #
-# The kit ships the BUILT SYSTEM AND BLANK MEDIA - the user performs the
-# same three bring-up steps a 1973 operator did (bootstrap tape, MINIT
-# format, cold start), following the QUICKSTART inside the archive. No
+# The kit ships the ready-made CDC disc (dist/cdc-jumpstart.img.gz:
+# bootstrap installed, MINIT-formatted, cold-started, user SYSTEM created),
+# a blank drum, tss.cfg and run-tss.sh. No BPUN tapes are shipped. No
 # emulator runs in CI.
 on:
   push:
@@ -37,22 +37,14 @@ jobs:
       - name: Score against the 1978 golden dump
         run: ./mac-c/scripts/verify/compare_asymb.sh Build/ASYMB.SYMB reference/ASYMB.SYMB
 
-      # ---- 2. package the bring-up kit ----------------------------------
-      # cdc.img = the built overlay disc padded to 8192 sectors (the CDC
-      # device does not grow on writes); drum.img = a blank 1 MB drum.
-      # Padding appends zeros only, so the overlays are untouched.
+      # ---- 2. package the disc set ------------------------------------
+      # cdc.img = the ready-made jump-start disc; drum.img = a blank 1 MB drum.
       - name: Assemble the release archive
         run: |
           VER="${GITHUB_REF_NAME:-dev}"
           OUT="nord-tss-3.0-$VER"
           mkdir -p "$OUT"
-          cp Build/drum/tss-drum.bpun      "$OUT/tss.bpun"
-          cp Build/minit/minit.bpun        "$OUT/minit.bpun"
-          cp Build/tdump/cdbin-boot.bpun   "$OUT/cdbin-boot.bpun"
-          cp Build/drum/tss-cdc.img        "$OUT/cdc.img"
-          truncate -s 4M                   "$OUT/cdc.img"
-          gunzip -c dist/cdc-jumpstart.img.gz > "$OUT/cdc-jumpstart.img"
-          gunzip -c dist/cdc-jumpstart-tel4.img.gz > "$OUT/cdc-jumpstart-tel4.img"
+          gunzip -c dist/cdc-jumpstart.img.gz > "$OUT/cdc.img"
           head -c 1048576 /dev/zero      > "$OUT/drum.img"
           cp dist/tss.cfg dist/run-tss.sh  "$OUT/"
           cp dist/QUICKSTART.md            "$OUT/README.md"
@@ -78,13 +70,10 @@ jobs:
             ${{ env.ARCHIVE }}.sha256
           body: |
             NORD TSS 3.0, built from the 1973 sources by this repository's
-            own MAC assembler: the system tape, the MINIT format tape, the
-            CDBIN bootstrap-install tape, and the disc media.
+            own MAC assembler: a ready-to-boot CDC disc with user SYSTEM
+            created, and a blank swapping drum.
 
-            Unpack, then either jump start with the ready-made
-            cdc-jumpstart.img, or follow the bring-up in the archive's
-            README (bootstrap tape -> MINIT format -> cold start, about
-            two minutes, once). After that:
+            Unpack, then:
 
                 ./run-tss.sh /path/to/nd100x
 

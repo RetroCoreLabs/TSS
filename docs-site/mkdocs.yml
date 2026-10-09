@@ -1,0 +1,61 @@
+# Base configuration of the documentation site.
+#
+# Shape: the pages are generated into build-site/ (not tracked) by
+# docs-site/gen-site.sh, which writes build-site/mkdocs.yml (INHERIT this file
+# plus the generated nav). Generated pages are never committed, so they always
+# match the source. MkDocs is installed only for the site build
+# (docs-site/requirements.txt); the repository itself stays python-free.
+site_name: NORD TSS 3.0
+site_description: Recovered source, reconstruction and history of Norsk Data's 1971-1973 timesharing system
+site_url: https://retrocorelabs.github.io/TSS/
+repo_url: https://github.com/RetroCoreLabs/TSS
+repo_name: RetroCoreLabs/TSS
+edit_uri: ""
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme)"
+      toggle: {icon: material/brightness-auto, name: Switch to light mode}
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle: {icon: material/brightness-7, name: Switch to dark mode}
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle: {icon: material/brightness-4, name: Switch to system preference}
+  features:
+    - navigation.indexes
+    - navigation.path
+    - navigation.top
+    - navigation.footer
+    - navigation.prune
+    - search.suggest
+    - search.highlight
+    - toc.follow
+    - content.code.copy
+plugins:
+  - search
+markdown_extensions:
+  - toc:
+      permalink: true
+      slugify: !!python/object/apply:pymdownx.slugs.slugify {kwds: {case: lower}}
+  - tables
+  - attr_list
+  - md_in_html
+  - admonition
+  - footnotes
+  - def_list
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+  - pymdownx.tabbed
+  - mdx_truly_sane_lists:
+      nested_indent: 2
+validation:
+  links:
+    not_found: warn
+    anchors: warn

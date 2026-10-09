@@ -2614,3 +2614,113 @@ and `RBLOAD` with a non-existent file answer `NO SUCH FILE`.
 
 **Not covered:** the phase-5 commands that end or replace the session
 (`LOAD-BINARY`, `RECOVER`, `DEFINE-VERSION`, `LOAD-SYSTEM`, `MODE`).
+
+---
+
+# PART X. THE ORIGINAL 1973 MANUAL AGAINST THE REBUILT SYSTEM
+
+**Question.** How does Bo Lewendal's own *Reference Manual for the NORD
+Timesharing System* (ND-60.039.01, 16 February 1973, in this folder as
+[`ND-60.039.01_Reference_Manual_for_the_NORD_Timesharing_System_16_February_1973.md`](ND-60.039.01_Reference_Manual_for_the_NORD_Timesharing_System_16_February_1973.md)
+and the scanned PDF) compare with what the rebuilt TSS 3.0 did in the tests
+above? The manual is the designer's statement of intent, written about two
+years before the archived build; the tests show the system as it survived.
+
+**Method.** Each command of chapter 5 of the manual, its syntax line and its
+description, set against the most recent test result in this document
+(PART II transcripts, the PART V/VII re-runs, the PART IX sweep).
+"Matches" means the observed behaviour is what the 1973 text describes;
+"differs" means it is not; "not tested" means the tests here did not
+exercise the described behaviour.
+
+## X.1 General rules (manual chapters 3-5)
+
+| 1973 manual | rebuilt TSS 3.0 | verdict |
+|---|---|---|
+| Any part of a hyphenated command name may be abbreviated: `LOAD-BINARY` as `LOAD`, `L-B` or `LO`; `L` alone is ambiguous | only full names and plain prefixes were used in the tests | not tested |
+| Parameters separated by comma or spaces; "If the user ... may simply omit any or all parameters. In this case, NORD-TSS will ask for the required parameters" | missing parameters are prompted for (`FILE NAME:`, `LOWER BOUND:`, `USER NAME:`, `TO USER:`) | matches |
+| A new file's name "must be enclosed by double quotes" | `OPEN-FILE "SCRATCH:DATA",WX` creates the file; an opening quote alone gives `BAD FILENAME` (PART III §6) | matches; the manual's wording does not show that the quotes must be a pair |
+| The user machine is core 30000-57777 (24K NORD-1) or 30000-77777 (32K) | on the NORD-10 build user memory starts at 40000 in eight 2K pages (`MEMORY 0` lists 40000-74000) | differs: the NORD-10 layout, later than the manual |
+| "Escape" while a program runs returns to the Utility Command Processor; ESC on a dead teletype restores the connection | ESC brings a dead teletype and a logged-out one back to `@ENTER` (PART IV D2) | matches for the dead teletype; interrupting a running program not tested |
+
+## X.2 The 47 commands of the 1973 manual
+
+| command (1973 syntax) | 1973 manual says | rebuilt TSS 3.0 did | verdict |
+|---|---|---|---|
+| `HELP` | lists the commands; `DESCRIBE` gives details | lists 60 commands | matches (more commands now) |
+| `LOGOUT` | ends the session, teletype dead until "escape", reports compute and console time | prints the date, `TIME USED IS` / `OUT OF`; ESC revives the teletype | matches |
+| `RESET` | releases all memory | `MEMORY 0` afterwards lists every page `EMPTY` (PART IX) | matches |
+| `MEMORY start address, end address` | a null argument lists the allocation; arguments redefine it | no argument prompts `LOWER BOUND:`; a lower bound of `0` lists; `MEMORY 40000 44000` assigns two pages | differs for the null argument; matches with arguments |
+| `DELETE-MEMORY address of block` | releases one 2K block | ignores the command-line argument and prompts `CORE ADDRESS OF BLOCK:` (PART IX) | differs |
+| `LOAD-BINARY file` | simulates MASTER CLEAR and LOAD from the file, adjusts memory | rejects `TAPE-READER` with `BAD FILENAME` (Phase 5b) | not confirmed; open question 2 |
+| `PLACE-BINARY file` | as `LOAD-BINARY` but not started | ignores the argument and prompts `FILE NAME:`; rejects `TAPE-READER` | differs; open question 2 |
+| `GOTO-USER address` | starts the user program at the address | an invalid address gives `ILLEGAL ADDRESS` | error path matches; a valid start not tested |
+| `DUMP file, start address, restart address` | saves memory and registers with two start addresses | prompted `FILE NAME:`; an unquoted new name gave `NO SUCH FILE` | not tested with a quoted new file name |
+| `RECOVER file` | loads and starts a dump; the word `RECOVER` may be left out (`MAC` alone means `RECOVER MAC`) | `NO SUCH FILE` for a missing file | the shorthand not tested |
+| `CONTINUE` | restarts at the `DUMP` restart address | with nothing to continue prints `?` | consistent; a real restart not tested |
+| `OPEN-FILE file, R or W or RX or WX` | opens or creates (quotes for new); R/W sequential, RX random read, WX random read/write; up to five open files; prints `FILE NUMBER n` | `FILE NUMBER = 100` for a new quoted file | matches; the five-file limit not tested |
+| `CLOSE-FILE file number or -1` | `-1` closes all; files close automatically on return to the command processor | `CLOSE-FILE 100` returns silently | matches; `-1` not tested |
+| `DELETE-FILE file` | deletes and frees the space | deleted `TESTF:DATA` (PART IX) | matches |
+| `LIST-FILE argument` | lists every file whose name contains the argument; null lists all; `-BL` matches the second part | `LIST-FILE SCRATCH` lists `SCRATCH:DATA`; silent when nothing matches | matches |
+| `RENAME old-name, new-name` | renames | `SCRATCH:DATA` became `TESTF:DATA` | matches |
+| `ALLOCATE file, track address, number of tracks` | creates a file on given tracks; SYSTEM only | `NO SUCH FILE` for an unquoted new name | not tested with a quoted name |
+| `LIST-OBJECTS` | lists the open files | silent with none open | consistent |
+| `CREATE-FRIEND user-name` | adds a friend | `TESTU` then listed | matches |
+| `DELETE-FRIEND user-name` | removes a friend | returns silently | matches |
+| `LIST-FRIENDS` | lists friends | lists `TESTU` | matches |
+| `DEFINE-UIB-ACCESS access-word` | sets the user index block access | `DEFINE-UIB-ACCESS (TESTU) 777` returns silently | matches; effect not checked |
+| `DEFINE-FILE-ACCESS file, access-word` | sets a file's access mode | returns silently | effect not checked |
+| `MAKE-REENTRANT file, list of block addresses` | makes 2K blocks of a program file read-only | `NO SUCH FILE` (no dump file existed) | not tested |
+| `STATUS` | lists the program's central registers | lists `STS D P B L A T X` | matches |
+| `SET-REGISTER register, value` | P X T A D L B or an octal address; a trailing `D` means decimal | all seven letters work after the 2026-10-08 fix; an address inside user memory works, outside gives `?` | matches after the fix; the `D` suffix not tested |
+| `EXAMINE addr1, addr2` | one location, or a range | both forms work | matches |
+| `RESERVE device-name` | reserves; names TAPE-READER, FAST-PUNCH, SLOW-PUNCH, CARD-READER, LINE-PRINTER | `RESERVE TELETYPE` returns silently | matches; the 1973 list has SLOW-PUNCH and no TELETYPE |
+| `RELEASE device-name` | releases | returns silently | matches |
+| `WHERE-IS device-name` | says who has the device | silent for a free device; silent after `RESERVE` in the tests | differs: never reported a holder |
+| `CLOCK-OFF` | turns the clock off, SYSTEM only | returns; `DATE` unchanged right after | consistent |
+| `CLOCK-ON` | turns the clock on | returns | matches |
+| `LINK-TO user-name or TTY number` | joins two teletypes' output | linking to oneself prints `?` | error path only |
+| `BREAK-LINKS` | ends links | returns silently | matches |
+| `PASSWORD` | asks `OLD PASSWORD IS`, then `NEW PASSWORD IS` | behaved (headline) | matches |
+| `CLEAR-PASSWORD user-name` | clears a password, SYSTEM only | returns silently | matches |
+| `WHO-IS-ON` | lists users and their teletypes | ` 1   SYSTEM` (two lines with a second terminal logged in) | matches |
+| `INIT-ACCOUNTING` | initialises accounting, SYSTEM only | returns | matches |
+| `LIST-ACCOUNTS title-string` | lists the accounting file on the line printer | prompts `FILE NAME:` and `TITLE:`; no printer file appeared (open question 5) | differs: takes a file name, output not seen |
+| `PAUSE` | prints `PASSWORD IS`; the teletype is locked until the password is typed | prints `PASSWORD IS`; SYSTEM's empty password releases it | matches |
+| `CREATE-USER user-name` | adds a user with an empty directory and null password, SYSTEM only | `USER NUMBER = 2` once SYSTEM holds track quota | matches (PART III §5 for the error path) |
+| `DELETE-USER user-name` | deletes a user and the user's files | `TESTU` gone from `LIST-USERS` | matches |
+| `LIST-USERS` | lists authorised users | lists them | matches |
+| `TIME-USED` | compute and console time since log-on | `TIME USED IS ... OUT OF ...` | matches |
+| `RESPONSE-TIME` | average response time since start-up | `AVERAGE RESPONSE TIME IS ... OVER A PERIOD OF ...` | matches |
+| `DISK-SPACE` | file space left | `15 TRACKS (30K WORDS) LEFT OUT OF 4096 TRACKS` | matches |
+| `MODE input file, output file` | redirects command input and output, a form of batch | accepted `TELETYPE` for both | matches; a real file pair not tested |
+
+## X.3 Commands newer than the 1973 manual
+
+Thirteen of the 60 commands in TSS 3.0 are not in the February 1973 manual:
+`DATE`, `DEFINE-DATE`, `RBLOAD`, `SAVE-CORE`, `GET-CORE`, `PIN-DEVICE`,
+`LIST-TRACKS`, `TRANSFER`, `SYSUP`, `SYSDOWN`, `DEFINE-VERSION`,
+`LOAD-SYSTEM` and `BACKUP`. They were added between February 1973 and the
+archived build; their behaviour is recorded in PARTS II-IX and in
+[`TSS-USER-MANUAL.md`](TSS-USER-MANUAL.md).
+
+## X.4 What the manual has that the tests do not cover
+
+Chapter 6 lists subsystems run by name (through `RECOVER`): `QED`, `MAC`,
+`FTN4`, `FLDR`, `BASIC`, `DESCRIBE`, `COPY`, `PRINT-FILE`, `KRYSREF`,
+`MAIL`, `CHESS` and `BONDESJAKK`. None of them is on the rebuilt disc, so
+none was tested. Chapter 7 documents the monitor calls 0-72;
+[`TSS-AND-SINTRAN.md`](TSS-AND-SINTRAN.md) section 6.1 uses that list to date
+which calls TSS had first.
+
+## X.5 Summary
+
+Of the 47 commands in the 1973 manual: 31 match its description (some with
+a detail not tested), 3 are consistent with it but their main path was not
+exercised (`CONTINUE`, `LIST-OBJECTS`, `CLOCK-OFF`), 5 differ (`MEMORY` with
+no argument, `DELETE-MEMORY`, `PLACE-BINARY`, `WHERE-IS`, `LIST-ACCOUNTS`),
+and 8 were tested only on an error path or not in the form the manual
+describes. Every 1973 command name is unchanged in TSS 3.0.
+Together with the 13 later commands that makes the 60 of TSS 3.0.
+The differences are all argument handling or output; none contradicts what
+a command is for.

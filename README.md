@@ -224,25 +224,13 @@ Nothing in this repository contains an absolute path. Every path in a script,
 Makefile, config file, source comment or document is **relative to the
 repository root**, so a clone works on any machine, drive or OS.
 
-A few inputs genuinely live outside the repo — the original ND binaries,
-reference manuals, microcode and the emulator. Those are reached through
-environment variables. Set only the ones a given task needs:
+The emulator lives outside the repo. It is reached through an environment
+variable:
 
 | variable | points at | used by |
 |---|---|---|
 | `ND100X` or `ND` | the `nd100x` emulator **binary** | `Makefile` (bring-up targets), the probe scripts |
-| `ND100X_SRC` | the `nd100x` **source tree** | device-analysis docs |
-| `ND_BPUN_DIR` | directory holding `MAC.BPUN`, `MACM-*.BPUN`, `FMAC-*.BPUN` | `docs/MAC-ASSEMBLER.md` |
-| `NDINSIGHT` | the NDInsight reference-manual collection | the manual citations throughout `docs/` |
-| `ND110COMPILE` | the ND110Compile tree holding `uCode/` | the microcode citations in `docs/TSS-FLOAT-FORMAT.md` |
 
-Example:
-
-```bash
-export ND_BPUN_DIR=/path/to/ND/BPUN
-export NDINSIGHT=/path/to/NDInsight
-```
-
-Scripts that need one of these fail immediately with a message naming the
+Scripts that need it fail immediately with a message naming the
 variable, rather than silently searching a path that only exists on one
 machine.

@@ -7,7 +7,8 @@ wrong answers to get here and the reasoning is worth preserving. TSS 3.0 is a
 **48-bit** floating-point program, and its `TBANG` clock constants were in the
 2-word 32-bit format: **wrong when the system was built in 1973/78**, not
 wrong in this reconstruction. **Nothing in this document is a defect in `mac-c`.** Read
-§5 before changing any code because of it.
+§5 before changing any code because of it. **The frozen clock described in §2 is fixed in
+the `CLKFX` build (§8, 2026-10-08)**; the original, golden build still has it.
 
 ---
 
@@ -21,9 +22,9 @@ load-bearing in different routines.
 three words, on every machine generation from the NORD-10/S to the ND-120.
 The `TBANG` constants are simply wrong. Evidence in §4; consequences in §6.
 
-## 2. Why it matters: the clock is frozen
+## 2. Why it matters: the clock is frozen (in the as-found build; fixed by `CLKFX`, see §8)
 
-Under the 48-bit FPP — the only self-consistent option nd100x offers — `DATE`
+In the as-found build, under the 48-bit FPP — the only self-consistent option nd100x offers — `DATE`
 returns *exactly* the value last set by the login prompt or `DEFINE-DATE` and
 never advances. Measured 2026-07-28: `KLOK` advanced 6736 ticks over 134
 seconds while `DATE` still read `1200:00`. Elapsed-time counters

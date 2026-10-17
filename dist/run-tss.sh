@@ -9,7 +9,7 @@ cd "$(dirname "$0")"
 
 ND=${1:-${ND100X:-$(command -v nd100x || true)}}
 if [ -z "$ND" ] || [ ! -x "$ND" ]; then
-    echo "nd100x not found. Build it from https://github.com/HackerCorpLabs/nd100x" >&2
+    echo "nd100x not found. Build it from https://github.com/RetroCoreLabs/nd100x" >&2
     echo "then: ./run-tss.sh /path/to/nd100x   (or set ND100X)" >&2
     exit 1
 fi

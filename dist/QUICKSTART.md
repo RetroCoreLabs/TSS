@@ -25,7 +25,7 @@ running system writes to it.
 TSS needs the **nd100x** ND-100 emulator, which is a separate project:
 
 ```bash
-git clone https://github.com/HackerCorpLabs/nd100x.git
+git clone https://github.com/RetroCoreLabs/nd100x.git
 cd nd100x
 sudo apt install build-essential cmake libcjson-dev   # Debian/Ubuntu
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
@@ -171,4 +171,4 @@ command against a running machine.
 ## More
 
 Source, documentation and the full command-validation record:
-https://github.com/HackerCorpLabs/TSS
+https://github.com/RetroCoreLabs/TSS

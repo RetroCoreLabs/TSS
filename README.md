@@ -84,7 +84,7 @@ The documentation:
 | [`docs/TSS-USER-MANUAL.md`](docs/TSS-USER-MANUAL.md) | **user manual** — logging in, the command processor, and all 60 `@`-prompt commands, with the error-message table and device list |
 | [`docs/TSS-COMMAND-VALIDATION.md`](docs/TSS-COMMAND-VALIDATION.md) | **what actually happens when you run it** — every one of the 60 commands exercised against the emulator, verbatim transcripts, root causes, and the corrections they forced on the manual |
 | [`docs/OPEN-QUESTIONS.md`](docs/OPEN-QUESTIONS.md) | **the live list** of what is still unanswered, and what would settle each item |
-| [`docs/TSS-FLOAT-FORMAT.md`](docs/TSS-FLOAT-FORMAT.md) | why the clock cannot advance: TSS is a 48-bit floating-point program whose `TBANG` constants were assembled in the 32-bit format — a defect in the 1978 original, not in this rebuild |
+| [`docs/TSS-FLOAT-FORMAT.md`](docs/TSS-FLOAT-FORMAT.md) | why the clock stood still: TSS is a 48-bit floating-point program whose `TBANG` constants were assembled in the 32-bit format — a defect in the 1978 original, not in this rebuild. The `CLKFX` build fixes it (2026-10-08) |
 
 This repository holds the recovered source, the original build outputs, and
 a C reimplementation of the MAC assembler that rebuilds the system. The
@@ -143,10 +143,11 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j
 ```
 
-> **`--mms=1` is required and cannot go in the config file.** TSS is 1973 code
-> that programs the MMU the Paging-System-I way; under nd100x's default MMS2
-> the machine starts and then hangs in the overlay loader. `run-tss.sh` passes
-> the flag for you.
+> **TSS needs `--mms=1`.** TSS is 1973 code that programs the MMU the
+> Paging-System-I way; under nd100x's default MMS2 the machine starts and then
+> hangs in the overlay loader. Give nd100x the flag, or put `mms = 1` under
+> `[machine]` in the config file (nd100x 1.0.15 and later; the release's
+> `tss.cfg` already does). `run-tss.sh` passes the flag as well, for older builds.
 
 ### B. Build it from source
 
@@ -234,3 +235,16 @@ variable:
 Scripts that need it fail immediately with a message naming the
 variable, rather than silently searching a path that only exists on one
 machine.
+
+## Provenance and rights
+
+- **The 1973-1978 material is Norsk Data's, not mine.** The source, tapes, listings, manuals and
+  binaries (`archive/`, `src/`, `reference/`, `Build/`, `derived/`, `dist/`) are kept here to
+  preserve them. This repository does not relicense them and claims no rights in them.
+- **Norsk Data no longer operates, and I do not know who holds the rights today.** If you hold
+  them and want something taken down, open an issue in this repository and it will be removed.
+- **My own work is MIT licensed:** the MAC assembler in C (`mac-c/`), the documents, and the
+  build and test scripts. See [LICENSE](LICENSE).
+- **What this repository does not state:** it does not say which tape or archive the original
+  files came from. The history of the files is in
+  [`docs/PROJECT-DESCRIPTION.md`](docs/PROJECT-DESCRIPTION.md).

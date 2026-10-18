@@ -13,6 +13,10 @@ repo_name: RetroCoreLabs/TSS
 edit_uri: ""
 theme:
   name: material
+  # The header add-on (the RetroCore Labs logo): the folder is read relative to build-site/.
+  custom_dir: ../docs-site/overrides
+  icon:
+    repo: fontawesome/brands/github
   palette:
     - media: "(prefers-color-scheme)"
       toggle: {icon: material/brightness-auto, name: Switch to light mode}
